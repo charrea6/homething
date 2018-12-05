@@ -1,0 +1,44 @@
+menu "IOT Configuration"
+
+config WIFI_SSID
+    string "WiFi SSID"
+    default "myssid"
+    help
+        SSID (network name) for the example to connect to.
+
+config WIFI_PASSWORD
+    string "WiFi Password"
+    default "mypassword"
+    help
+        WiFi password (WPA or WPA2) for the example to use.
+
+        Can be left blank if the network has no security set.
+
+config MQTT_HOST
+    string "MQTT Server"
+    help
+        Hostname/IP address of the MQTT server to connect to.
+
+config MQTT_PORT
+    int "MQTT Port"
+    range 1 65536
+    default 1883
+    help
+        Port to connect to on the MQTT server.
+
+config MQTT_USERNAME
+    string "MQTT Username"
+    help
+        Username used to connect to the MQTT server or blank if not required
+
+config MQTT_PASSWORD
+    string "MQTT Password"
+    help
+        Password used to connect to the MQTT server or blank if not required    
+
+config MQTT_CLIENT_ID
+    string "MQTT Client Id"
+    default "ESP8266Example"
+    help
+        Identifier used when connecting to the MQTT server.
+endmenu

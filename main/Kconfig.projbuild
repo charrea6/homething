@@ -1,0 +1,16 @@
+menu "Switch Configuration"
+
+config ROOM
+    string "Room name"
+    default "home/myroom"
+    help
+        Name of the room as will be used in MQTT topics
+
+config FAN
+    bool "Enable Fan"
+
+config RELAY_ON_HIGH
+    bool "Relay switches on high signal?"
+    
+
+endmenu
