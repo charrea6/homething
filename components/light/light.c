@@ -7,7 +7,7 @@ static void lightControl(Light_t *light, iotElementSub_t *sub, iotValue_t value)
 
 static int lightCount = 0;
 
-void lightInit(Light_t *light, int pin)
+void lightInit(Light_t *light, int8_t pin)
 {
     iotValue_t initial;
     sprintf(light->name, "light%d", lightCount);
