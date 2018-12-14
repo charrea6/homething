@@ -10,7 +10,7 @@ typedef union {
     int i;
     float f;
     bool b;
-    char *s;
+    const char *s;
 } iotValue_t;
 
 enum iotValueType_e {

@@ -19,15 +19,22 @@
 #include "switch.h"
 #include "iot.h"
 #include "dht.h"
+#include "motion.h"
 
 static Light_t light0;
 static DHT22Sensor_t thSensor;
+static Motion_t motion0;
 
 static void temperature(void *userData, int16_t tenthsUnit)
 {
     printf("Temperature: %d.%d\n", tenthsUnit / 10, tenthsUnit % 10);
 }
 
+static void lightSwitchCallback(void *userData, int state)
+{
+    Light_t *light = userData;
+    lightToggle(light);
+}
 
 void app_main(void)
 {
@@ -37,10 +44,12 @@ void app_main(void)
 
     lightInit(&light0, 14);
     dht22Init(&thSensor, 5);
+    motionInit(&motion0, 13);
+
     dht22AddTemperatureCallback(&thSensor, temperature, NULL);
-    switchAdd(4, (SwitchCallback_t)lightToggle, &light0);
+    
+    switchAdd(4, lightSwitchCallback, &light0);
     switchStart();
     iotStart();
-
     dht22Start(&thSensor);
 }

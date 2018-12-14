@@ -192,7 +192,7 @@ static void iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub,
         sprintf(payload, "%f", pub->value.f);
         break;
         case iotValueType_String:
-        message.payload = pub->value.s;
+        message.payload = (char*)pub->value.s;
         break;
     }
     message.payloadlen = strlen((char*)message.payload);
