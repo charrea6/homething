@@ -62,7 +62,7 @@ static void switchThread(void* pvParameters)
             new_state = gpio_get_level(switches[i].pin);
             if (new_state != switches[i].state) 
             {
-                switches[i].cb(switches[i].userData);
+                switches[i].cb(switches[i].userData, new_state);
                 switches[i].state = new_state;
             }
         }
