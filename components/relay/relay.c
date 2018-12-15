@@ -16,7 +16,7 @@ void relayInit(int8_t pin, Relay_t *relay)
     relaySetState(relay, RelayState_Off);
 }
 
-void relaySetState(Relay_t *relay, RelayState state)
+void relaySetState(Relay_t *relay, RelayState_t state)
 {
     int l;
 #ifdef CONFIG_RELAY_ON_HIGH

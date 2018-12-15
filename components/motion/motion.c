@@ -23,6 +23,6 @@ void motionInit(Motion_t *motion, int pin)
     motionCount++;
     iotElementAdd(motion->name, &motion->element);
     initialValue.s = motionStopped;
-    iotElementPubAdd(motion->element, "state", iotValueType_String, initialValue, &motion->pub);
+    iotElementPubAdd(motion->element, "", iotValueType_String, initialValue, &motion->pub);
     switchAdd(pin, motionCallback, motion);
 }

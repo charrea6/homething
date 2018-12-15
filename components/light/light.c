@@ -17,7 +17,7 @@ void lightInit(Light_t *light, int8_t pin)
     iotElementAdd(light->name, &light->element);
     initial.b = light->relay.state == RelayState_On ? true:false;
     iotElementPubAdd(light->element, "state", iotValueType_Bool, initial, &light->state);
-    iotElememtSubAdd(light->element, "ctrl", iotValueType_Bool, (iotElementSubUpdateCallback_t)lightControl, light, &light->control);
+    iotElementSubAdd(light->element, "ctrl", iotValueType_Bool, (iotElementSubUpdateCallback_t)lightControl, light, &light->control);
 }
 
 void lightToggle(Light_t *light)
@@ -25,7 +25,7 @@ void lightToggle(Light_t *light)
     lightSetState(light, light->relay.state ==RelayState_Off ? RelayState_On:RelayState_Off);
 }
 
-void lightSetState(Light_t *light, RelayState state)
+void lightSetState(Light_t *light, RelayState_t state)
 {
     if (light->relay.state != state)
     {

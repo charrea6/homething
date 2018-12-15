@@ -14,6 +14,7 @@
 #include "MQTTClient.h"
 
 #include "iot.h"
+#include "sdkconfig.h"
 
 static const char *TAG="IOT";
 
@@ -74,7 +75,7 @@ void iotElementAdd(const char *name, iotElement_t **ppElement)
     ESP_LOGI(TAG, "Added element \"%s\"", name);
 }
 
-void iotElememtSubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, iotElementSubUpdateCallback_t callback, void *userData, iotElementSub_t **ppSub)
+void iotElementSubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, iotElementSubUpdateCallback_t callback, void *userData, iotElementSub_t **ppSub)
 {
     iotElementSub_t *sub = NULL;
     int i;
@@ -173,7 +174,15 @@ static void iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub,
     char payload[30] = "";
     int rc;
 
-    sprintf(path, "%s/%s/%s", mqttPathPrefix, element->name, pub->name);
+    if (pub->name[0] == 0)
+    {
+        sprintf(path, "%s/%s", mqttPathPrefix, element->name);
+    }
+    else
+    {
+        sprintf(path, "%s/%s/%s", mqttPathPrefix, element->name, pub->name);
+    }
+    
 
     message.qos = QOS0;
     message.retained = 0;
