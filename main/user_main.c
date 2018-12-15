@@ -20,10 +20,12 @@
 #include "iot.h"
 #include "dht.h"
 #include "motion.h"
+#include "humidityfan.h"
 
 static Light_t light0;
 static DHT22Sensor_t thSensor;
 static Motion_t motion0;
+static HumidityFan_t fan0;
 
 static void temperature(void *userData, int16_t tenthsUnit)
 {
@@ -45,8 +47,10 @@ void app_main(void)
     lightInit(&light0, 14);
     dht22Init(&thSensor, 5);
     motionInit(&motion0, 13);
+    humidityFanInit(&fan0, 14, 75);
 
     dht22AddTemperatureCallback(&thSensor, temperature, NULL);
+    dht22AddHumidityCallback(&thSensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan0);
     
     switchAdd(4, lightSwitchCallback, &light0);
     switchStart();

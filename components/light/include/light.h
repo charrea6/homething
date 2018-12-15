@@ -15,6 +15,6 @@ typedef struct {
 
 void lightInit(Light_t *light, int8_t pin);
 void lightToggle(Light_t *light);
-void lightSetState(Light_t *light, RelayState state);
+void lightSetState(Light_t *light, RelayState_t state);
 void lightSendUpdate(Light_t *light, MQTTClient *client, const char *topic);
 #endif

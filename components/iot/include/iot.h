@@ -50,7 +50,7 @@ void iotInit(const char *roomPath);
 void iotStart();
 
 void iotElementAdd(const char *name, iotElement_t **ppElement);
-void iotElememtSubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, iotElementSubUpdateCallback_t callback, void *userData, iotElementSub_t **ppSub);
+void iotElementSubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, iotElementSubUpdateCallback_t callback, void *userData, iotElementSub_t **ppSub);
 void iotElementPubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, iotValue_t initial, iotElementPub_t **ppPub);
 void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value);
 
