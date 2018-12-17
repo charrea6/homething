@@ -456,36 +456,39 @@ static void mqttClientThread(void* pvParameters)
         connectData.password.cstring = CONFIG_MQTT_PASSWORD;
 #endif
 
-        if ((rc = MQTTConnect(&client, &connectData)) != 0) {
+        if ((rc = MQTTConnect(&client, &connectData)) != 0) 
+        {
             ESP_LOGE(TAG, "Return code from MQTT connect is %d", rc);
-        } else {
-            ESP_LOGI(TAG, "MQTT Connected");
-        }
+        } 
+        else 
+        {
+            ESP_LOGI(TAG, "MQTT Connected");        
 
-        for (e=0;e<elementCount; e++)
-        {
-            iotElementSubscribe(&elements[e], &client);
-            iotElementSendUpdate(&elements[e], true, &client);
-        }
-        loop = true;
-        while(loop)
-        {
             for (e=0;e<elementCount; e++)
             {
-                iotElementSendUpdate(&elements[e], false, &client);
+                iotElementSubscribe(&elements[e], &client);
+                iotElementSendUpdate(&elements[e], true, &client);
             }
-#if defined(MQTT_TASK)
-            MutexLock(&client.mutex);
-#endif
-            if (MQTTYield(&client, 100) < 0)
+            loop = true;
+            while(loop)
             {
-                loop = false;
-            }
+                for (e=0;e<elementCount; e++)
+                {
+                    iotElementSendUpdate(&elements[e], false, &client);
+                }
 #if defined(MQTT_TASK)
-            MutexUnlock(&client.mutex);
+                MutexLock(&client.mutex);
 #endif
-        }
+                if (MQTTYield(&client, 100) < 0)
+                {
+                    loop = false;
+                }
+#if defined(MQTT_TASK)
+                MutexUnlock(&client.mutex);
+#endif
+            }
+        }       
         ESP_LOGW(TAG, "Lost connection to MQTT Server");
-        network.disconnect(&network);       
+        network.disconnect(&network);
     }
 }
