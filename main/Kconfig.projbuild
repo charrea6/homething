@@ -1,4 +1,4 @@
-menu "Switch Configuration"
+menu "Thing Configuration"
 
 config ROOM
     string "Room name"
@@ -6,11 +6,31 @@ config ROOM
     help
         Name of the room as will be used in MQTT topics
 
+config DHT22
+    bool "Enable DHT22"
+
 config FAN
     bool "Enable Fan"
 
-config RELAY_ON_HIGH
-    bool "Relay switches on high signal?"
-    
+choice LIGHTS
+    prompt "Number of lights to support"
+    default LIGHTS_NONE
+
+config LIGHTS_NONE
+    bool "No lights"
+
+config LIGHTS_1
+    bool "1 light"
+
+config LIGHTS_2
+    bool "2 light"
+
+config LIGHTS_3
+    bool "3 lights"
+
+endchoice
+
+config MOTION
+    bool "Enable Motion detection"
 
 endmenu
