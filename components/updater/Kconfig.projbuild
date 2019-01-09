@@ -1,0 +1,24 @@
+menu "Updater Configuration"
+
+config UPDATER_HOST
+    string "Updater Server"
+    help
+        Hostname/IP address of the Updater server to connect to.
+
+config UPDATER_PORT
+    int "Updater Port"
+    range 1 65536
+    default 80
+    help
+        Port to connect to on the Updater server.    
+
+config UPDATER_PATH_PREFIX
+    string "Path Prefix"
+    help
+        Path prefix to access the update images. 
+        The prefix will be combined with the room name and the version to 
+        update to and then either the a or b image depending on what 
+        partition will be used for the new image:
+        
+        <prefix>/<room>/<update version>/<a|b image>
+endmenu

@@ -16,7 +16,7 @@ void lightInit(Light_t *light, int8_t pin)
     relayInit(pin, &light->relay);
     iotElementAdd(light->name, &light->element);
     initial.b = light->relay.state == RelayState_On ? true:false;
-    iotElementPubAdd(light->element, "state", iotValueType_Bool, initial, &light->state);
+    iotElementPubAdd(light->element, "state", iotValueType_Bool, true, initial, &light->state);
     iotElementSubAdd(light->element, "ctrl", iotValueType_Bool, (iotElementSubUpdateCallback_t)lightControl, light, &light->control);
 }
 
