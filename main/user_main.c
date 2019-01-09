@@ -21,6 +21,7 @@
 #include "dht.h"
 #include "motion.h"
 #include "humidityfan.h"
+#include "updater.h"
 
 //
 // Lights
@@ -101,7 +102,7 @@ void app_main(void)
     sprintf(temperatureStr, "0.0");
     value.s = temperatureStr;
     iotElementAdd("temperature", &temperatureElement);
-    iotElementPubAdd(temperatureElement, "", iotValueType_String, value, &temperaturePub);
+    iotElementPubAdd(temperatureElement, "", iotValueType_String, false, value, &temperaturePub);
     dht22AddTemperatureCallback(&thSensor, temperatureUpdate, NULL);
 #if defined(CONFIG_FAN)
     humidityFanInit(&fan0, 12, 75);
@@ -113,5 +114,6 @@ void app_main(void)
 #if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_MOTION)
     switchStart();
 #endif
+    updaterInit();
     iotStart();
 }

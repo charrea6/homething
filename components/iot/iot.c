@@ -111,7 +111,7 @@ void iotElementSubAdd(iotElement_t *element, const char *name, enum iotValueType
     ESP_LOGI(TAG, "Added sub \"%s\" to element \"%s\"", name, element->name);
 }
 
-void iotElementPubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, iotValue_t initial, iotElementPub_t **ppPub)
+void iotElementPubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, bool retain, iotValue_t initial, iotElementPub_t **ppPub)
 {
     iotElementPub_t *pub = NULL;
     int i;
@@ -132,6 +132,7 @@ void iotElementPubAdd(iotElement_t *element, const char *name, enum iotValueType
     }
     pub->name = name;
     pub->type = type;
+    pub->retain = retain;
     pub->value = initial;
     pub->updateRequired = false;
     ESP_LOGI(TAG, "Added pub \"%s\" to element \"%s\"", name, element->name);
@@ -185,7 +186,7 @@ static void iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub,
     
 
     message.qos = QOS0;
-    message.retained = 0;
+    message.retained = pub->retain?1:0;
     
     switch(pub->type)
     {

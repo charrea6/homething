@@ -24,13 +24,13 @@ void humidityFanInit(HumidityFan_t *fan, int relayPin, int threshold)
 
     iotElementAdd(fan->name, &fan->element);
     value.b = false;
-    iotElementPubAdd(fan->element, "state", iotValueType_Bool, value, &fan->statePub);
+    iotElementPubAdd(fan->element, "state", iotValueType_Bool, true, value, &fan->statePub);
     
     value.s = fan->humidity;
-    iotElementPubAdd(fan->element, "humidity", iotValueType_String, value, &fan->humidityPub);
+    iotElementPubAdd(fan->element, "humidity", iotValueType_String, false, value, &fan->humidityPub);
     
     value.i = fan->threshold;
-    iotElementPubAdd(fan->element, "threshold", iotValueType_Int, value, &fan->thresholdPub);
+    iotElementPubAdd(fan->element, "threshold", iotValueType_Int, true, value, &fan->thresholdPub);
 
     iotElementSubAdd(fan->element, "ctrl", iotValueType_Bool, humidityFanCtrl, fan, &fan->ctrl);
     iotElementSubAdd(fan->element, "thresholdSet", iotValueType_Int, humidityFanThresholdSet, fan, &fan->thresholdSub);
