@@ -19,16 +19,11 @@
 
 #include "version.h"
 
-#define BUFFSIZE 1500
-#define TEXT_BUFFSIZE 1024
-
 #define MAX_VERSION_LEN 31
 
 #define UPDATER_THREAD_NAME "updater"
 #define UPDATER_THREAD_PRIO 7
 #define UPDATER_THREAD_STACK_WORDS 8192
-
-#define updateStatusf(fmt...) snprintf(statusBuffer, sizeof(statusBuffer), fmt); updateStatus(statusBuffer)
 
 static const char TAG[]="Updater";
 const int UPDATE_BIT = BIT0;
@@ -42,52 +37,11 @@ static EventGroupHandle_t updateEventGroup;
 
 static char newVersion[MAX_VERSION_LEN + 1];
 
-static char statusBuffer[64];
-
-
-static int connectToServer(char *host, int port)
-{
-    struct sockaddr_in sAddr;
-    int mySocket = -1;
-    struct hostent* entry;
-    
-    entry = gethostbyname(host);
-    if (entry != NULL) 
-    {
-        sAddr.sin_family = AF_INET;
-        sAddr.sin_addr.s_addr = ((struct in_addr*)(entry->h_addr))->s_addr;
-        sAddr.sin_port = htons(port);
-
-        mySocket = socket(AF_INET, SOCK_STREAM, 0);
-        if (mySocket >= 0) 
-        {
-            if (connect(mySocket, (struct sockaddr*)&sAddr, sizeof(sAddr)) == 0)
-            {
-                return mySocket;
-            }
-            else
-            {
-                close(mySocket);
-            }
-        }
-    }
-    return -1;
-}
-
-static void updateStatus(char *status)
-{
-    iotValue_t value;
-    value.s = status;
-    iotElementPubUpdate(statusPub, value);
-}
+char updaterStatusBuffer[UPDATER_STATUS_BUFFER_SIZE];
+static char updatePath[256];
 
 static void updaterThread(void *pvParameter)
 {
-    esp_err_t err;
-    /* update handle : set by esp_ota_begin(), must be freed via esp_ota_end() */
-    esp_ota_handle_t update_handle = 0 ;
-    const esp_partition_t *update_partition = NULL;
-
     ESP_LOGI(TAG, "Starting OTA : flash %s", CONFIG_ESPTOOLPY_FLASHSIZE);
 
     const esp_partition_t *configured = esp_ota_get_boot_partition();
@@ -100,14 +54,16 @@ static void updaterThread(void *pvParameter)
     }
     ESP_LOGI(TAG, "Running partition type %d subtype %d (offset 0x%08x)",
              running->type, running->subtype, running->address);
-
+    
+    updaterUpdateStatus("Waiting for update");
     while(true)
-    {
-        updateStatus("Waiting for update");
+    {    
         xEventGroupWaitBits(updateEventGroup, UPDATE_BIT, false, true, portMAX_DELAY);
         xEventGroupClearBits(updateEventGroup, UPDATE_BIT);
-        updateStatusf("Updating to %s", newVersion);
-
+        updaterUpdateStatusf("Updating to %s", newVersion);
+        snprintf(updatePath, sizeof(updatePath),"%s/%s/%s/ota%d", CONFIG_UPDATER_PATH_PREFIX, CONFIG_ROOM, newVersion, 
+            running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 ? 1:0);
+        updaterUpdate(CONFIG_UPDATER_HOST, CONFIG_UPDATER_PORT, updatePath);
     }
 }
 
@@ -121,7 +77,7 @@ static void updateVersion(void *userData, struct iotElementSub *sub, iotValue_t 
     }
     else
     {
-        updateStatus("Failed : Version too long");
+        updaterUpdateStatus("Failed : Version too long");
     }
 }
 
@@ -143,4 +99,11 @@ void updaterInit(void)
                 NULL,
                 UPDATER_THREAD_PRIO,
                 NULL);
+}
+
+void updaterUpdateStatus(char *status)
+{
+    iotValue_t value;
+    value.s = status;
+    iotElementPubUpdate(statusPub, value);
 }

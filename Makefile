@@ -15,5 +15,10 @@ version:
 
 all: version
 
+APP_OTA=$(APP_BIN:.bin=.ota)
+
+app-ota:$(APP_BIN)
+	$(PYTHON) main/ota.py $(APP_BIN) $(APP_OTA)
+
 include $(IDF_PATH)/make/project.mk
 
