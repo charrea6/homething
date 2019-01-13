@@ -24,6 +24,7 @@ static const char TAG[]="Updater";
 #define MAX_HASH_LENGTH 16
 
 static struct Header{
+    char sig[4];
     size_t binLen;
     char digest[MAX_HASH_LENGTH];
 } updateHeader;
@@ -133,6 +134,14 @@ static int onBody(http_parser* parser, const char *at, size_t length)
         at += toCopy;
         length -= toCopy;
         updaterUpdateStatusf("Downloading Header: %d/%d", updateHeaderBytes, sizeof(struct Header));
+        if (updateHeaderBytes == sizeof(struct Header))
+        {
+            if (memcmp(updateHeader.sig, "OTA\0", 4) != 0)
+            {
+                updaterUpdateStatus("Failed: Invalid OTA signature");
+                return -1;
+            }
+        }
     }
     
     if(updateHeaderBytes == sizeof(struct Header))
@@ -206,12 +215,9 @@ void updaterUpdate(char *host, int port, char *path)
             goto exit;
         }
         http_parser_execute(&parser, &parserSettings, recvBuffer, len);
-        switch (parser.http_errno )
+        if (parser.http_errno != HPE_OK)
         {
-            case HPE_OK: break;
-            case HPE_CB_body: done = true; break;
-            default:
-                goto exit;
+            goto exit;
         }
     }
     close(sock);
