@@ -8,6 +8,7 @@ if len(sys.argv) != 3:
 
 with open(sys.argv[1]) as inf:  
     with open(sys.argv[2], 'w') as outf:
+        outf.write('OTA\0')
         outf.write('\0' * 20)
         m = hashlib.md5()
         in_len = 0
@@ -18,6 +19,8 @@ with open(sys.argv[1]) as inf:
             in_len += len(data)
             m.update(data)
             outf.write(data)
-        outf.seek(0)
-        data = struct.pack('<l', in_len)
-        data += m.digest()
+        
+        outf.seek(4)
+        outf.write(struct.pack('<l', in_len))
+        outf.write(m.digest())
+        
