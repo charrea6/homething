@@ -61,8 +61,7 @@ static void updaterThread(void *pvParameter)
         xEventGroupWaitBits(updateEventGroup, UPDATE_BIT, false, true, portMAX_DELAY);
         xEventGroupClearBits(updateEventGroup, UPDATE_BIT);
         updaterUpdateStatusf("Updating to %s", newVersion);
-        snprintf(updatePath, sizeof(updatePath),"%s/%s/%s/ota%d", CONFIG_UPDATER_PATH_PREFIX, CONFIG_ROOM, newVersion, 
-            running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 ? 1:0);
+        snprintf(updatePath, sizeof(updatePath),"%s/%s/%s.ota", CONFIG_UPDATER_PATH_PREFIX, CONFIG_ROOM, newVersion);
         updaterUpdate(CONFIG_UPDATER_HOST, CONFIG_UPDATER_PORT, updatePath);
     }
 }
@@ -84,7 +83,7 @@ static void updateVersion(void *userData, struct iotElementSub *sub, iotValue_t 
 void updaterInit(void)
 {
     iotValue_t value;
-    ESP_LOGI(TAG, "Updater initialised");
+    ESP_LOGI(TAG, "Updater initialised, Version %s", appVersion);
     iotElementAdd("sw", &updaterElement);
     value.s = appVersion;
     iotElementPubAdd(updaterElement, "version", iotValueType_String, true, value, &versionPub);
