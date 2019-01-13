@@ -111,6 +111,17 @@ static int onMessageComplete(http_parser* parser)
     return 0;
 }
 
+static int onStatus(http_parser* parser, const char *at, size_t length)
+{
+    if (parser->status_code != HTTP_STATUS_OK)
+        {
+            ESP_LOGW(TAG, "Download failed %d", parser->status_code);
+            updaterUpdateStatusf("Download failed with error code %d", parser->status_code);
+            return -1;
+        }
+    return 0;
+}
+
 static int onBody(http_parser* parser, const char *at, size_t length)
 {
     int r = 0;
@@ -175,6 +186,7 @@ void updaterUpdate(char *host, int port, char *path)
     if (sock == -1)
     {
         updaterUpdateStatus("Failed to connect to update host");
+        esp_ota_end(updateHandle);
         return;
     }
     ESP_LOGI(TAG, "Connected to update host");
@@ -183,6 +195,7 @@ void updaterUpdate(char *host, int port, char *path)
     parser.data = &done;
     http_parser_settings_init(&parserSettings);
     parserSettings.on_body = onBody;
+    parserSettings.on_status = onStatus;
     parserSettings.on_message_complete = onMessageComplete;
 
     while (!done)
@@ -201,13 +214,14 @@ void updaterUpdate(char *host, int port, char *path)
                 goto exit;
         }
     }
+    close(sock);
 
     err = esp_ota_end(updateHandle);
     if (err != ESP_OK) 
     {
         ESP_LOGE(TAG, "esp_ota_end failed! err=0x%x", err);
         updaterUpdateStatus("Failed: esp_ota_end");
-        goto exit;
+        return;
     }
 
     mbedtls_md5_finish_ret(&updateDigest, digest);
@@ -215,7 +229,7 @@ void updaterUpdate(char *host, int port, char *path)
     {
         ESP_LOGE(TAG, "esp_ota_end failed! err=0x%x", err);
         updaterUpdateStatus("Failed: digests don't match");
-        goto exit;
+        return;
     }
 
     err = esp_ota_set_boot_partition(updatePartition);
@@ -223,13 +237,15 @@ void updaterUpdate(char *host, int port, char *path)
     {
         ESP_LOGE(TAG, "esp_ota_set_boot_partition failed! err=0x%x", err);
         updaterUpdateStatus("Failed: esp_ota_set_boot_partition");
-        goto exit;
+        return;
     }
 
     updaterUpdateStatus("Update successful, restarting in 1 second");
     vTaskDelay(1000 / portTICK_RATE_MS);
     ESP_LOGI(TAG, "Prepare to restart system!");
     esp_restart();
+
 exit:
+    esp_ota_end(updateHandle);
     close(sock);    
 }
