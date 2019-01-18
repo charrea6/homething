@@ -3,13 +3,15 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := mqtt_switch
+PROJECT_NAME := homething
+
 
 VER:=$(shell git describe --dirty)
 
 version:
 	echo "Creating version.h..."
 	echo "char appVersion[]=\"$(VER)\";" > components/updater/version.h
+	echo "char deviceProfile[]=\"$(DEVICE_PROFILE)\";" >> components/updater/version.h
 
 .phony: version
 
@@ -22,3 +24,30 @@ app-ota:$(APP_BIN)
 
 include $(IDF_PATH)/make/project.mk
 
+PROFILE:=
+ifeq ($(CONFIG_LIGHTS_1), y)
+PROFILE += L
+endif
+ifeq ($(CONFIG_LIGHTS_2), y)
+PROFILE += LL
+endif
+ifeq ($(CONFIG_LIGHTS_3), y)
+PROFILE += LLL
+endif
+
+ifeq ($(CONFIG_DHT22), y)
+PROFILE += T
+ifeq ($(CONFIG_FAN), y)
+PROFILE += F
+endif
+endif
+
+ifeq ($(CONFIG_DOORBELL), y)
+PROFILE += B
+endif
+
+ifeq ($(CONFIG_MOTION), y)
+PROFILE += M
+endif
+
+DEVICE_PROFILE=$(shell  echo $(PROFILE) | sed 's/ //g')

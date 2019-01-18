@@ -40,7 +40,6 @@ static char newVersion[MAX_VERSION_LEN + 1];
 
 char updaterStatusBuffer[UPDATER_STATUS_BUFFER_SIZE];
 static char updatePath[256];
-static char *deviceProfile;
 
 static void updaterThread(void *pvParameter)
 {
@@ -82,19 +81,18 @@ static void updateVersion(void *userData, struct iotElementSub *sub, iotValue_t 
     }
 }
 
-void updaterInit(char *profile)
+void updaterInit()
 {
     iotValue_t value;
-    ESP_LOGI(TAG, "Updater initialised, Version: %s Profile: %s", appVersion, profile);
-    deviceProfile = profile;
+    ESP_LOGI(TAG, "Updater initialised, Version: %s Profile: %s", appVersion, deviceProfile);
     iotElementAdd("sw", &updaterElement);
     value.s = appVersion;
     iotElementPubAdd(updaterElement, "version", iotValueType_String, true, value, &versionPub);
     value.s = "";
     iotElementPubAdd(updaterElement, "status", iotValueType_String, true, value, &statusPub);
-    value.s = profile;
+    value.s = deviceProfile;
     iotElementPubAdd(updaterElement, "profile", iotValueType_String, true, value, &profilePub);
-    
+
     iotElementSubAdd(updaterElement, "update", iotValueType_String, updateVersion, NULL, &updateSub);
     
     updateEventGroup = xEventGroupCreate();

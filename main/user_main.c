@@ -62,8 +62,6 @@ GPIO16(D0) - possibly tied to RST to allow exit from deep sleep by pulling GPIO1
 
 */
 
-static char profile[12];
-
 //
 // Lights
 // 
@@ -124,8 +122,6 @@ static void setupLight(Light_t *light, int switchPin, int relayPin)
 
 void app_main(void)
 {
-    int profileIdx = 0;
-#define PROFILE_ADD(letter) profile[profileIdx++] = (letter)
     struct timeval tv = {.tv_sec = 0, .tv_usec=0};
 
     ESP_ERROR_CHECK( nvs_flash_init() );
@@ -135,33 +131,26 @@ void app_main(void)
     iotInit();
 
 #ifdef ENABLE_LIGHT_1
-    PROFILE_ADD('L');
     setupLight(&light0, 12, 0);
 #endif
 #ifdef ENABLE_LIGHT_2
-    PROFILE_ADD('L');
     setupLight(&light1, 2, 5);
 #endif
 #ifdef ENABLE_LIGHT_3
-    PROFILE_ADD('L');
     setupLight(&light2, 15, 16);
 #endif
 
 #if defined(CONFIG_MOTION)   
-    PROFILE_ADD('M'); 
     motionInit(&motion0, 13);
 #endif
 
 #if defined(CONFIG_DOORBELL)
-    PROFILE_ADD('B');
     doorbellInit(5);
 #endif
 
 #if defined(CONFIG_DHT22) 
     iotValue_t value;
     
-    PROFILE_ADD('T');
-
     dht22Init(&thSensor, 4);
     sprintf(temperatureStr, "0.0");
     value.s = temperatureStr;
@@ -169,7 +158,6 @@ void app_main(void)
     iotElementPubAdd(temperatureElement, "", iotValueType_String, false, value, &temperaturePub);
     dht22AddTemperatureCallback(&thSensor, temperatureUpdate, NULL);
 #if defined(CONFIG_FAN)
-    PROFILE_ADD('F');
     humidityFanInit(&fan0, 14, 75);
     dht22AddHumidityCallback(&thSensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan0);
 #endif
@@ -179,7 +167,6 @@ void app_main(void)
 #if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_MOTION)
     switchStart();
 #endif
-    profile[profileIdx] = 0;
-    updaterInit(profile);
+    updaterInit();
     iotStart();
 }
