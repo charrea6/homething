@@ -24,28 +24,44 @@ static const char *TAG="IOT";
 
 #define MAX_TOPIC_NAME 512
 
+#define DEVICE_ELEMENT 0
+#define IP_PUB 0
+#define UPTIME_PUB 1
+
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t wifi_event_group;
-
-/* The event group allows multiple bits for each event,
-   but we only care about one event - are we connected
-   to the AP with an IP? */
+/* Event Group bits */
 const int CONNECTED_BIT = BIT0;
 const int MQTT_UPDATE_BIT = BIT1;
 
-static const char *mqttPathPrefix;
-
 static int elementCount = 0;
 static iotElement_t elements[IOT_MAX_ELEMENT] = {0};
+
+static char mqttPathPrefix[23]; // homething/<MAC 12 Hexchars> \0
+static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 
 static void mqttClientThread(void* pvParameters);
 static void mqttMessageArrived(MessageData *data);
 static void wifiInitialise(void);
 
-void iotInit(const char *roomPath)
+void iotInit(void)
 {
-    mqttPathPrefix = roomPath;   
-    ESP_LOGI(TAG, "Initialised path: %s", roomPath);
+    uint8_t mac[6];
+
+    iotValue_t value;
+    iotElementPub_t *pub;
+
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    
+    sprintf(mqttPathPrefix, "homething/%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    ESP_LOGI(TAG, "Initialised IOT - device path: %s", mqttPathPrefix);
+    elementCount = 1;
+    elements[DEVICE_ELEMENT].name = "device";
+    value.s = "?";
+    iotElementPubAdd(&elements[DEVICE_ELEMENT], "ip", iotValueType_String, true, value, &pub);
+    value.i = 0;
+    iotElementPubAdd(&elements[DEVICE_ELEMENT], "uptime", iotValueType_Int, true, value, &pub);
 }
 
 void iotStart()
@@ -168,20 +184,21 @@ void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value)
     
 }
 
-static void iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub, MQTTClient *client)
+static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub, MQTTClient *client)
 {
     char path[MAX_TOPIC_NAME + 1];
     MQTTMessage message;
     char payload[30] = "";
+    const char *prefix = mqttPathPrefix;
     int rc;
-
+ 
     if (pub->name[0] == 0)
     {
-        sprintf(path, "%s/%s", mqttPathPrefix, element->name);
+        sprintf(path, "%s/%s", prefix, element->name);
     }
     else
     {
-        sprintf(path, "%s/%s/%s", mqttPathPrefix, element->name, pub->name);
+        sprintf(path, "%s/%s/%s", prefix, element->name, pub->name);
     }
     
 
@@ -210,15 +227,17 @@ static void iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub,
     if ((rc = MQTTPublish(client, path, &message)) != 0) 
     {
         ESP_LOGW(TAG, "PUB: Failed to send message to %s rc %d", path, rc);
+        return false;
     } 
     else 
     {
         ESP_LOGI(TAG, "PUB: Sent %s (%d) to %s", (char *)message.payload, message.payloadlen, path);
     }
     pub->updateRequired = false;
+    return true;
 }
 
-static void iotElementSendUpdate(iotElement_t *element, bool force, MQTTClient *client)
+static bool iotElementSendUpdate(iotElement_t *element, bool force, MQTTClient *client)
 {
     int p;
     for (p = 0; p < IOT_MAX_PUB; p ++)
@@ -227,10 +246,14 @@ static void iotElementSendUpdate(iotElement_t *element, bool force, MQTTClient *
         {
             if (element->pubs[p].updateRequired || force)
             {
-                iotElementPubSendUpdate(element, &element->pubs[p], client);
+                if (!iotElementPubSendUpdate(element, &element->pubs[p], client))
+                {
+                    return false;
+                }
             }
         }
     }
+    return true;
 }
 
 static void iotElementSubUpdate(iotElementSub_t *sub, char *payload, size_t len)
@@ -282,29 +305,35 @@ static void iotElementSubUpdate(iotElementSub_t *sub, char *payload, size_t len)
     sub->callback(sub->userData, sub, value);
 }
 
-static void iotElementSubSubscribe(iotElement_t *element, iotElementSub_t *sub, MQTTClient *client)
+static bool iotElementSubSubscribe(iotElement_t *element, iotElementSub_t *sub, MQTTClient *client)
 {
     int rc;
     if ((rc = MQTTSubscribe(client, sub->path, 2, mqttMessageArrived)) != 0) 
     {
         ESP_LOGE(TAG, "SUB: Return code from MQTT subscribe is %d for \"%s\"", rc, sub->path);
+        return false;
     } 
     else 
     {
         ESP_LOGI(TAG, "SUB: element %s sub %s MQTT subscribe to topic \"%s\"", element->name, sub->name, sub->path);
     }
+    return true;
 }
 
-static void iotElementSubscribe(iotElement_t *element, MQTTClient *client)
+static bool iotElementSubscribe(iotElement_t *element, MQTTClient *client)
 {
     int s;
     for (s = 0; s < IOT_MAX_SUB; s ++)
     {
         if (element->subs[s].name != NULL)
         {
-            iotElementSubSubscribe(element, &element->subs[s], client);
+            if (!iotElementSubSubscribe(element, &element->subs[s], client))
+            {
+                return false;
+            }
         }
     }
+    return true;
 }
 
 static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
@@ -314,6 +343,7 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
         esp_wifi_connect();
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
+        sprintf(ipAddr, IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
         xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -416,6 +446,8 @@ static void mqttClientThread(void* pvParameters)
     unsigned char sendbuf[80], readbuf[80] = {0};
     int rc = 0, e;
     bool loop = true;
+    unsigned int loopCount=0;
+    iotValue_t value;
 
     MQTTPacket_connectData connectData = MQTTPacket_connectData_initializer;
 
@@ -437,6 +469,9 @@ static void mqttClientThread(void* pvParameters)
                                 false, true, portMAX_DELAY);
             ESP_LOGI(TAG, "Connected to AP");
 
+            value.s = ipAddr;
+            iotElementPubUpdate(&elements[DEVICE_ELEMENT].pubs[IP_PUB], value);
+
             if ((rc = NetworkConnect(&network, CONFIG_MQTT_HOST, CONFIG_MQTT_PORT)) != 0) 
             {
                 ESP_LOGE(TAG, "Return code from network connect is %d, pausing for 5 seconds before reconnecting", rc);
@@ -448,7 +483,7 @@ static void mqttClientThread(void* pvParameters)
             }
         }
         connectData.MQTTVersion = 3;
-        connectData.clientID.cstring = CONFIG_MQTT_CLIENT_ID;
+        connectData.clientID.cstring = mqttPathPrefix; // We use our unique MQTT path prefix as our client id here because it's unique and identifies this device nicely.
 
 #ifdef CONFIG_MQTT_USERNAME
         connectData.username.cstring = CONFIG_MQTT_USERNAME;
@@ -464,18 +499,22 @@ static void mqttClientThread(void* pvParameters)
         else 
         {
             ESP_LOGI(TAG, "MQTT Connected");        
-
-            for (e=0;e<elementCount; e++)
-            {
-                iotElementSubscribe(&elements[e], &client);
-                iotElementSendUpdate(&elements[e], true, &client);
-            }
             loop = true;
-            while(loop)
+
+            for (e=0;e<elementCount & loop; e++)
             {
-                for (e=0;e<elementCount; e++)
+                loop = iotElementSubscribe(&elements[e], &client);
+                if (loop)
                 {
-                    iotElementSendUpdate(&elements[e], false, &client);
+                    loop = iotElementSendUpdate(&elements[e], true, &client);
+                }
+            }
+            
+            for (loopCount = 0; loop; loopCount++)
+            {
+                for (e=0;e<elementCount & loop; e++)
+                {
+                    loop = iotElementSendUpdate(&elements[e], false, &client);
                 }
 #if defined(MQTT_TASK)
                 MutexLock(&client.mutex);
@@ -487,6 +526,14 @@ static void mqttClientThread(void* pvParameters)
 #if defined(MQTT_TASK)
                 MutexUnlock(&client.mutex);
 #endif
+                if (loopCount == 10)
+                {
+                    struct timeval tv;
+                    gettimeofday(&tv, NULL);
+                    value.i = tv.tv_sec;
+                    iotElementPubUpdate(&elements[DEVICE_ELEMENT].pubs[UPTIME_PUB], value);
+                    loopCount = 0;
+                }
             }
         }       
         ESP_LOGW(TAG, "Lost connection to MQTT Server");
