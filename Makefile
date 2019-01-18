@@ -17,13 +17,18 @@ version:
 
 all: version
 
-APP_OTA=$(APP_BIN:.bin=.ota)
+APP_OTA=$(APP_BIN:.bin=__$(DEVICE_PROFILE)__$(VER).ota)
 
 app-ota:$(APP_BIN)
 	$(PYTHON) main/ota.py $(APP_BIN) $(APP_OTA)
 
 include $(IDF_PATH)/make/project.mk
 
+#
+# Work out the build profile string
+# 
+# This is used to ensure that when updating we get a new build with the same functionality.
+#
 PROFILE:=
 ifeq ($(CONFIG_LIGHTS_1), y)
 PROFILE += L
