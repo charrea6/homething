@@ -501,7 +501,7 @@ static void mqttClientThread(void* pvParameters)
             ESP_LOGI(TAG, "MQTT Connected");        
             loop = true;
 
-            for (e=0;e<elementCount & loop; e++)
+            for (e=0;(e<elementCount) && loop; e++)
             {
                 loop = iotElementSubscribe(&elements[e], &client);
                 if (loop)
@@ -512,7 +512,7 @@ static void mqttClientThread(void* pvParameters)
             
             for (loopCount = 0; loop; loopCount++)
             {
-                for (e=0;e<elementCount & loop; e++)
+                for (e=0;(e<elementCount) && loop; e++)
                 {
                     loop = iotElementSendUpdate(&elements[e], false, &client);
                 }
