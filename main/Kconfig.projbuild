@@ -1,11 +1,5 @@
 menu "Thing Configuration"
 
-config ROOM
-    string "Room name"
-    default "home/myroom"
-    help
-        Name of the room as will be used in MQTT topics
-
 config DHT22
     bool "Enable DHT22"
 
@@ -32,5 +26,8 @@ endchoice
 
 config MOTION
     bool "Enable Motion detection"
+
+config DOORBELL
+    bool "Enable Doorbell function"
 
 endmenu

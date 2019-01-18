@@ -2,7 +2,7 @@
 #define _IOT_H_
 #include <stdbool.h>
 
-#define IOT_MAX_ELEMENT 4
+#define IOT_MAX_ELEMENT 8
 #define IOT_MAX_PUB 5
 #define IOT_MAX_SUB 5
 
@@ -36,18 +36,29 @@ typedef struct iotElementPub {
     const char *name;
     enum iotValueType_e type;
     iotValue_t value;
-    bool updateRequired;
-    bool retain;
+    bool updateRequired:1;
+    bool retain:1;
 }iotElementPub_t;
 
 typedef struct {
     const char *name;
     iotElementSub_t subs[IOT_MAX_SUB];
     iotElementPub_t pubs[IOT_MAX_PUB];
-    bool updateRequired;
+    bool updateRequired:1;
 }iotElement_t;
 
-void iotInit(const char *roomPath);
+/** Initialse the IOT subsystem.
+ * This needs to be done before you can add Elements and Pub/Sub items.
+ */
+void iotInit(void);
+
+/** Start the IOT Subsystem
+ * Connects to the configured Wifi network and then to the configured MQTT server.
+ * Once connected any updates to Pub items will be reflected to the MQTT server every
+ * period (a period is currently 0.1 seconds).
+ * Any message sent to subscribe topics (iotElementSub_t) will be reflected to the specified 
+ * callback as soon as they are recieved.
+ */
 void iotStart();
 
 void iotElementAdd(const char *name, iotElement_t **ppElement);
