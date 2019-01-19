@@ -24,10 +24,6 @@ static const char *TAG="IOT";
 
 #define MAX_TOPIC_NAME 512
 
-#define DEVICE_ELEMENT 0
-#define IP_PUB 0
-#define UPTIME_PUB 1
-
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t wifi_event_group;
 /* Event Group bits */
@@ -162,7 +158,7 @@ static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub,
     {
         sprintf(path, "%s/%s/%s", prefix, element->name, pub->name);
     }
-    
+
     message.qos = QOS0;
     message.retained = pub->retain?1:0;
     
@@ -421,7 +417,7 @@ static void mqttClientThread(void* pvParameters)
             ESP_LOGI(TAG, "Connected to AP");
 
             value.s = ipAddr;
-            iotElementPubUpdate(&elements[DEVICE_ELEMENT].pubs[IP_PUB], value);
+            iotElementPubUpdate(&deviceIPPub, value);
 
             if ((rc = NetworkConnect(&network, CONFIG_MQTT_HOST, CONFIG_MQTT_PORT)) != 0) 
             {
@@ -477,12 +473,12 @@ static void mqttClientThread(void* pvParameters)
 #if defined(MQTT_TASK)
                 MutexUnlock(&client.mutex);
 #endif
-                if (loopCount == 10)
+                if (loopCount == 50)
                 {
                     struct timeval tv;
                     gettimeofday(&tv, NULL);
                     value.i = tv.tv_sec;
-                    iotElementPubUpdate(&elements[DEVICE_ELEMENT].pubs[UPTIME_PUB], value);
+                    iotElementPubUpdate(&deviceUptimePub, value);
                     loopCount = 0;
                 }
             }
