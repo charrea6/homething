@@ -11,12 +11,12 @@ typedef struct HumidityFan{
     char humidity[6];
     bool override;
     Relay_t relay;
-    iotElement_t *element;
-    iotElementPub_t *statePub;
-    iotElementPub_t *thresholdPub;
-    iotElementPub_t *humidityPub;
-    iotElementSub_t *ctrl;
-    iotElementSub_t *thresholdSub;
+    iotElement_t element;
+    iotElementPub_t statePub;
+    iotElementPub_t thresholdPub;
+    iotElementPub_t humidityPub;
+    iotElementSub_t ctrl;
+    iotElementSub_t thresholdSub;
     int threshold;
     int runOnSeconds;
     TimerHandle_t runOnTimer;

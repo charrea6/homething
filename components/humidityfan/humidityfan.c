@@ -11,7 +11,8 @@ static int fanCount=0;
 
 void humidityFanInit(HumidityFan_t *fan, int relayPin, int threshold)
 {
-    iotValue_t value;
+    iotElementPub_t *pub;
+    iotElementSub_t *sub;
     sprintf(fan->name, "fan%d", fanCount);
     fanCount ++;
 
@@ -21,19 +22,38 @@ void humidityFanInit(HumidityFan_t *fan, int relayPin, int threshold)
     sprintf(fan->humidity, "0.0");
 
     relayInit(relayPin, &fan->relay);
-
-    iotElementAdd(fan->name, &fan->element);
-    value.b = false;
-    iotElementPubAdd(fan->element, "state", iotValueType_Bool, true, value, &fan->statePub);
-    
-    value.s = fan->humidity;
-    iotElementPubAdd(fan->element, "humidity", iotValueType_String, false, value, &fan->humidityPub);
-    
-    value.i = fan->threshold;
-    iotElementPubAdd(fan->element, "threshold", iotValueType_Int, true, value, &fan->thresholdPub);
-
-    iotElementSubAdd(fan->element, "ctrl", iotValueType_Bool, humidityFanCtrl, fan, &fan->ctrl);
-    iotElementSubAdd(fan->element, "thresholdSet", iotValueType_Int, humidityFanThresholdSet, fan, &fan->thresholdSub);
+    fan->element.name = fan->name;
+    iotElementAdd(&fan->element);
+    pub = &fan->statePub;
+    pub->name = "state";
+    pub->type = iotValueType_Bool;
+    pub->retain = true;
+    pub->value.b = false;
+    iotElementPubAdd(&fan->element, pub);
+    pub = &fan->humidityPub;
+    pub->name = "humidity";
+    pub->type = iotValueType_String;
+    pub->retain = false;
+    pub->value.s = fan->humidity;
+    iotElementPubAdd(&fan->element,pub);
+    pub = &fan->thresholdPub;
+    pub->name = "threshold";
+    pub->type = iotValueType_Int;
+    pub->retain = true;
+    pub->value.i = fan->threshold;
+    iotElementPubAdd(&fan->element, pub);
+    sub = &fan->ctrl;
+    sub->name = "ctrl";
+    sub->type = iotValueType_Bool;
+    sub->callback = humidityFanCtrl;
+    sub->userData = fan;
+    iotElementSubAdd(&fan->element,sub);
+    sub = &fan->thresholdSub;
+    sub->name = "thresholdSet";
+    sub->type = iotValueType_Int;
+    sub->callback = humidityFanThresholdSet;
+    sub->userData = fan;
+    iotElementSubAdd(&fan->element, sub);
 
     fan->runOnTimer = xTimerCreate(fan->name, fan->runOnSeconds / portTICK_RATE_MS, pdFALSE, fan, humidityFanRunOnTimeout);
 }
@@ -47,7 +67,7 @@ static void humidityFanSetState(HumidityFan_t *fan, bool state)
     {
         relaySetState(&fan->relay, newState);
         value.b = state;
-        iotElementPubUpdate(fan->statePub, value);
+        iotElementPubUpdate(&fan->statePub, value);
         if (xTimerIsTimerActive(fan->runOnTimer) == pdTRUE)
         {
             xTimerStop(fan->runOnTimer, 0);
@@ -80,7 +100,7 @@ void humidityFanUpdateHumidity(HumidityFan_t *fan, int humidityTenths)
     }
     sprintf(fan->humidity, "%d.%d", humidityTenths / 10, humidityTenths % 10);
     value.s = fan->humidity;
-    iotElementPubUpdate(fan->humidityPub, value);
+    iotElementPubUpdate(&fan->humidityPub, value);
 }
 
 static void humidityFanCtrl(void *userData, iotElementSub_t *sub, iotValue_t value)
@@ -103,7 +123,7 @@ static void humidityFanThresholdSet(void *userData, iotElementSub_t *sub, iotVal
     if (value.i <= 100)
     {
         fan->threshold = value.i;
-        iotElementPubUpdate(fan->thresholdPub, value);
+        iotElementPubUpdate(&fan->thresholdPub, value);
     } 
 }
 
