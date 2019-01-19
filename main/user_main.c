@@ -84,8 +84,8 @@ static Light_t light2;
 #if defined(CONFIG_DHT22)
 static DHT22Sensor_t thSensor;
 static char temperatureStr[6];
-static iotElement_t *temperatureElement;
-static iotElementPub_t *temperaturePub;
+static iotElement_t temperatureElement;
+static iotElementPub_t temperaturePub;
 
 #if defined(CONFIG_FAN)
 static HumidityFan_t fan0;
@@ -102,7 +102,7 @@ static void temperatureUpdate(void *userData, int16_t tenthsUnit)
     iotValue_t value;
     sprintf(temperatureStr, "%d.%d", tenthsUnit / 10, tenthsUnit % 10);
     value.s = temperatureStr;
-    iotElementPubUpdate(temperaturePub, value);
+    iotElementPubUpdate(&temperaturePub, value);
 }
 #endif
 
@@ -148,14 +148,20 @@ void app_main(void)
     doorbellInit(5);
 #endif
 
-#if defined(CONFIG_DHT22) 
-    iotValue_t value;
-    
+#if defined(CONFIG_DHT22)    
     dht22Init(&thSensor, 4);
+
     sprintf(temperatureStr, "0.0");
-    value.s = temperatureStr;
-    iotElementAdd("temperature", &temperatureElement);
-    iotElementPubAdd(temperatureElement, "", iotValueType_String, false, value, &temperaturePub);
+    
+    temperatureElement.name = "temperature";
+    iotElementAdd(&temperatureElement);
+
+    temperaturePub.name = "";
+    temperaturePub.type = iotValueType_String;
+    temperaturePub.retain = false;
+    temperaturePub.value.s = temperatureStr;
+    iotElementPubAdd(&temperatureElement, &temperaturePub);
+
     dht22AddTemperatureCallback(&thSensor, temperatureUpdate, NULL);
 #if defined(CONFIG_FAN)
     humidityFanInit(&fan0, 14, 75);

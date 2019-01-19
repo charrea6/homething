@@ -35,10 +35,4 @@ config MQTT_PASSWORD
     string "MQTT Password"
     help
         Password used to connect to the MQTT server or blank if not required    
-
-config MQTT_CLIENT_ID
-    string "MQTT Client Id"
-    default "ESP8266Example"
-    help
-        Identifier used when connecting to the MQTT server.
 endmenu

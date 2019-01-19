@@ -26,25 +26,35 @@ typedef void (*iotElementSubUpdateCallback_t)(void *userData, struct iotElementS
 
 typedef struct iotElementSub {
     const char *name;
-    char *path;
     enum iotValueType_e type;
     iotElementSubUpdateCallback_t callback;
     void *userData;
+
+    /* Private fields */
+    char *path;
+    struct iotElement *element;
+    struct iotElementSub *next;
 }iotElementSub_t;
 
 typedef struct iotElementPub {
     const char *name;
     enum iotValueType_e type;
     iotValue_t value;
-    bool updateRequired:1;
     bool retain:1;
+
+    /* Private fields */
+    bool updateRequired:1;  
+    struct iotElement *element;
+    struct iotElementPub *next;
 }iotElementPub_t;
 
-typedef struct {
+typedef struct iotElement {
     const char *name;
-    iotElementSub_t subs[IOT_MAX_SUB];
-    iotElementPub_t pubs[IOT_MAX_PUB];
-    bool updateRequired:1;
+    
+    /* Private fields */
+    struct iotElement *next;
+    iotElementSub_t *subs;
+    iotElementPub_t *pubs;
 }iotElement_t;
 
 /** Initialse the IOT subsystem.
@@ -61,9 +71,9 @@ void iotInit(void);
  */
 void iotStart();
 
-void iotElementAdd(const char *name, iotElement_t **ppElement);
-void iotElementSubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, iotElementSubUpdateCallback_t callback, void *userData, iotElementSub_t **ppSub);
-void iotElementPubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, bool retain, iotValue_t initial, iotElementPub_t **ppPub);
+void iotElementAdd(iotElement_t *element);
+void iotElementSubAdd(iotElement_t *element, iotElementSub_t *sub);
+void iotElementPubAdd(iotElement_t *element, iotElementPub_t *pub);
 void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value);
 
 

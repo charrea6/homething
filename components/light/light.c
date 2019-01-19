@@ -9,15 +9,29 @@ static int lightCount = 0;
 
 void lightInit(Light_t *light, int8_t pin)
 {
-    iotValue_t initial;
+    iotElementPub_t *state;
+    iotElementSub_t *control;
     sprintf(light->name, "light%d", lightCount);
     lightCount = (lightCount + 1) % 10;
     
     relayInit(pin, &light->relay);
-    iotElementAdd(light->name, &light->element);
-    initial.b = light->relay.state == RelayState_On ? true:false;
-    iotElementPubAdd(light->element, "state", iotValueType_Bool, true, initial, &light->state);
-    iotElementSubAdd(light->element, "ctrl", iotValueType_Bool, (iotElementSubUpdateCallback_t)lightControl, light, &light->control);
+    
+    light->element.name = light->name;
+    iotElementAdd(&light->element);
+    
+    state = &light->state;
+    state->name = "state";
+    state->type = iotValueType_Bool;
+    state->retain = true;
+    state->value.b = light->relay.state == RelayState_On ? true:false;
+    iotElementPubAdd(&light->element, &light->state);
+    
+    control = &light->control;
+    control->name = "ctrl";
+    control->type = iotValueType_Bool;
+    control->callback = (iotElementSubUpdateCallback_t)lightControl;
+    control->userData = light;
+    iotElementSubAdd(&light->element, &light->control);
 }
 
 void lightToggle(Light_t *light)
@@ -32,7 +46,7 @@ void lightSetState(Light_t *light, RelayState_t state)
         iotValue_t value;
         relaySetState(&light->relay, state);
         value.b = light->relay.state == RelayState_On ? true:false;
-        iotElementPubUpdate(light->state, value);
+        iotElementPubUpdate(&light->state, value);
     }
 }
 

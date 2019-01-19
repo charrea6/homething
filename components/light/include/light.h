@@ -7,9 +7,9 @@
 
 typedef struct {
     Relay_t relay;
-    iotElement_t *element;
-    iotElementSub_t *control;
-    iotElementPub_t *state;
+    iotElement_t element;
+    iotElementSub_t control;
+    iotElementPub_t state;
     char name[7];
 }Light_t;
 

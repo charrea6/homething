@@ -34,8 +34,11 @@ static EventGroupHandle_t wifi_event_group;
 const int CONNECTED_BIT = BIT0;
 const int MQTT_UPDATE_BIT = BIT1;
 
-static int elementCount = 0;
-static iotElement_t elements[IOT_MAX_ELEMENT] = {0};
+static iotElement_t *elements = NULL;
+
+static iotElement_t deviceElement;
+static iotElementPub_t deviceIPPub;
+static iotElementPub_t deviceUptimePub;
 
 static char mqttPathPrefix[23]; // homething/<MAC 12 Hexchars> \0
 static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
@@ -47,21 +50,26 @@ static void wifiInitialise(void);
 void iotInit(void)
 {
     uint8_t mac[6];
-
-    iotValue_t value;
-    iotElementPub_t *pub;
-
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     
     sprintf(mqttPathPrefix, "homething/%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     ESP_LOGI(TAG, "Initialised IOT - device path: %s", mqttPathPrefix);
-    elementCount = 1;
-    elements[DEVICE_ELEMENT].name = "device";
-    value.s = "?";
-    iotElementPubAdd(&elements[DEVICE_ELEMENT], "ip", iotValueType_String, true, value, &pub);
-    value.i = 0;
-    iotElementPubAdd(&elements[DEVICE_ELEMENT], "uptime", iotValueType_Int, true, value, &pub);
+    
+    deviceElement.name = "device";
+    iotElementAdd(&deviceElement);
+
+    deviceIPPub.name = "ip";
+    deviceIPPub.type = iotValueType_String;
+    deviceIPPub.retain = true;
+    deviceIPPub.value.s = "?";
+    iotElementPubAdd(&deviceElement, &deviceIPPub);
+    
+    deviceUptimePub.name = "uptime";
+    deviceUptimePub.type = iotValueType_Int;
+    deviceUptimePub.retain = true;
+    deviceUptimePub.value.i = 0;
+    iotElementPubAdd(&deviceElement, &deviceUptimePub);
 }
 
 void iotStart()
@@ -75,42 +83,19 @@ void iotStart()
                 NULL);
 }
 
-void iotElementAdd(const char *name, iotElement_t **ppElement)
+void iotElementAdd(iotElement_t *element)
 {
-    iotElement_t *element;
-    if (elementCount >= IOT_MAX_ELEMENT)
-    {
-        *ppElement = NULL;
-        return;
-    }
-    element = &elements[elementCount];
-    elementCount++;
-    
-    element->name = name;
-    *ppElement = element;
-    ESP_LOGI(TAG, "Added element \"%s\"", name);
+    element->next = elements;
+    elements = element;
+    element->pubs = NULL;
+    elements->subs = NULL;
+    ESP_LOGI(TAG, "Added element \"%s\"", element->name);
 }
 
-void iotElementSubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, iotElementSubUpdateCallback_t callback, void *userData, iotElementSub_t **ppSub)
+void iotElementSubAdd(iotElement_t *element, iotElementSub_t *sub)
 {
-    iotElementSub_t *sub = NULL;
-    int i;
     size_t len;
-
-    for (i=0; i < IOT_MAX_SUB; i++)
-    {
-        if (element->subs[i].name == NULL)
-        {
-            sub = &element->subs[i];
-            break;
-        }
-    }
-    *ppSub = sub;
-    if (sub == NULL)
-    {
-        ESP_LOGE(TAG, "No more subs available in element %s", element->name);
-        return;
-    }
+    const char *name = sub->name;
     
     len = strlen(mqttPathPrefix) + 1 + strlen(element->name) + 1 + strlen(name) + 1;
     sub->path = (char *)malloc(len);
@@ -119,44 +104,22 @@ void iotElementSubAdd(iotElement_t *element, const char *name, enum iotValueType
         ESP_LOGE(TAG, "Failed to allocate path for Element %s Sub %s", element->name, name);
         return;
     }
-    sub->name = name;
     sprintf(sub->path, "%s/%s/%s", mqttPathPrefix, element->name, sub->name);
-    sub->type = type;
-    sub->callback = callback;
-    sub->userData = userData;
+    sub->element = element;
     ESP_LOGI(TAG, "Added sub \"%s\" to element \"%s\"", name, element->name);
 }
 
-void iotElementPubAdd(iotElement_t *element, const char *name, enum iotValueType_e type, bool retain, iotValue_t initial, iotElementPub_t **ppPub)
+void iotElementPubAdd(iotElement_t *element, iotElementPub_t *pub)
 {
-    iotElementPub_t *pub = NULL;
-    int i;
-    
-    for (i=0; i < IOT_MAX_PUB; i++)
-    {
-        if (element->pubs[i].name == NULL)
-        {
-            pub = &element->pubs[i];
-            break;
-        }
-    }
-    *ppPub = pub;
-    if (pub == NULL)
-    {
-        ESP_LOGE(TAG, "No more pubs available in element %s", element->name);
-        return;
-    }
-    pub->name = name;
-    pub->type = type;
-    pub->retain = retain;
-    pub->value = initial;
+    pub->next = element->pubs;
+    element->pubs = pub;
+    pub->element = element;
     pub->updateRequired = false;
-    ESP_LOGI(TAG, "Added pub \"%s\" to element \"%s\"", name, element->name);
+    ESP_LOGI(TAG, "Added pub \"%s\" to element \"%s\"", pub->name, element->name);
 }
 
 void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value)
 {
-    
     switch(pub->type)
     {
         case iotValueType_Bool:
@@ -175,13 +138,12 @@ void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value)
     pub->value = value;
     if (pub->updateRequired)
     {
-        ESP_LOGI(TAG, "PUB: Flagging update required for %s", pub->name);
+        ESP_LOGI(TAG, "PUB: Flagging update required for %s%s%s", pub->element->name, pub->name[0]?"/":"", pub->name);
     }
     else
     {
-        ESP_LOGI(TAG, "PUB: No update required for %s", pub->name);
-    }
-    
+        ESP_LOGI(TAG, "PUB: No update required for %s%s%s",pub->element->name, pub->name[0]?"/":"", pub->name);
+    }    
 }
 
 static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub, MQTTClient *client)
@@ -201,7 +163,6 @@ static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub,
         sprintf(path, "%s/%s/%s", prefix, element->name, pub->name);
     }
     
-
     message.qos = QOS0;
     message.retained = pub->retain?1:0;
     
@@ -239,19 +200,16 @@ static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub,
 
 static bool iotElementSendUpdate(iotElement_t *element, bool force, MQTTClient *client)
 {
-    int p;
-    for (p = 0; p < IOT_MAX_PUB; p ++)
+    for (iotElementPub_t *pub = element->pubs;pub != NULL; pub = pub->next)
     {
-        if (element->pubs[p].name != NULL)
+        if (pub->updateRequired || force)
         {
-            if (element->pubs[p].updateRequired || force)
+            if (!iotElementPubSendUpdate(element, pub, client))
             {
-                if (!iotElementPubSendUpdate(element, &element->pubs[p], client))
-                {
-                    return false;
-                }
+                return false;
             }
         }
+
     }
     return true;
 }
@@ -305,7 +263,7 @@ static void iotElementSubUpdate(iotElementSub_t *sub, char *payload, size_t len)
     sub->callback(sub->userData, sub, value);
 }
 
-static bool iotElementSubSubscribe(iotElement_t *element, iotElementSub_t *sub, MQTTClient *client)
+static bool iotElementSubSubscribe(iotElementSub_t *sub, MQTTClient *client)
 {
     int rc;
     if ((rc = MQTTSubscribe(client, sub->path, 2, mqttMessageArrived)) != 0) 
@@ -315,22 +273,18 @@ static bool iotElementSubSubscribe(iotElement_t *element, iotElementSub_t *sub, 
     } 
     else 
     {
-        ESP_LOGI(TAG, "SUB: element %s sub %s MQTT subscribe to topic \"%s\"", element->name, sub->name, sub->path);
+        ESP_LOGI(TAG, "SUB: MQTT subscribe to topic \"%s\"", sub->path);
     }
     return true;
 }
 
 static bool iotElementSubscribe(iotElement_t *element, MQTTClient *client)
 {
-    int s;
-    for (s = 0; s < IOT_MAX_SUB; s ++)
+    for (iotElementSub_t *sub = element->subs; sub != NULL; sub = sub->next)
     {
-        if (element->subs[s].name != NULL)
+        if (!iotElementSubSubscribe(sub, client))
         {
-            if (!iotElementSubSubscribe(element, &element->subs[s], client))
-            {
-                return false;
-            }
+            return false;
         }
     }
     return true;
@@ -380,7 +334,6 @@ static void wifiInitialise(void)
 
 static void mqttMessageArrived(MessageData* data)
 {
-    int e;
     char *topic, *topicStart;
     char *payload;
     bool found = false;
@@ -408,19 +361,17 @@ static void mqttMessageArrived(MessageData* data)
     if ((strncmp(topic, mqttPathPrefix, len) == 0) || (topic[len] == '/'))
     {
         topic += len + 1;
-        for (e=0;e<elementCount; e++)
+        for (iotElement_t *element = elements; element != NULL; element = element->next)
         {
-            len = strlen(elements[e].name);
-            if ((strncmp(topic, elements[e].name, len) == 0) && (topic[len] == '/'))
+            len = strlen(element->name);
+            if ((strncmp(topic, element->name, len) == 0) && (topic[len] == '/'))
             {
-                int s;
-                iotElement_t *element = &elements[e];
                 topic += len + 1;
-                for (s=0; s < IOT_MAX_SUB; s++)
+                for (iotElementSub_t *sub = element->subs; sub != NULL; sub = sub->next)
                 {
-                    if (strcmp(topic, element->subs[s].name) == 0)
+                    if (strcmp(topic, sub->name) == 0)
                     {
-                        iotElementSubUpdate(&element->subs[s], payload, data->message->payloadlen);
+                        iotElementSubUpdate(sub, payload, data->message->payloadlen);
                         found = true;
                         break;
                     }
@@ -444,7 +395,7 @@ static void mqttClientThread(void* pvParameters)
     MQTTClient client;
     Network network;
     unsigned char sendbuf[80], readbuf[80] = {0};
-    int rc = 0, e;
+    int rc = 0;
     bool loop = true;
     unsigned int loopCount=0;
     iotValue_t value;
@@ -501,20 +452,20 @@ static void mqttClientThread(void* pvParameters)
             ESP_LOGI(TAG, "MQTT Connected");        
             loop = true;
 
-            for (e=0;(e<elementCount) && loop; e++)
+            for (iotElement_t *element = elements; (element != NULL) && loop; element = element->next)
             {
-                loop = iotElementSubscribe(&elements[e], &client);
+                loop = iotElementSubscribe(element, &client);
                 if (loop)
                 {
-                    loop = iotElementSendUpdate(&elements[e], true, &client);
+                    loop = iotElementSendUpdate(element, true, &client);
                 }
             }
             
             for (loopCount = 0; loop; loopCount++)
             {
-                for (e=0;(e<elementCount) && loop; e++)
+                for (iotElement_t *element = elements; (element != NULL) && loop; element = element->next)
                 {
-                    loop = iotElementSendUpdate(&elements[e], false, &client);
+                    loop = iotElementSendUpdate(element, false, &client);
                 }
 #if defined(MQTT_TASK)
                 MutexLock(&client.mutex);
