@@ -24,7 +24,7 @@
 #include "humidityfan.h"
 #include "doorbell.h"
 #include "updater.h"
-
+const char TAG[] = "main";
 /* 
   Pin Allocations
   ---------------
@@ -115,6 +115,7 @@ static void lightSwitchCallback(void *userData, int state)
 
 static void setupLight(Light_t *light, int switchPin, int relayPin)
 {
+    ESP_LOGI(TAG, "Adding light %d switch %d", relayPin, switchPin);
     lightInit(light, relayPin);
     switchAdd(switchPin, lightSwitchCallback, light);
 }
@@ -140,15 +141,18 @@ void app_main(void)
     setupLight(&light2, 15, 16);
 #endif
 
-#if defined(CONFIG_MOTION)   
+#if defined(CONFIG_MOTION)
+    ESP_LOGI(TAG, "Adding motion");
     motionInit(&motion0, 13);
 #endif
 
 #if defined(CONFIG_DOORBELL)
+    ESP_LOGI(TAG , "Adding doorbell");
     doorbellInit(5);
 #endif
 
-#if defined(CONFIG_DHT22)    
+#if defined(CONFIG_DHT22)
+    ESP_LOGI(TAG, "Adding temperature...");
     dht22Init(&thSensor, 4);
 
     sprintf(temperatureStr, "0.0");
@@ -164,6 +168,7 @@ void app_main(void)
 
     dht22AddTemperatureCallback(&thSensor, temperatureUpdate, NULL);
 #if defined(CONFIG_FAN)
+    ESP_LOGI(TAG, "Adding Fan");
     humidityFanInit(&fan0, 14, 75);
     dht22AddHumidityCallback(&thSensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan0);
 #endif
