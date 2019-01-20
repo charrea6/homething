@@ -105,6 +105,8 @@ void iotElementSubAdd(iotElement_t *element, iotElementSub_t *sub)
     }
     sprintf(sub->path, "%s/%s/%s", mqttPathPrefix, element->name, sub->name);
     sub->element = element;
+    sub->next = element->subs;
+    element->subs = sub;
     ESP_LOGI(TAG, "Added sub \"%s\" to element \"%s\"", name, element->name);
 }
 
