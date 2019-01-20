@@ -24,6 +24,9 @@ static const char *TAG="IOT";
 
 #define MAX_TOPIC_NAME 512
 
+#define POLL_INTERVAL_MS 10
+#define UPTIME_UPDATE_MS 5000
+
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t wifi_event_group;
 /* Event Group bits */
@@ -466,14 +469,14 @@ static void mqttClientThread(void* pvParameters)
 #if defined(MQTT_TASK)
                 MutexLock(&client.mutex);
 #endif
-                if (MQTTYield(&client, 100) < 0)
+                if (MQTTYield(&client, POLL_INTERVAL_MS) < 0)
                 {
                     loop = false;
                 }
 #if defined(MQTT_TASK)
                 MutexUnlock(&client.mutex);
 #endif
-                if (loopCount == 50)
+                if (loopCount == (UPTIME_UPDATE_MS / POLL_INTERVAL_MS))
                 {
                     struct timeval tv;
                     gettimeofday(&tv, NULL);
