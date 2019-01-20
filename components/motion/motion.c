@@ -21,7 +21,7 @@ void motionInit(Motion_t *motion, int pin)
     iotElementPub_t *pub;
     sprintf(motion->name, "motion%d", motionCount);
     motionCount++;
-    
+    motion->element.name = motion->name;
     iotElementAdd(&motion->element);
     pub = &motion->pub;
     pub->name = "";
