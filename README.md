@@ -27,8 +27,8 @@ An MQTT server to connect the homething to.
 ## How to build
 After installing ESP8266_RTOS_SDK and the toolchain, ensure that the following shell environment variables are pointing to the correct locations:
 
-export PATH=<location of toolchain>/bin/:$PATH
-export IDF_PATH=<location of ESP8266_RTOS_SDK>
+    export PATH=<location of toolchain>/bin/:$PATH
+    export IDF_PATH=<location of ESP8266_RTOS_SDK>
 
 Next run `make menuconfig`
 
