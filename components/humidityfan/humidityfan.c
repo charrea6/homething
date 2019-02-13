@@ -96,6 +96,7 @@ void humidityFanUpdateHumidity(HumidityFan_t *fan, int humidityTenths)
                 ESP_LOGI(TAG, "%s: Start run on timer", fan->name);
                 xTimerStart(fan->runOnTimer, 0);
             }
+            fan->override = false;
         }
     }
     sprintf(fan->humidity, "%d.%d", humidityTenths / 10, humidityTenths % 10);

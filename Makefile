@@ -55,4 +55,8 @@ ifeq ($(CONFIG_MOTION), y)
 PROFILE += M
 endif
 
+ifeq ($(CONFIG_RELAY_ON_HIGH), y)
+PROFILE += +
+endif
+
 DEVICE_PROFILE=$(shell  echo $(PROFILE) | sed 's/ //g')
