@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include "driver/gpio.h"
 #include "relay.h"
+#include "sdkconfig.h"
 
 void relayInit(int8_t pin, Relay_t *relay)
 {
