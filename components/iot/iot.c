@@ -11,6 +11,8 @@
 #include "esp_wifi.h"
 #include "esp_event_loop.h"
 
+#include "tcpip_adapter.h"
+
 #include "MQTTClient.h"
 
 #include "iot.h"
@@ -315,7 +317,16 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
 
 static void wifiInitialise(void)
 {
+    uint8_t mac[6];
+    char hostname[23];
+    
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    sprintf(hostname, "homething-%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
     tcpip_adapter_init();
+    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
+    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
+
     wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK( esp_event_loop_init(wifiEventHandler, NULL) );
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
