@@ -58,11 +58,27 @@ static void updaterThread(void *pvParameter)
     
     updaterUpdateStatus("Waiting for update");
     while(true)
-    {    
+    {   
         xEventGroupWaitBits(updateEventGroup, UPDATE_BIT, false, true, portMAX_DELAY);
         xEventGroupClearBits(updateEventGroup, UPDATE_BIT);
         updaterUpdateStatusf("Updating to %s", newVersion);
+
+#ifdef CONFIG_ESPTOOLPY_FLASHSIZE_1MB 
+        {
+            const esp_partition_t *updatePartition;
+            int partitionId;
+            updatePartition = esp_ota_get_next_update_partition(NULL);
+            partitionId = (updatePartition->subtype - ESP_PARTITION_SUBTYPE_APP_OTA_0) + 1;
+            if ((partitionId <= 0) || (partitionId > 16))
+            {
+                partitionId = 1;
+            }
+            snprintf(updatePath, sizeof(updatePath),"%s/homething.app%d__%s__%s.ota", CONFIG_UPDATER_PATH_PREFIX, partitionId, deviceProfile, newVersion);
+        }
+#else
         snprintf(updatePath, sizeof(updatePath),"%s/homething__%s__%s.ota", CONFIG_UPDATER_PATH_PREFIX, deviceProfile, newVersion);
+#endif
+
         updaterUpdate(CONFIG_UPDATER_HOST, CONFIG_UPDATER_PORT, updatePath);
     }
 }
