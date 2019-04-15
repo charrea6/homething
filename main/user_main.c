@@ -65,17 +65,21 @@ GPIO16(D0) - possibly tied to RST to allow exit from deep sleep by pulling GPIO1
 //
 // Lights
 // 
-#if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3)
+#if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_LIGHTS_4)
 #define ENABLE_LIGHT_1
 static Light_t light0;
 #endif
-#if defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3)
+#if defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_LIGHTS_4)
 #define ENABLE_LIGHT_2
 static Light_t light1;
 #endif
-#if defined(CONFIG_LIGHTS_3)
+#if defined(CONFIG_LIGHTS_3) || defined(CONFIG_LIGHTS_4)
 #define ENABLE_LIGHT_3
 static Light_t light2;
+#endif
+#if defined(CONFIG_LIGHTS_4)
+#define ENABLE_LIGHT_4
+static Light_t light3;
 #endif
 
 //
@@ -106,7 +110,7 @@ static void temperatureUpdate(void *userData, int16_t tenthsUnit)
 }
 #endif
 
-#if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3)
+#if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_LIGHTS_4)
 static void lightSwitchCallback(void *userData, int state)
 {
     Light_t *light = userData;
@@ -117,7 +121,10 @@ static void setupLight(Light_t *light, int switchPin, int relayPin)
 {
     ESP_LOGI(TAG, "Adding light %d switch %d", relayPin, switchPin);
     lightInit(light, relayPin);
-    switchAdd(switchPin, lightSwitchCallback, light);
+    if (switchPin != -1)
+    {
+        switchAdd(switchPin, lightSwitchCallback, light);
+    }
 }
 #endif
 
@@ -132,28 +139,31 @@ void app_main(void)
     iotInit();
 
 #ifdef ENABLE_LIGHT_1
-    setupLight(&light0, 12, 0);
+    setupLight(&light0, CONFIG_LIGHT_1_SWITCH_PIN, CONFIG_LIGHT_1_RELAY_PIN);
 #endif
 #ifdef ENABLE_LIGHT_2
-    setupLight(&light1, 2, 5);
+    setupLight(&light1, CONFIG_LIGHT_2_SWITCH_PIN, CONFIG_LIGHT_2_RELAY_PIN);
 #endif
 #ifdef ENABLE_LIGHT_3
-    setupLight(&light2, 15, 16);
+    setupLight(&light2, CONFIG_LIGHT_3_SWITCH_PIN, CONFIG_LIGHT_3_RELAY_PIN);
+#endif
+#ifdef ENABLE_LIGHT_4
+    setupLight(&light3, CONFIG_LIGHT_4_SWITCH_PIN, CONFIG_LIGHT_4_RELAY_PIN);
 #endif
 
 #if defined(CONFIG_MOTION)
     ESP_LOGI(TAG, "Adding motion");
-    motionInit(&motion0, 13);
+    motionInit(&motion0, CONFIG_MOTION_PIN);
 #endif
 
 #if defined(CONFIG_DOORBELL)
     ESP_LOGI(TAG , "Adding doorbell");
-    doorbellInit(5);
+    doorbellInit(CONFIG_DOORBELL_PIN);
 #endif
 
 #if defined(CONFIG_DHT22)
     ESP_LOGI(TAG, "Adding temperature...");
-    dht22Init(&thSensor, 4);
+    dht22Init(&thSensor, CONFIG_DHT22_PIN);
 
     sprintf(temperatureStr, "0.0");
     
@@ -169,13 +179,18 @@ void app_main(void)
     dht22AddTemperatureCallback(&thSensor, temperatureUpdate, NULL);
 #if defined(CONFIG_FAN)
     ESP_LOGI(TAG, "Adding Fan");
-    humidityFanInit(&fan0, 14, 75);
+    humidityFanInit(&fan0, CONFIG_FAN_PIN, FAN_HUMIDITY);
     dht22AddHumidityCallback(&thSensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan0);
 #endif
     dht22Start(&thSensor);
 #endif
 
-#if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_MOTION)
+#if defined(CONFIG_LIGHTS_1) || \
+    defined(CONFIG_LIGHTS_2) || \
+    defined(CONFIG_LIGHTS_3) || \
+    defined(CONFIG_LIGHTS_4) || \
+    defined(CONFIG_MOTION) || \
+    defined(CONFIG_DOORBELL)
     switchStart();
 #endif
     updaterInit();
