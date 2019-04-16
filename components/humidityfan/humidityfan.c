@@ -68,6 +68,9 @@ static void humidityFanSetState(HumidityFan_t *fan, bool state)
         relaySetState(&fan->relay, newState);
         value.b = state;
         iotElementPubUpdate(&fan->statePub, value);
+    }
+    if (state)
+    {
         if (xTimerIsTimerActive(fan->runOnTimer) == pdTRUE)
         {
             xTimerStop(fan->runOnTimer, 0);
@@ -96,7 +99,6 @@ void humidityFanUpdateHumidity(HumidityFan_t *fan, int humidityTenths)
                 ESP_LOGI(TAG, "%s: Start run on timer", fan->name);
                 xTimerStart(fan->runOnTimer, 0);
             }
-            fan->override = false;
         }
     }
     sprintf(fan->humidity, "%d.%d", humidityTenths / 10, humidityTenths % 10);
@@ -132,5 +134,6 @@ static void humidityFanRunOnTimeout(TimerHandle_t xTimer)
 {
     HumidityFan_t *fan = pvTimerGetTimerID(xTimer);
     ESP_LOGI(TAG, "%s: Run on timer fired", fan->name);
+    fan->override = false;
     humidityFanSetState(fan, false);
 }
