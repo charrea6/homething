@@ -24,7 +24,7 @@
 #include "humidityfan.h"
 #include "doorbell.h"
 #include "updater.h"
-const char TAG[] = "main";
+static const char TAG[] = "main";
 /* 
   Pin Allocations
   ---------------
@@ -131,7 +131,6 @@ static void setupLight(Light_t *light, int switchPin, int relayPin)
 void app_main(void)
 {
     struct timeval tv = {.tv_sec = 0, .tv_usec=0};
-
     ESP_ERROR_CHECK( nvs_flash_init() );
 
     settimeofday(&tv, NULL);

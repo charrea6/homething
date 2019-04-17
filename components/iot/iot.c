@@ -5,11 +5,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include "freertos/timers.h"
 
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event_loop.h"
+
+#include "driver/gpio.h"
 
 #include "tcpip_adapter.h"
 
@@ -48,6 +51,25 @@ static void mqttClientThread(void* pvParameters);
 static void mqttMessageArrived(MessageData *data);
 static void wifiInitialise(void);
 
+#ifdef CONFIG_CONNECTION_LED
+#define LED_ON 0
+#define LED_OFF 1
+
+#define LED_STATE_DISCONNECTED 0
+#define LED_STATE_WIFI_CONNECTED 1
+#define LED_STATE_MQTT_CONNECTED 2
+
+static TimerHandle_t ledTimer;
+
+static void setupLed();
+static void setLedState(int state);
+
+#define IF_LED(func) func
+#else
+#define IF_LED(func)
+#endif
+
+
 void iotInit(void)
 {
     uint8_t mac[6];
@@ -71,6 +93,8 @@ void iotInit(void)
     deviceUptimePub.retain = true;
     deviceUptimePub.value.i = 0;
     iotElementPubAdd(&deviceElement, &deviceUptimePub);
+
+    IF_LED(setupLed());
 }
 
 void iotStart()
@@ -319,7 +343,7 @@ static void wifiInitialise(void)
 {
     uint8_t mac[6];
     char hostname[23];
-    
+
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     sprintf(hostname, "homething-%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
@@ -422,6 +446,7 @@ static void mqttClientThread(void* pvParameters)
     while (true)
     {
         ESP_LOGI(TAG, "Waiting for network connection");
+        IF_LED(setLedState(LED_STATE_DISCONNECTED));
         loop = true;
         while(loop)
         {
@@ -431,6 +456,7 @@ static void mqttClientThread(void* pvParameters)
             xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
                                 false, true, portMAX_DELAY);
             ESP_LOGI(TAG, "Connected to AP");
+            IF_LED(setLedState(LED_STATE_WIFI_CONNECTED));
 
             value.s = ipAddr;
             iotElementPubUpdate(&deviceIPPub, value);
@@ -458,10 +484,12 @@ static void mqttClientThread(void* pvParameters)
         if ((rc = MQTTConnect(&client, &connectData)) != 0) 
         {
             ESP_LOGE(TAG, "Return code from MQTT connect is %d", rc);
+            vTaskDelay(5000 / portTICK_RATE_MS);  //wait for 5 seconds
         } 
         else 
         {
-            ESP_LOGI(TAG, "MQTT Connected");        
+            ESP_LOGI(TAG, "MQTT Connected");
+            IF_LED(setLedState(LED_STATE_MQTT_CONNECTED));
             loop = true;
 
             for (iotElement_t *element = elements; (element != NULL) && loop; element = element->next)
@@ -503,3 +531,49 @@ static void mqttClientThread(void* pvParameters)
         network.disconnect(&network);
     }
 }
+
+#ifdef CONFIG_CONNECTION_LED
+
+static void onLedTimer(TimerHandle_t xTimer)
+{
+    gpio_set_level(CONFIG_CONNECTION_LED_PIN, !gpio_get_level(CONFIG_CONNECTION_LED_PIN));
+}
+
+static void setupLed()
+{
+    gpio_config_t config;
+
+    config.pin_bit_mask = 1 << CONFIG_CONNECTION_LED_PIN;
+    config.mode = GPIO_MODE_DEF_OUTPUT;
+    config.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    config.pull_up_en = GPIO_PULLUP_DISABLE;
+    config.intr_type = GPIO_INTR_DISABLE;
+    gpio_config(&config);
+    gpio_set_level(CONFIG_CONNECTION_LED_PIN, LED_OFF);
+    ledTimer = xTimerCreate("CONNLED", 500 / portTICK_RATE_MS, pdTRUE, NULL, onLedTimer);
+}
+
+static void setLedState(int state)
+{
+    switch(state)
+    {
+        case LED_STATE_DISCONNECTED:
+        case LED_STATE_WIFI_CONNECTED:
+            if (xTimerIsTimerActive(ledTimer) == pdFALSE)
+            {
+                xTimerStart(ledTimer, 0);
+            }
+            break;
+        case LED_STATE_MQTT_CONNECTED:
+        default:
+            if (xTimerIsTimerActive(ledTimer) == pdTRUE)
+            {
+                xTimerStop(ledTimer, 0);
+            }
+            gpio_set_level(CONFIG_CONNECTION_LED_PIN, LED_ON);
+            break;
+    }
+}
+
+
+#endif
