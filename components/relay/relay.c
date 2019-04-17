@@ -2,6 +2,9 @@
 #include "driver/gpio.h"
 #include "relay.h"
 #include "sdkconfig.h"
+#include "esp_log.h"
+
+static const char TAG[] = "relay";
 
 void relayInit(int8_t pin, Relay_t *relay)
 {
@@ -25,6 +28,7 @@ void relaySetState(Relay_t *relay, RelayState_t state)
 #else
     l = state == RelayState_On ? 0:1;
 #endif
+    ESP_LOGI(TAG, "Relay %d: Set state %d (pin value %d)", relay->pin, state, l);
     gpio_set_level(relay->pin, l);
     relay->state = state;
 }

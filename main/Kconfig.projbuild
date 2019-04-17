@@ -122,4 +122,13 @@ config DOORBELL_PIN
     range 0 16
     default 5
 
+config CONNECTION_LED
+    bool "Enable Wifi/MQTT connection LED"
+
+config CONNECTION_LED_PIN
+    int "GPIO pin for LED"
+    depends on CONNECTION_LED
+    range 0 16
+    default 2
+    
 endmenu
