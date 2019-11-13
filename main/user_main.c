@@ -42,14 +42,15 @@ static const char TAG[] = "main";
   |  0  |   D3    | Light    |          | Light | Light 1 |
   |  1  |   TX    | TX       | TX       | TX    | TX      |
   |  2  |   D4    |          |          |       | Light 2 |
-  |  3  |   RX    | RX       | RX       | RX    | RX      |
-  |  4  |   D2    | DHT22    |          |       | DHT22   |
+  |  3  |   RX    | RX       | RX       | RX    | DHT22   |
+
+  |  4  |   D2    | DHT22    |          |       | Switch 3|
   |  5  |   D1    |          |  Switch  |       | Switch 2|
   |6-11 |   --    |  --      |  --      | --    |  --     |  
   | 12  |   D6    | Switch   |          | Switch| Switch 1|
   | 13  |   D7    | Motion   |          |       | Motion  |
   | 14  |   D5    | Fan      |          |       | Fan     |
-  | 15  |   D8    |          |          |       | Switch 3|
+  | 15  |   D8    |          |          |       |         |
   | 16  |   D0    |          |          |       | Light 3 |
 
 GPIO0(D3) - used to indicate to bootloader to go into upload mode + tied to Flash button.
@@ -178,7 +179,7 @@ void app_main(void)
     dht22AddTemperatureCallback(&thSensor, temperatureUpdate, NULL);
 #if defined(CONFIG_FAN)
     ESP_LOGI(TAG, "Adding Fan");
-    humidityFanInit(&fan0, CONFIG_FAN_PIN, FAN_HUMIDITY);
+    humidityFanInit(&fan0, CONFIG_FAN_PIN, CONFIG_FAN_HUMIDITY);
     dht22AddHumidityCallback(&thSensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan0);
 #endif
     dht22Start(&thSensor);
