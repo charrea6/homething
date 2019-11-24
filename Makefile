@@ -17,6 +17,8 @@ app-version:
 
 all: app-version
 
+EXTRA_COMPONENT_DIRS:=esp-idf-lib/components
+EXCLUDE_COMPONENTS := max7219 mcp23x17
 include $(IDF_PATH)/make/project.mk
 
 ifeq ($(CONFIG_ESPTOOLPY_FLASHSIZE), "1MB")

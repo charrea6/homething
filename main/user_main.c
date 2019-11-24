@@ -87,13 +87,23 @@ static Light_t light3;
 // DHT22 : Temperature and humidity + fan
 //
 #if defined(CONFIG_DHT22)
-static DHT22Sensor_t thSensor;
-static char temperatureStr[6];
-static iotElement_t temperatureElement;
-static iotElementPub_t temperaturePub;
+struct TemperatureSensor {
+    DHT22Sensor_t sensor;
+    char temperatureStr[6];
+    iotElement_t temperatureElement;
+    iotElementPub_t temperaturePub;
+};
+static struct TemperatureSensor thSensor0;
+
+#if defined(CONFIG_DHT22)
+static struct TemperatureSensor thSensor1;
+#endif
 
 #if defined(CONFIG_FAN)
 static HumidityFan_t fan0;
+#if defined(CONFIG_FAN_2)
+static HumidityFan_t fan1;
+#endif
 #endif
 #endif
 
@@ -104,11 +114,31 @@ static Motion_t motion0;
 #if defined(CONFIG_DHT22)
 static void temperatureUpdate(void *userData, int16_t tenthsUnit)
 {
+    struct TemperatureSensor *thSensor = userData;
     iotValue_t value;
-    sprintf(temperatureStr, "%d.%d", tenthsUnit / 10, tenthsUnit % 10);
-    value.s = temperatureStr;
-    iotElementPubUpdate(&temperaturePub, value);
+    sprintf(thSensor->temperatureStr, "%d.%d", tenthsUnit / 10, tenthsUnit % 10);
+    value.s = thSensor->temperatureStr;
+    iotElementPubUpdate(&thSensor->temperaturePub, value);
 }
+
+static void initTHSensor(struct TemperatureSensor *thSensor, int pin)
+{
+    dht22Init(&thSensor->sensor, pin);
+
+    sprintf(thSensor->temperatureStr, "0.0");
+    
+    thSensor->temperatureElement.name = "temperature";
+    iotElementAdd(&thSensor->temperatureElement);
+
+    thSensor->temperaturePub.name = "";
+    thSensor->temperaturePub.type = iotValueType_String;
+    thSensor->temperaturePub.retain = false;
+    thSensor->temperaturePub.value.s = thSensor->temperatureStr;
+    iotElementPubAdd(&thSensor->temperatureElement, &thSensor->temperaturePub);
+
+    dht22AddTemperatureCallback(&thSensor->sensor, temperatureUpdate, thSensor);
+}
+
 #endif
 
 #if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_LIGHTS_4)
@@ -163,26 +193,23 @@ void app_main(void)
 
 #if defined(CONFIG_DHT22)
     ESP_LOGI(TAG, "Adding temperature...");
-    dht22Init(&thSensor, CONFIG_DHT22_PIN);
-
-    sprintf(temperatureStr, "0.0");
-    
-    temperatureElement.name = "temperature";
-    iotElementAdd(&temperatureElement);
-
-    temperaturePub.name = "";
-    temperaturePub.type = iotValueType_String;
-    temperaturePub.retain = false;
-    temperaturePub.value.s = temperatureStr;
-    iotElementPubAdd(&temperatureElement, &temperaturePub);
-
-    dht22AddTemperatureCallback(&thSensor, temperatureUpdate, NULL);
+    initTHSensor(&thSensor0, CONFIG_DHT22_PIN);
+#if defined(CONFIG_DHT22)
+    initTHSensor(&thSensor1, CONFIG_DHT22_2_PIN);
+#endif
 #if defined(CONFIG_FAN)
     ESP_LOGI(TAG, "Adding Fan");
     humidityFanInit(&fan0, CONFIG_FAN_PIN, CONFIG_FAN_HUMIDITY);
-    dht22AddHumidityCallback(&thSensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan0);
+    dht22AddHumidityCallback(&thSensor0.sensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan0);
+#if defined(CONFIG_FAN_2)
+    ESP_LOGI(TAG, "Adding Fan 2");
+    humidityFanInit(&fan1, CONFIG_FAN_2_PIN, CONFIG_FAN_HUMIDITY);
+    dht22AddHumidityCallback(&thSensor1.sensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan1);
 #endif
-    dht22Start(&thSensor);
+
+#endif
+
+    dht22Start();
 #endif
 
 #if defined(CONFIG_LIGHTS_1) || \

@@ -34,6 +34,9 @@ static const char *TAG="DHT";
 #define debug(fmt, ...) /* (do nothing) */
 #endif
 
+static int sensorCount = 0;
+static DHT22Sensor_t *sensors = NULL;
+
 /*
  *  Note:
  *  A suitable pull-up resistor should be connected to the selected GPIO line
@@ -215,9 +218,8 @@ static void dhtThread(void* pvParameters)
 {
     bool lastNotSet = true;
     int16_t temp, hum, lastTemp=0, lastHum=0;
-
-    DHT22Sensor_t *sensor = pvParameters;
-    ESP_LOGI(TAG, "DHT thread starting, pin %d", sensor->pin);
+    DHT22Sensor_t *sensor = sensors;
+    ESP_LOGI(TAG, "DHT thread starting");
     while(true)
     {
         bool ok = dht_read_data(sensor->pin, &hum, &temp);
@@ -237,7 +239,12 @@ static void dhtThread(void* pvParameters)
             }
             lastNotSet = false;
         }
-        vTaskDelay(5000 / portTICK_RATE_MS);  //send every 5 seconds
+        vTaskDelay(5000 / (portTICK_RATE_MS * sensorCount));  //send every 5 seconds
+        sensor = sensor->next;
+        if (sensor == NULL) 
+        {
+            sensor = sensors;
+        }
     }
 }
 
@@ -246,6 +253,9 @@ void dht22Init(DHT22Sensor_t *sensor, int8_t pin)
 {
     sensor->pin = pin;
     sensor->nrofHumidityCBs = sensor->nrofTemperatureCBs = 0;
+    sensor->next = sensors;
+    sensors = sensor;
+    sensorCount++;
     setupGpio(pin);
 }
 
@@ -271,12 +281,12 @@ void dht22AddTemperatureCallback(DHT22Sensor_t *sensor, DHT22CallBack_t cb, void
     sensor->nrofTemperatureCBs ++;
 }
 
-void dht22Start(DHT22Sensor_t *sensor)
+void dht22Start(void)
 {
     xTaskCreate(dhtThread,
                 DHT_THREAD_NAME,
                 DHT_THREAD_STACK_WORDS,
-                sensor,
+                NULL,
                 DHT_THREAD_PRIO,
                 NULL);
 }

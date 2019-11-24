@@ -9,6 +9,16 @@ config DHT22_PIN
     depends on DHT22
     range 0 16
 
+config DHT22_2
+    bool "Enable 2nd DHT22"
+    depends on DHT22
+
+config DHT22_2_PIN
+    int "GPIO pin used to communicate with the DHT22"
+    default 4
+    depends on DHT22_2
+    range 0 16
+
 config FAN
     bool "Enable Fan"
 
@@ -16,6 +26,16 @@ config FAN_PIN
     int "GPIO pin used to turn on the fan"
     default 14
     depends on FAN
+    range 0 16
+
+config FAN_2
+    bool "Enable 2nd Fan"
+    depends on FAN && DHT22_2
+
+config FAN_2_PIN
+    int "GPIO pin used to turn on the fan"
+    default 14
+    depends on FAN_2
     range 0 16
 
 config FAN_HUMIDITY
@@ -110,6 +130,16 @@ config MOTION
 config MOTION_PIN
     int "GPIO pin used to detect motion"
     depends on MOTION
+    range 0 16
+    default 13
+
+config MOTION_2
+    bool "Enable Motion detection"
+    depends on MOTION
+
+config MOTION_2_PIN
+    int "GPIO pin used to detect motion"
+    depends on MOTION_2
     range 0 16
     default 13
 

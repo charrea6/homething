@@ -1,3 +1,6 @@
 [submodule "components/http-parser/http-parser"]
 	path = components/http-parser/http-parser
 	url = https://github.com/nodejs/http-parser.git
+[submodule "esp-idf-lib"]
+	path = esp-idf-lib
+	url = https://github.com/UncleRus/esp-idf-lib.git
