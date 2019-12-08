@@ -1,0 +1,20 @@
+menu "GPIO Expander Configuration"
+
+config GPIOX_NROF_EXPANDERS
+    int "Number of GPIO expanders"
+    range 0 4
+    default 0
+    help
+        This is the number of GPIO expander boards (PCF8574) that the component will support.
+
+config GPIOX_SDA_PIN
+    int "I2C SDA Pin"
+    range 0 15
+    default 4
+
+config GPIOX_SCL_PIN
+    int "I2C SCL Pin"
+    range 0 15
+    default 5
+
+endmenu
