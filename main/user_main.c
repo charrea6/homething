@@ -24,6 +24,8 @@
 #include "humidityfan.h"
 #include "doorbell.h"
 #include "updater.h"
+#include "gpiox.h"
+
 static const char TAG[] = "main";
 /* 
   Pin Allocations
@@ -121,13 +123,13 @@ static void temperatureUpdate(void *userData, int16_t tenthsUnit)
     iotElementPubUpdate(&thSensor->temperaturePub, value);
 }
 
-static void initTHSensor(struct TemperatureSensor *thSensor, int pin)
+static void initTHSensor(struct TemperatureSensor *thSensor, char *name, int pin)
 {
     dht22Init(&thSensor->sensor, pin);
 
     sprintf(thSensor->temperatureStr, "0.0");
     
-    thSensor->temperatureElement.name = "temperature";
+    thSensor->temperatureElement.name = name;
     iotElementAdd(&thSensor->temperatureElement);
 
     thSensor->temperaturePub.name = "";
@@ -167,7 +169,7 @@ void app_main(void)
     settimeofday(&tv, NULL);
     
     iotInit();
-
+    gpioxInit();
 #ifdef ENABLE_LIGHT_1
     setupLight(&light0, CONFIG_LIGHT_1_SWITCH_PIN, CONFIG_LIGHT_1_RELAY_PIN);
 #endif
@@ -193,9 +195,9 @@ void app_main(void)
 
 #if defined(CONFIG_DHT22)
     ESP_LOGI(TAG, "Adding temperature...");
-    initTHSensor(&thSensor0, CONFIG_DHT22_PIN);
+    initTHSensor(&thSensor0, "temperature0", CONFIG_DHT22_PIN);
 #if defined(CONFIG_DHT22)
-    initTHSensor(&thSensor1, CONFIG_DHT22_2_PIN);
+    initTHSensor(&thSensor1, "temperature1", CONFIG_DHT22_2_PIN);
 #endif
 #if defined(CONFIG_FAN)
     ESP_LOGI(TAG, "Adding Fan");

@@ -83,8 +83,8 @@ typedef enum {
 #define GPIOX_PINS_CLEAR_ALL(_pins) do{int i; for (i = 0; i < GPIOX_PINS_SIZE;i++) (_pins).pins[i] = 0; }while(0)
 #define GPIOX_PINS_IS_SET(_pins, pin) (((_pins).pins[pin/32] & 1 << (pin % 32)) != 0)
 
-int gpiox_init(void);
-int gpiox_setup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode);
-int gpiox_get_pins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values);
-int gpiox_set_pins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values);
+int gpioxInit(void);
+int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode);
+int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values);
+int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values);
 #endif
