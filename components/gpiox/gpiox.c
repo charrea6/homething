@@ -14,7 +14,7 @@ static i2c_dev_t expander_devices[CONFIG_GPIOX_NROF_EXPANDERS];
 
 #define BASE_ADDR 0x40
 
-int gpiox_init(void)
+int gpioxInit(void)
 {
 #if CONFIG_GPIOX_NROF_EXPANDERS > 0
     for (int i=0; i < CONFIG_GPIOX_NROF_EXPANDERS; i++)
@@ -29,7 +29,7 @@ int gpiox_init(void)
     return 0;
 }
 
-int gpiox_setup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
+int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
 {
     if (pins->pins[0] != 0)
     {
@@ -100,7 +100,7 @@ int gpiox_setup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
     return 0;   
 }
 
-int gpiox_get_pins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
+int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
 {
     GPIOX_PINS_CLEAR_ALL(*values);
     if (pins->pins[0] != 0)
@@ -137,7 +137,7 @@ int gpiox_get_pins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
     return 0;
 }
 
-int gpiox_set_pins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
+int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
 {
     if (pins->pins[0] != 0)
     {
