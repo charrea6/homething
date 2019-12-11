@@ -165,7 +165,7 @@ void app_main(void)
 {
     struct timeval tv = {.tv_sec = 0, .tv_usec=0};
     ESP_ERROR_CHECK( nvs_flash_init() );
-
+    
     settimeofday(&tv, NULL);
     
     iotInit();
