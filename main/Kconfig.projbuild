@@ -69,13 +69,13 @@ menu "Light 1 settings"
     config LIGHT_1_RELAY_PIN
         int "GPIO pin used to control relay"
         depends on LIGHTS_1 || LIGHTS_2 || LIGHTS_3 || LIGHTS_4
-        range 0 16
+        range 0 63
         default 0
 
     config LIGHT_1_SWITCH_PIN
         int "GPIO pin used for the light switch (-1 for no phyical switch)"
         depends on LIGHTS_1 || LIGHTS_2 || LIGHTS_3 || LIGHTS_4
-        range -1 16
+        range -1 63
         default 12
 endmenu
 
@@ -84,13 +84,13 @@ menu "Light 2 settings"
     config LIGHT_2_RELAY_PIN
         int "GPIO pin used to control relay"
         depends on LIGHTS_2 || LIGHTS_3 || LIGHTS_4
-        range 0 16
+        range 0 63
         default 0
 
     config LIGHT_2_SWITCH_PIN
         int "GPIO pin used for the light switch (-1 for no phyical switch)"
         depends on LIGHTS_2 || LIGHTS_3 || LIGHTS_4
-        range -1 16
+        range -1 63
         default 5
 endmenu
 
@@ -99,13 +99,13 @@ menu "Light 3 settings"
     config LIGHT_3_RELAY_PIN
         int "GPIO pin used to control relay"
         depends on LIGHTS_3 || LIGHTS_4
-        range 0 16
+        range 0 63
         default 16
 
     config LIGHT_3_SWITCH_PIN
         int "GPIO pin used for the light switch (-1 for no phyical switch)"
         depends on LIGHTS_3 || LIGHTS_4
-        range -1 16
+        range -1 63
         default 15
 endmenu
 
@@ -114,13 +114,13 @@ menu "Light 4 settings"
     config LIGHT_4_RELAY_PIN
         int "GPIO pin used to control relay"
         depends on LIGHTS_4
-        range 0 16
+        range 0 63
         default 14
 
     config LIGHT_4_SWITCH_PIN
         int "GPIO pin used for the light switch (-1 for no phyical switch)"
         depends on LIGHTS_4
-        range -1 16
+        range -1 63
         default -1
 endmenu
 
