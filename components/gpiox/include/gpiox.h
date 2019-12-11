@@ -20,7 +20,7 @@
 
 #if CONFIG_GPIOX_NROF_EXPANDERS > 0
 #define GPIOX_PINS_SIZE 2
-#define GPIOX_BASE 24
+#define GPIOX_BASE 32
 #define X1 (GPIOX_BASE)
 #define X2 (GPIOX_BASE + 1)
 #define X3 (GPIOX_BASE + 2)
