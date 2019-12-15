@@ -165,7 +165,9 @@ void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value)
     pub->value = value;
     if (pub->updateRequired)
     {
-        ESP_LOGI(TAG, "PUB: Flagging update required for %s%s%s", pub->element->name, pub->name[0]?"/":"", pub->name);
+        if (pub != &deviceUptimePub) {
+            ESP_LOGI(TAG, "PUB: Flagging update required for %s%s%s", pub->element->name, pub->name[0]?"/":"", pub->name);
+        }
     }
     else
     {
@@ -219,7 +221,7 @@ static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub,
     } 
     else 
     {
-        ESP_LOGI(TAG, "PUB: Sent %s (%d) to %s", (char *)message.payload, message.payloadlen, path);
+        ESP_LOGV(TAG, "PUB: Sent %s (%d) to %s", (char *)message.payload, message.payloadlen, path);
     }
     pub->updateRequired = false;
     return true;
