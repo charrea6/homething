@@ -68,22 +68,12 @@ GPIO16(D0) - possibly tied to RST to allow exit from deep sleep by pulling GPIO1
 //
 // Lights
 // 
-#if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_LIGHTS_4)
-#define ENABLE_LIGHT_1
-static Light_t light0;
+#if CONFIG_NROF_LIGHTS > 0
+#define LIGHT_SETUP(n) setupLight(&lights[n-1], CONFIG_LIGHT_## n ##_SWITCH_PIN, CONFIG_LIGHT_## n ##_RELAY_PIN)
+
+static Light_t lights[CONFIG_NROF_LIGHTS];
 #endif
-#if defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_LIGHTS_4)
-#define ENABLE_LIGHT_2
-static Light_t light1;
-#endif
-#if defined(CONFIG_LIGHTS_3) || defined(CONFIG_LIGHTS_4)
-#define ENABLE_LIGHT_3
-static Light_t light2;
-#endif
-#if defined(CONFIG_LIGHTS_4)
-#define ENABLE_LIGHT_4
-static Light_t light3;
-#endif
+
 
 //
 // DHT22 : Temperature and humidity + fan
@@ -143,7 +133,7 @@ static void initTHSensor(struct TemperatureSensor *thSensor, char *name, int pin
 
 #endif
 
-#if defined( CONFIG_LIGHTS_1) || defined(CONFIG_LIGHTS_2) || defined(CONFIG_LIGHTS_3) || defined(CONFIG_LIGHTS_4)
+#if CONFIG_NROF_LIGHTS > 0
 static void lightSwitchCallback(void *userData, int state)
 {
     Light_t *light = userData;
@@ -159,6 +149,7 @@ static void setupLight(Light_t *light, int switchPin, int relayPin)
         switchAdd(switchPin, lightSwitchCallback, light);
     }
 }
+
 #endif
 
 void app_main(void)
@@ -170,17 +161,30 @@ void app_main(void)
     
     iotInit();
     gpioxInit();
-#ifdef ENABLE_LIGHT_1
-    setupLight(&light0, CONFIG_LIGHT_1_SWITCH_PIN, CONFIG_LIGHT_1_RELAY_PIN);
+
+#if CONFIG_NROF_LIGHTS > 0
+    LIGHT_SETUP(1);
 #endif
-#ifdef ENABLE_LIGHT_2
-    setupLight(&light1, CONFIG_LIGHT_2_SWITCH_PIN, CONFIG_LIGHT_2_RELAY_PIN);
+#if CONFIG_NROF_LIGHTS > 1
+    LIGHT_SETUP(2);
 #endif
-#ifdef ENABLE_LIGHT_3
-    setupLight(&light2, CONFIG_LIGHT_3_SWITCH_PIN, CONFIG_LIGHT_3_RELAY_PIN);
+#if CONFIG_NROF_LIGHTS > 2
+    LIGHT_SETUP(3);
 #endif
-#ifdef ENABLE_LIGHT_4
-    setupLight(&light3, CONFIG_LIGHT_4_SWITCH_PIN, CONFIG_LIGHT_4_RELAY_PIN);
+#if CONFIG_NROF_LIGHTS > 3
+    LIGHT_SETUP(4);
+#endif
+#if CONFIG_NROF_LIGHTS > 4
+    LIGHT_SETUP(5);
+#endif
+#if CONFIG_NROF_LIGHTS > 5
+    LIGHT_SETUP(6);
+#endif
+#if CONFIG_NROF_LIGHTS > 6
+    LIGHT_SETUP(7);
+#endif
+#if CONFIG_NROF_LIGHTS > 7
+    LIGHT_SETUP(8);
 #endif
 
 #if defined(CONFIG_MOTION)
@@ -214,10 +218,7 @@ void app_main(void)
     dht22Start();
 #endif
 
-#if defined(CONFIG_LIGHTS_1) || \
-    defined(CONFIG_LIGHTS_2) || \
-    defined(CONFIG_LIGHTS_3) || \
-    defined(CONFIG_LIGHTS_4) || \
+#if CONFIG_NROF_LIGHTS > 0 || \
     defined(CONFIG_MOTION) || \
     defined(CONFIG_DOORBELL)
     switchStart();

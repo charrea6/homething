@@ -5,7 +5,7 @@
 
 PROJECT_NAME := homething
 
-
+EXTRA_CFLAGS+= -DMAX_MESSAGE_HANDLERS=8 
 VER:=$(shell git describe --dirty)
 
 app-version:

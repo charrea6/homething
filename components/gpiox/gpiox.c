@@ -37,6 +37,8 @@ int gpioxInit(void)
 
 int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
 {
+    ESP_LOGI(TAG,"Setting up Pins 0x%08x 0x%08x Mode %d", pins->pins[0], pins->pins[1], mode);
+
     if (pins->pins[0] != 0)
     {
         for (int i=0; i < GPIO_NUM_MAX; i++)

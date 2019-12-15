@@ -78,7 +78,7 @@ typedef enum {
     GPIOX_MODE_IN_PULLDOWN,
 }GPIOX_Mode_t;
 
-#define GPIOX_PINS_SET(_pins, pin) ((_pins).pins[pin/32] = 1 << (pin % 32))
+#define GPIOX_PINS_SET(_pins, pin) ((_pins).pins[pin/32] |= 1 << (pin % 32))
 #define GPIOX_PINS_CLEAR(_pins, pin) ((_pins).pins[pin/32] = ((pins).pins[pin/32] & ~(1 << (pin % 32))))
 #define GPIOX_PINS_CLEAR_ALL(_pins) do{int i; for (i = 0; i < GPIOX_PINS_SIZE;i++) (_pins).pins[i] = 0; }while(0)
 #define GPIOX_PINS_IS_SET(_pins, pin) (((_pins).pins[pin/32] & 1 << (pin % 32)) != 0)
