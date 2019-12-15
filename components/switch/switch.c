@@ -5,6 +5,7 @@
 #include "esp_log.h"
 
 #include "switch.h"
+#include "gpiox.h"
 
 static const char *TAG="switch";
 
@@ -40,26 +41,30 @@ void switchAdd(int pin, SwitchCallback_t cb, void *userData)
 static void switchThread(void* pvParameters)
 {
     int new_state, i;
-    gpio_config_t config;
+    GPIOX_Pins_t pins, values;
+    GPIOX_PINS_CLEAR_ALL(pins);
+
     ESP_LOGI(TAG, "Switch thread starting, count %d", switchCount);
     for (i=0; i < switchCount; i++)
     {
-        config.pin_bit_mask = 1<<switches[i].pin;
-        config.mode = GPIO_MODE_DEF_INPUT;
-        config.pull_down_en = GPIO_PULLDOWN_DISABLE;
-        config.pull_up_en = GPIO_PULLUP_ENABLE;
-        config.intr_type = GPIO_INTR_DISABLE;
         ESP_LOGI(TAG, "Configuring switch %d pin %d", i, switches[i].pin);
-        gpio_config(&config);
-        switches[i].state = gpio_get_level(switches[i].pin);
+        GPIOX_PINS_SET(pins, switches[i].pin);
+    }
+    gpioxSetup(&pins, GPIOX_MODE_IN_PULLUP);
+    gpioxGetPins(&pins, &values);
+    for (i=0; i < switchCount; i++)
+    {
+        switches[i].state = GPIOX_PINS_IS_SET(values, switches[i].pin);
         ESP_LOGI(TAG, "Switch %d configured pin %d state %d", i, switches[i].pin, switches[i].state);
     }
+    ESP_LOGI(TAG, "Switches configured");
     while(true)
     {
         vTaskDelay(10 / portTICK_RATE_MS);  //send every 0.01 seconds
+        gpioxGetPins(&pins, &values);
         for (i=0; i < switchCount; i++)
         {
-            new_state = gpio_get_level(switches[i].pin);
+            new_state = GPIOX_PINS_IS_SET(values, switches[i].pin);
             if (new_state != switches[i].state) 
             {
                 switches[i].cb(switches[i].userData, new_state);
