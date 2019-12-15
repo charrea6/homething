@@ -8,10 +8,13 @@ PROJECT_NAME := homething
 EXTRA_CFLAGS+= -DMAX_MESSAGE_HANDLERS=8 
 VER:=$(shell git describe --dirty)
 
+VERSION_PATH=$(BUILD_DIR_BASE)/include/version.h
+
 app-version:
+	mkdir -p $(BUILD_DIR_BASE)/include
 	echo "Creating version.h..."
-	echo "char appVersion[]=\"$(VER)\";" > components/updater/version.h
-	echo "char deviceProfile[]=\"$(DEVICE_PROFILE)\";" >> components/updater/version.h
+	echo "char appVersion[]=\"$(VER)\";" > $(VERSION_PATH)
+	echo "char deviceProfile[]=\"$(DEVICE_PROFILE)\";" >> $(VERSION_PATH)
 
 .phony: app-version
 
@@ -44,22 +47,25 @@ endif
 # 
 # This is used to ensure that when updating we get a new build with the same functionality.
 #
-PROFILE:=
-ifeq ($(CONFIG_LIGHTS_1), y)
-PROFILE += L
-endif
-ifeq ($(CONFIG_LIGHTS_2), y)
-PROFILE += LL
-endif
-ifeq ($(CONFIG_LIGHTS_3), y)
-PROFILE += LLL
+PROFILE:= 
+ifneq ($(CONFIG_NROF_LIGHTS), 0)
+	PROFILE += L$(CONFIG_NROF_LIGHTS)
 endif
 
 ifeq ($(CONFIG_DHT22), y)
-PROFILE += T
+ifeq ($(CONFIG_DHT22_2), y)
+		PROFILE += T2
+else
+		PROFILE += T1
+endif # DHT22_2
+
 ifeq ($(CONFIG_FAN), y)
-PROFILE += F
-endif
+ifeq ($(CONFIG_FAN_2), y)
+	PROFILE += F2
+else
+	PROFILE += F1
+endif # FAN_2
+endif # FAN
 endif
 
 ifeq ($(CONFIG_DOORBELL), y)
