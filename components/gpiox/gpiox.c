@@ -25,7 +25,7 @@ int gpioxInit(void)
     {
         memset(&expander_devices[i], 0, sizeof(i2c_dev_t));
 
-        if (pcf8574_init_desc(&expander_devices[i], 0, BASE_ADDR + (i * 2), CONFIG_GPIOX_SDA_PIN, CONFIG_GPIOX_SCL_PIN) != ESP_OK)
+        if (pcf8574_init_desc(&expander_devices[i], 0, BASE_ADDR + i, CONFIG_GPIOX_SDA_PIN, CONFIG_GPIOX_SCL_PIN) != ESP_OK)
         {
             ESP_LOGE(TAG, "Failed to create PCF8574 device for expander %d", i);
             return 1;
