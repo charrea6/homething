@@ -283,10 +283,13 @@ void dht22AddTemperatureCallback(DHT22Sensor_t *sensor, DHT22CallBack_t cb, void
 
 void dht22Start(void)
 {
-    xTaskCreate(dhtThread,
-                DHT_THREAD_NAME,
-                DHT_THREAD_STACK_WORDS,
-                NULL,
-                DHT_THREAD_PRIO,
-                NULL);
+    if (sensors != NULL)
+    {
+            xTaskCreate(dhtThread,
+                        DHT_THREAD_NAME,
+                        DHT_THREAD_STACK_WORDS,
+                        NULL,
+                        DHT_THREAD_PRIO,
+                        NULL);
+    }
 }

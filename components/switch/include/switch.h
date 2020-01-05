@@ -3,6 +3,7 @@
 
 typedef void (*SwitchCallback_t)(void* userData, int state);
 
+int switchInit(int max);
 void switchAdd(int pin, SwitchCallback_t cb, void *userData);
 void switchStart();
 #endif

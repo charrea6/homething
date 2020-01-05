@@ -11,6 +11,7 @@
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event_loop.h"
+#include "nvs_flash.h"
 
 #include "driver/gpio.h"
 
@@ -22,6 +23,10 @@
 #include "sdkconfig.h"
 
 static const char *TAG="IOT";
+static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
+
+#define MQTT_PATH_PREFIX_LEN 23 // homething/<MAC 12 Hexchars> \0
+#define MQTT_COMMON_CTRL_SUB_LEN (MQTT_PATH_PREFIX_LEN + 7) // "/+/ctrl"
 
 #define MQTT_CLIENT_THREAD_NAME         "mqtt_client_thread"
 #define MQTT_CLIENT_THREAD_STACK_WORDS  8192
@@ -31,6 +36,14 @@ static const char *TAG="IOT";
 
 #define POLL_INTERVAL_MS 10
 #define UPTIME_UPDATE_MS 5000
+
+#define MAX_LENGTH_WIFI_NAME 32
+#define MAX_LENGTH_WIFI_PASSWORD 64
+#define MAX_LENGTH_MQTT_SERVER 256
+#define MAX_LENGTH_MQTT_USERNAME 65
+#define MAX_LENGTH_MQTT_PASSWORD 65
+
+#define NVS_READ_STR(key, out) nvsReadStr(handle, key, out, sizeof(out))
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t wifi_event_group;
@@ -44,7 +57,16 @@ static iotElement_t deviceElement;
 static iotElementPub_t deviceIPPub;
 static iotElementPub_t deviceUptimePub;
 
-static char mqttPathPrefix[23]; // homething/<MAC 12 Hexchars> \0
+static char wifiSsid[MAX_LENGTH_WIFI_NAME];
+static char wifiPassword[MAX_LENGTH_WIFI_PASSWORD];
+
+static char mqttServer[MAX_LENGTH_MQTT_SERVER];
+static int mqttPort;
+static char mqttUsername[MAX_LENGTH_MQTT_USERNAME];
+static char mqttPassword[MAX_LENGTH_MQTT_PASSWORD];
+
+static char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
+static char mqttCommonCtrlSub[MQTT_COMMON_CTRL_SUB_LEN];
 static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 
 static void mqttClientThread(void* pvParameters);
@@ -63,19 +85,23 @@ static TimerHandle_t ledTimer;
 
 static void setupLed();
 static void setLedState(int state);
+static int nvsReadStr(nvs_handle handle, const char *key, char *out, size_t len);
 
 #define IF_LED(func) func
 #else
 #define IF_LED(func)
 #endif
 
-
-void iotInit(void)
+int iotInit(void)
 {
+    int result = 0;
+    nvs_handle handle;
+    esp_err_t err;
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     
     sprintf(mqttPathPrefix, "homething/%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    sprintf(mqttCommonCtrlSub, "%s/+/%s", mqttPathPrefix, IOT_DEFAULT_CONTROL_STR);
 
     ESP_LOGI(TAG, "Initialised IOT - device path: %s", mqttPathPrefix);
     
@@ -95,6 +121,58 @@ void iotInit(void)
     iotElementPubAdd(&deviceElement, &deviceUptimePub);
 
     IF_LED(setupLed());
+
+    err = nvs_open("wifi", NVS_READONLY, &handle);
+    if (err == ESP_OK)
+    {
+        result = NVS_READ_STR("ssid", wifiSsid);
+        if (result == 0)
+        {
+            result = NVS_READ_STR("pass", wifiPassword);
+        }
+        nvs_close(handle);
+    }
+    else
+    {
+        result = 1;
+    }
+    
+    if (result == 0)
+    {
+        err = nvs_open("mqtt", NVS_READONLY, &handle);
+        if (err == ESP_OK)
+        {
+            result = NVS_READ_STR("host", mqttServer);
+            if (result == 0)
+            {
+                uint16_t p;
+                err = nvs_get_u16(handle, "port", &p);
+                if (err == ESP_OK)
+                {   
+                    mqttPort = (int) p;
+                }
+                else
+                {
+                    mqttPort = 1883;
+                }
+
+            }
+            if (result == 0)
+            {
+                if (NVS_READ_STR("user", mqttUsername))
+                {
+                    mqttUsername[0] = 0;
+                }
+                if (NVS_READ_STR("pass", mqttPassword))
+                {
+                    mqttPassword[0] = 0;
+                }
+            }
+            nvs_close(handle);
+        }
+    }
+
+    return result;
 }
 
 void iotStart()
@@ -120,8 +198,15 @@ void iotElementAdd(iotElement_t *element)
 void iotElementSubAdd(iotElement_t *element, iotElementSub_t *sub)
 {
     size_t len;
-    const char *name = sub->name;
-    
+    const char *name;
+    if (sub->name == IOT_DEFAULT_CONTROL)
+    {
+        name = "ctrl";
+    }
+    else
+    {
+        name = sub->name;
+    }
     len = strlen(mqttPathPrefix) + 1 + strlen(element->name) + 1 + strlen(name) + 1;
     sub->path = (char *)malloc(len);
     if (sub->path == NULL)
@@ -129,7 +214,7 @@ void iotElementSubAdd(iotElement_t *element, iotElementSub_t *sub)
         ESP_LOGE(TAG, "Failed to allocate path for Element %s Sub %s", element->name, name);
         return;
     }
-    sprintf(sub->path, "%s/%s/%s", mqttPathPrefix, element->name, sub->name);
+    sprintf(sub->path, "%s/%s/%s", mqttPathPrefix, element->name, name);
     sub->element = element;
     sub->next = element->subs;
     element->subs = sub;
@@ -243,6 +328,23 @@ static bool iotElementSendUpdate(iotElement_t *element, bool force, MQTTClient *
     return true;
 }
 
+int iotStrToBool(const char *str, bool *out)
+{
+    if ((strcasecmp(str, "on") == 0) || (strcasecmp(str, "true") == 0))
+    {
+        *out = true;
+    }
+    else if ((strcasecmp(str, "off") == 0) || (strcasecmp(str, "false") == 0))
+    {
+        *out = false;
+    }
+    else
+    {
+        return 1;
+    }
+    return 0;
+}
+
 static void iotElementSubUpdate(iotElementSub_t *sub, char *payload, size_t len)
 {
     iotValue_t value;
@@ -250,15 +352,7 @@ static void iotElementSubUpdate(iotElementSub_t *sub, char *payload, size_t len)
     switch(sub->type)
     {
         case iotValueType_Bool:
-        if ((strcasecmp(payload, "on") == 0) || (strcasecmp(payload, "true") == 0))
-        {
-            value.b = true;
-        }
-        else if ((strcasecmp(payload, "off") == 0) || (strcasecmp(payload, "false") == 0))
-        {
-            value.b = false;
-        }
-        else
+        if (iotStrToBool(payload, &value.b))
         {
             ESP_LOGW(TAG, "Invalid value for bool type (%s)", payload);
             return;
@@ -292,17 +386,17 @@ static void iotElementSubUpdate(iotElementSub_t *sub, char *payload, size_t len)
     sub->callback(sub->userData, sub, value);
 }
 
-static bool iotElementSubSubscribe(iotElementSub_t *sub, MQTTClient *client)
+static bool iotSubscribe(MQTTClient *client, char *topic)
 {
     int rc;
-    if ((rc = MQTTSubscribe(client, sub->path, 2, mqttMessageArrived)) != 0) 
+    if ((rc = MQTTSubscribe(client, topic, 2, mqttMessageArrived)) != 0) 
     {
-        ESP_LOGE(TAG, "SUB: Return code from MQTT subscribe is %d for \"%s\"", rc, sub->path);
+        ESP_LOGE(TAG, "SUB: Return code from MQTT subscribe is %d for \"%s\"", rc, topic);
         return false;
     } 
     else 
     {
-        ESP_LOGI(TAG, "SUB: MQTT subscribe to topic \"%s\"", sub->path);
+        ESP_LOGI(TAG, "SUB: MQTT subscribe to topic \"%s\"", topic);
     }
     return true;
 }
@@ -311,9 +405,12 @@ static bool iotElementSubscribe(iotElement_t *element, MQTTClient *client)
 {
     for (iotElementSub_t *sub = element->subs; sub != NULL; sub = sub->next)
     {
-        if (!iotElementSubSubscribe(sub, client))
+        if (sub->name != IOT_DEFAULT_CONTROL)
         {
-            return false;
+            if (!iotSubscribe(client, sub->path))
+            {
+                return false;
+            }
         }
     }
     return true;
@@ -358,12 +455,10 @@ static void wifiInitialise(void)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = CONFIG_WIFI_SSID,
-            .password = CONFIG_WIFI_PASSWORD,
-        },
-    };
+    wifi_config_t wifi_config;
+    memset(&wifi_config, 0, sizeof(wifi_config));
+    strcpy((char *)wifi_config.sta.ssid, wifiSsid);
+    strcpy((char *)wifi_config.sta.password, wifiPassword);
     ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
@@ -463,7 +558,7 @@ static void mqttClientThread(void* pvParameters)
             value.s = ipAddr;
             iotElementPubUpdate(&deviceIPPub, value);
 
-            if ((rc = NetworkConnect(&network, CONFIG_MQTT_HOST, CONFIG_MQTT_PORT)) != 0) 
+            if ((rc = NetworkConnect(&network, mqttServer, mqttPort)) != 0) 
             {
                 ESP_LOGE(TAG, "Return code from network connect is %d, pausing for 5 seconds before reconnecting", rc);
                 vTaskDelay(5000 / portTICK_RATE_MS);  //wait for 5 seconds
@@ -475,14 +570,11 @@ static void mqttClientThread(void* pvParameters)
         }
         connectData.MQTTVersion = 3;
         connectData.clientID.cstring = mqttPathPrefix; // We use our unique MQTT path prefix as our client id here because it's unique and identifies this device nicely.
-
-#ifdef CONFIG_MQTT_USERNAME
-        connectData.username.cstring = CONFIG_MQTT_USERNAME;
-#endif
-#ifdef CONFIG_MQTT_PASSWORD
-        connectData.password.cstring = CONFIG_MQTT_PASSWORD;
-#endif
-
+        if (mqttUsername[0])
+        {
+            connectData.username.cstring = mqttUsername;
+            connectData.password.cstring = mqttPassword;
+        }
         if ((rc = MQTTConnect(&client, &connectData)) != 0) 
         {
             ESP_LOGE(TAG, "Return code from MQTT connect is %d", rc);
@@ -493,6 +585,7 @@ static void mqttClientThread(void* pvParameters)
             ESP_LOGI(TAG, "MQTT Connected");
             IF_LED(setLedState(LED_STATE_MQTT_CONNECTED));
             loop = true;
+            iotSubscribe(&client, mqttCommonCtrlSub);
 
             for (iotElement_t *element = elements; (element != NULL) && loop; element = element->next)
             {
@@ -532,6 +625,16 @@ static void mqttClientThread(void* pvParameters)
         ESP_LOGW(TAG, "Lost connection to MQTT Server");
         network.disconnect(&network);
     }
+}
+
+static int nvsReadStr(nvs_handle handle, const char *key, char *out, size_t len)
+{
+    esp_err_t err = nvs_get_str(handle, key, out, &len);
+    if (err != ESP_OK)
+    {
+        return 1;
+    }
+    return 0;
 }
 
 #ifdef CONFIG_CONNECTION_LED

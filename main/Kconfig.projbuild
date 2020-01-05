@@ -1,185 +1,25 @@
 menu "Thing Configuration"
 
 config DHT22
-    bool "Enable DHT22"
-
-config DHT22_PIN
-    int "GPIO pin used to communicate with the DHT22"
-    default 4
-    depends on DHT22
-    range 0 16
-
-config DHT22_2
-    bool "Enable 2nd DHT22"
-    depends on DHT22
-
-config DHT22_2_PIN
-    int "GPIO pin used to communicate with the DHT22"
-    default 4
-    depends on DHT22_2
-    range 0 16
+    bool "Enable DHT22 support"
 
 config FAN
-    bool "Enable Fan"
-
-config FAN_PIN
-    int "GPIO pin used to turn on the fan"
-    default 14
-    depends on FAN
-    range 0 16
-
-config FAN_2
-    bool "Enable 2nd Fan"
-    depends on FAN && DHT22_2
-
-config FAN_2_PIN
-    int "GPIO pin used to turn on the fan"
-    default 14
-    depends on FAN_2
-    range 0 16
-
+    bool "Enable Humidistat Fan support"
+    
 config FAN_HUMIDITY
     int "Percent Relative Humidty at which to turn on the fan"
     default 75
     range 0 100
     depends on FAN
 
-config NROF_LIGHTS
-    int "Number of lights to support"
-    range 0 8
-    default 0
-
-menu "Light 1 settings"
-    depends on NROF_LIGHTS > 0
-    config LIGHT_1_RELAY_PIN
-        int "GPIO pin used to control relay"
-        range 0 63
-        default 0
-
-    config LIGHT_1_SWITCH_PIN
-        int "GPIO pin used for the light switch (-1 for no phyical switch)"
-        range -1 63
-        default 12
-endmenu
-
-menu "Light 2 settings"
-    depends on NROF_LIGHTS > 1
-    config LIGHT_2_RELAY_PIN
-        int "GPIO pin used to control relay"
-        range 0 63
-        default 0
-
-    config LIGHT_2_SWITCH_PIN
-        int "GPIO pin used for the light switch (-1 for no phyical switch)"
-        range -1 63
-        default 5
-endmenu
-
-menu "Light 3 settings"
-    depends on NROF_LIGHTS > 2
-    config LIGHT_3_RELAY_PIN
-        int "GPIO pin used to control relay"
-        range 0 63
-        default 16
-
-    config LIGHT_3_SWITCH_PIN
-        int "GPIO pin used for the light switch (-1 for no phyical switch)"
-        range -1 63
-        default 15
-endmenu
-
-menu "Light 4 settings"
-    depends on NROF_LIGHTS > 3
-    config LIGHT_4_RELAY_PIN
-        int "GPIO pin used to control relay"
-        range 0 63
-        default 14
-
-    config LIGHT_4_SWITCH_PIN
-        int "GPIO pin used for the light switch (-1 for no phyical switch)"
-        range -1 63
-        default -1
-endmenu
-
-menu "Light 5 settings"
-    depends on NROF_LIGHTS > 4
-    config LIGHT_5_RELAY_PIN
-        int "GPIO pin used to control relay"
-        range 0 63
-        default 14
-
-    config LIGHT_5_SWITCH_PIN
-        int "GPIO pin used for the light switch (-1 for no phyical switch)"
-        range -1 63
-        default -1
-endmenu
-
-menu "Light 6 settings"
-    depends on NROF_LIGHTS > 5
-    config LIGHT_6_RELAY_PIN
-        int "GPIO pin used to control relay"
-        range 0 63
-        default 14
-
-    config LIGHT_6_SWITCH_PIN
-        int "GPIO pin used for the light switch (-1 for no phyical switch)"
-        range -1 63
-        default -1
-endmenu
-
-menu "Light 7 settings"
-    depends on NROF_LIGHTS > 6
-    config LIGHT_7_RELAY_PIN
-        int "GPIO pin used to control relay"
-        range 0 63
-        default 14
-
-    config LIGHT_7_SWITCH_PIN
-        int "GPIO pin used for the light switch (-1 for no phyical switch)"
-        range -1 63
-        default -1
-endmenu
-
-menu "Light 8 settings"
-    depends on NROF_LIGHTS > 7
-    config LIGHT_8_RELAY_PIN
-        int "GPIO pin used to control relay"
-        range 0 63
-        default 14
-
-    config LIGHT_8_SWITCH_PIN
-        int "GPIO pin used for the light switch (-1 for no phyical switch)"
-        range -1 63
-        default -1
-endmenu
+config LIGHT
+    bool "Enable light switch support"
 
 config MOTION
-    bool "Enable Motion detection"
-
-config MOTION_PIN
-    int "GPIO pin used to detect motion"
-    depends on MOTION
-    range 0 16
-    default 13
-
-config MOTION_2
-    bool "Enable Motion detection"
-    depends on MOTION
-
-config MOTION_2_PIN
-    int "GPIO pin used to detect motion"
-    depends on MOTION_2
-    range 0 16
-    default 13
+    bool "Enable Motion detection support"
 
 config DOORBELL
     bool "Enable Doorbell function"
-
-config DOORBELL_PIN
-    int "GPIO pin used to detect presses on the doorbell"
-    depends on DOORBELL
-    range 0 16
-    default 5
 
 config CONNECTION_LED
     bool "Enable Wifi/MQTT connection LED"

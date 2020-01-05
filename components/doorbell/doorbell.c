@@ -12,7 +12,7 @@ static const char pressed[] = "pressed";
 static iotElement_t element;
 static iotElementPub_t alertPub;
 
-void doorbellInit(int8_t pin)
+void doorbellInit(int pin)
 {
     switchAdd(pin, doorbellSwitchCallback, NULL);
     element.name = "doorbell";

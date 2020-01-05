@@ -27,33 +27,26 @@
 #include "gpiox.h"
 
 static const char TAG[] = "main";
+static const char PROFILE[] = "profile";
 /* 
-  Pin Allocations
-  ---------------
+  Pins
+  ----
 
-  | Profile  | Functions
-  |----------|----------------------------------------------------
-  | Bathroom | Light/Switch/Motion/Temperature/Humidity Fan
-  | Utility  | 3x Light/3x Switch/Motion/Temperature/Humidity Fan
-  | Light    | Light/Switch
-  | Doorbell | doorbell(Switch)
-  
-  |    Pins       |             Profile                   |
-  |GPIO | NodeMcu | Bathroom | Doorbell | Light | Utility |
-  |-----|---------|----------|----------|-------|---------|
-  |  0  |   D3    | Light    |          | Light | Light 1 |
-  |  1  |   TX    | TX       | TX       | TX    | TX      |
-  |  2  |   D4    |          |          |       | Light 2 |
-  |  3  |   RX    | RX       | RX       | RX    | DHT22   |
-
-  |  4  |   D2    | DHT22    |          |       | Switch 3|
-  |  5  |   D1    |          |  Switch  |       | Switch 2|
-  |6-11 |   --    |  --      |  --      | --    |  --     |  
-  | 12  |   D6    | Switch   |          | Switch| Switch 1|
-  | 13  |   D7    | Motion   |          |       | Motion  |
-  | 14  |   D5    | Fan      |          |       | Fan     |
-  | 15  |   D8    |          |          |       |         |
-  | 16  |   D0    |          |          |       | Light 3 |
+  |    Pins       |
+  |GPIO | NodeMcu |
+  |-----|---------|
+  |  0  |   D3    |
+  |  1  |   TX    |
+  |  2  |   D4    |
+  |  3  |   RX    |
+  |  4  |   D2    |
+  |  5  |   D1    |
+  |6-11 |   --    |
+  | 12  |   D6    |
+  | 13  |   D7    |
+  | 14  |   D5    |
+  | 15  |   D8    |
+  | 16  |   D0    |
 
 GPIO0(D3) - used to indicate to bootloader to go into upload mode + tied to Flash button.
 GPIO16(D0) - possibly tied to RST to allow exit from deep sleep by pulling GPIO16 low.
@@ -65,15 +58,18 @@ GPIO16(D0) - possibly tied to RST to allow exit from deep sleep by pulling GPIO1
 
 */
 
+static int nrofLights = 0;
+static int nrofBells = 0;
+static int nrofMotions = 0;
+static int nrofTemps = 0;
+static int nrofFans = 0;
+
 //
 // Lights
 // 
-#if CONFIG_NROF_LIGHTS > 0
-#define LIGHT_SETUP(n) setupLight(&lights[n-1], CONFIG_LIGHT_## n ##_SWITCH_PIN, CONFIG_LIGHT_## n ##_RELAY_PIN)
-
-static Light_t lights[CONFIG_NROF_LIGHTS];
+#if defined(CONFIG_LIGHT)
+static Light_t *lights;
 #endif
-
 
 //
 // DHT22 : Temperature and humidity + fan
@@ -81,26 +77,20 @@ static Light_t lights[CONFIG_NROF_LIGHTS];
 #if defined(CONFIG_DHT22)
 struct TemperatureSensor {
     DHT22Sensor_t sensor;
+    char name[13];
     char temperatureStr[6];
     iotElement_t temperatureElement;
     iotElementPub_t temperaturePub;
 };
-static struct TemperatureSensor thSensor0;
-
-#if defined(CONFIG_DHT22)
-static struct TemperatureSensor thSensor1;
-#endif
+static struct TemperatureSensor *thSensors;
 
 #if defined(CONFIG_FAN)
-static HumidityFan_t fan0;
-#if defined(CONFIG_FAN_2)
-static HumidityFan_t fan1;
-#endif
+static HumidityFan_t *fans;
 #endif
 #endif
 
 #if defined(CONFIG_MOTION)
-static Motion_t motion0;
+static Motion_t *motionSenors;
 #endif
 
 #if defined(CONFIG_DHT22)
@@ -113,13 +103,14 @@ static void temperatureUpdate(void *userData, int16_t tenthsUnit)
     iotElementPubUpdate(&thSensor->temperaturePub, value);
 }
 
-static void initTHSensor(struct TemperatureSensor *thSensor, char *name, int pin)
+static void initTHSensor(struct TemperatureSensor *thSensor, int id, int pin)
 {
+    sprintf(thSensor->name, "temperature%d", id);
     dht22Init(&thSensor->sensor, pin);
 
     sprintf(thSensor->temperatureStr, "0.0");
     
-    thSensor->temperatureElement.name = name;
+    thSensor->temperatureElement.name = thSensor->name;
     iotElementAdd(&thSensor->temperatureElement);
 
     thSensor->temperaturePub.name = "";
@@ -133,7 +124,7 @@ static void initTHSensor(struct TemperatureSensor *thSensor, char *name, int pin
 
 #endif
 
-#if CONFIG_NROF_LIGHTS > 0
+#if defined(CONFIG_LIGHT)
 static void lightSwitchCallback(void *userData, int state)
 {
     Light_t *light = userData;
@@ -149,80 +140,218 @@ static void setupLight(Light_t *light, int switchPin, int relayPin)
         switchAdd(switchPin, lightSwitchCallback, light);
     }
 }
-
 #endif
 
+esp_err_t processProfile(uint8_t *profile, size_t len)
+{
+    int i;
+    int bell=0, light=0, motion=0, temp=0, fan=0;
+
+    // First pass of profile string to work out how many of each type of sensor/switch/relay we have
+    for (i=0; i < len; i++)
+    {
+        switch(profile[i])
+        {
+            case 'L': nrofLights++; i+=2;
+            break;
+            case 'B': i+=1;
+            if (nrofBells >= 1) {
+                ESP_LOGW(TAG, "Only 1 doorbell supported");
+            } else {
+                nrofBells++;
+            }
+            break;
+            case 'M': nrofMotions++; i+=1;
+            break;
+            case 'T': nrofTemps++; i+=1;
+            break;
+            case 'F': nrofFans++; i+=1;
+            break;
+            default:
+            printf("Unknown profile type '%c'!\n", profile[i]);
+            abort();
+        }
+    }
+
+    ESP_LOGI(TAG, "Lights: %d Doorbells: %d Motion Detectors: %d Temperature Sensors: %d Humidity Fans: %d", 
+        nrofLights, nrofBells, nrofMotions, nrofTemps, nrofFans);
+    
+    switchInit(nrofLights + nrofBells + nrofMotions);
+
+#if defined(CONFIG_LIGHT)
+    lights = calloc(nrofLights, sizeof(Light_t));
+    if (lights == NULL) 
+    {
+        return ESP_ERR_NO_MEM;
+    }
+#endif
+#if defined(CONFIG_MOTION)
+    motionSenors = calloc(nrofMotions, sizeof(Motion_t));
+    if (motionSenors == NULL)
+    {
+        return ESP_ERR_NO_MEM;
+    }
+#endif
+#if defined(CONFIG_DHT22)
+    thSensors = calloc(nrofTemps, sizeof(struct TemperatureSensor));
+    if (thSensors == NULL)
+    {
+        return ESP_ERR_NO_MEM;
+    }
+#if defined(CONFIG_FAN)
+    fans = calloc(nrofFans, sizeof(HumidityFan_t));
+    if (fans == NULL)
+    {
+        return ESP_ERR_NO_MEM;
+    }
+#endif
+#endif
+
+    // Second pass to create the sensors/lights etc
+    for (i=0; i < len; i++)
+    {
+        switch(profile[i])
+        {
+            case 'L': 
+#if defined(CONFIG_LIGHT)
+            {
+                int relay_pin = profile[++i];
+                int sw_pin = profile[++i];
+                setupLight(&lights[light], sw_pin, relay_pin);
+                light++;
+            }
+#else
+            i+=2;
+#endif
+            break;
+            case 'B': 
+#if defined(CONFIG_DOORBELL)
+            if (bell == 0)
+            {
+                doorbellInit((int) profile[++i]);
+                bell++;
+            }
+#else
+            i+=1;
+#endif
+            break;
+            case 'M': 
+#if defined(CONFIG_MOTION)
+            motionInit(&motionSenors[motion], (int)profile[++i]);
+            motion++;
+#else
+            i+=1;
+#endif
+            break;
+            case 'T': 
+#if defined(CONFIG_DHT22)
+            initTHSensor(&thSensors[temp], temp, (int)profile[++i]);
+            temp++;
+#else
+            i+=1;
+#endif
+            break;
+            case 'F': 
+#if defined(CONFIG_FAN)
+            if (temp >= nrofTemps)
+            {
+                ESP_LOGE(TAG, "More fans than temperature sensors, reducing to the same as sensors!");
+            }
+            else
+            {
+                humidityFanInit(&fans[fan], (int)profile[++i], CONFIG_FAN_HUMIDITY);
+                dht22AddHumidityCallback(&thSensors[fan].sensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fans[fan]);
+                fan++;
+            }
+#else
+            i+=1;
+#endif
+            break;
+            default:
+            printf("Unknown profile type '%c'!\n", profile[i]);
+            abort();
+        }
+    }
+    return ESP_OK;
+}
+
+/* NVS Configuration
+ *
+ * NS: wifi
+ * net = Network to connect to
+ * pass = Wifi network password
+ * 
+ * NS: mqtt
+ * host = Server IP address
+ * port = Server Port
+ * user = username
+ * pass = password
+ * 
+ * NS: thing
+ * profile = Profile configuration string (str)
+ *     <b> == byte
+ * 
+ *     L<b1><b2> : b1= Switch pin, b2= Relay pin
+ *     B<b1>     : b1= Doorbell switch pin
+ *     M<b1>     : b1= Motion detector pin
+ *     T<b1>     : b1= DHT22 pin
+ *     F<b1>     : b1= Relay pin
+ * relayOnLevel = Relay activation level (1/0)
+ * 
+ * NS: gpiox
+ * num = GPIOX number of expanders (byte)
+ * sda = SDA pin (byte)
+ * scl = SCL pin (byte)
+ * 
+ */
 void app_main(void)
 {
+    nvs_handle handle;
+    esp_err_t err;
+    uint8_t relayOnLevel = 0;
+    size_t len;
+    uint8_t *profile = NULL;
     struct timeval tv = {.tv_sec = 0, .tv_usec=0};
-    ESP_ERROR_CHECK( nvs_flash_init() );
-    
     settimeofday(&tv, NULL);
-    
+
+    ESP_ERROR_CHECK( nvs_flash_init() );
+    ESP_ERROR_CHECK( nvs_open("thing", NVS_READONLY, &handle) );
+
+    err = nvs_get_u8(handle, "relayOnLevel", &relayOnLevel);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to retrieve relayOnLevel, defaulting to 0: %d", err);
+    }
+    relaySetOnLevel(relayOnLevel);
+
+    ESP_ERROR_CHECK( nvs_get_blob(handle, PROFILE, NULL, &len) );
+    profile = malloc(len);
+    if (profile == NULL)
+    {  
+        printf("Failed to allocate memory for profile string (%d bytes required)\n", len);
+        abort();
+    }
+
+    ESP_ERROR_CHECK( nvs_get_blob(handle, PROFILE, profile, &len) );
+
+    nvs_close(handle);
+
     iotInit();
     gpioxInit();
-
-#if CONFIG_NROF_LIGHTS > 0
-    LIGHT_SETUP(1);
-#endif
-#if CONFIG_NROF_LIGHTS > 1
-    LIGHT_SETUP(2);
-#endif
-#if CONFIG_NROF_LIGHTS > 2
-    LIGHT_SETUP(3);
-#endif
-#if CONFIG_NROF_LIGHTS > 3
-    LIGHT_SETUP(4);
-#endif
-#if CONFIG_NROF_LIGHTS > 4
-    LIGHT_SETUP(5);
-#endif
-#if CONFIG_NROF_LIGHTS > 5
-    LIGHT_SETUP(6);
-#endif
-#if CONFIG_NROF_LIGHTS > 6
-    LIGHT_SETUP(7);
-#endif
-#if CONFIG_NROF_LIGHTS > 7
-    LIGHT_SETUP(8);
-#endif
-
-#if defined(CONFIG_MOTION)
-    ESP_LOGI(TAG, "Adding motion");
-    motionInit(&motion0, CONFIG_MOTION_PIN);
-#endif
-
-#if defined(CONFIG_DOORBELL)
-    ESP_LOGI(TAG , "Adding doorbell");
-    doorbellInit(CONFIG_DOORBELL_PIN);
-#endif
+    
+    ESP_ERROR_CHECK( processProfile(profile, len));
+    free(profile);
 
 #if defined(CONFIG_DHT22)
-    ESP_LOGI(TAG, "Adding temperature...");
-    initTHSensor(&thSensor0, "temperature0", CONFIG_DHT22_PIN);
-#if defined(CONFIG_DHT22)
-    initTHSensor(&thSensor1, "temperature1", CONFIG_DHT22_2_PIN);
-#endif
-#if defined(CONFIG_FAN)
-    ESP_LOGI(TAG, "Adding Fan");
-    humidityFanInit(&fan0, CONFIG_FAN_PIN, CONFIG_FAN_HUMIDITY);
-    dht22AddHumidityCallback(&thSensor0.sensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan0);
-#if defined(CONFIG_FAN_2)
-    ESP_LOGI(TAG, "Adding Fan 2");
-    humidityFanInit(&fan1, CONFIG_FAN_2_PIN, CONFIG_FAN_HUMIDITY);
-    dht22AddHumidityCallback(&thSensor1.sensor, (DHT22CallBack_t)humidityFanUpdateHumidity, &fan1);
-#endif
-
-#endif
-
     dht22Start();
 #endif
 
-#if CONFIG_NROF_LIGHTS > 0 || \
+#if defined(CONFIG_LIGHT) || \
     defined(CONFIG_MOTION) || \
     defined(CONFIG_DOORBELL)
     switchStart();
 #endif
+
     updaterInit();
     iotStart();
 }

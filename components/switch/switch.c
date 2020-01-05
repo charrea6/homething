@@ -26,13 +26,31 @@ static struct Switch{
     int state;
     SwitchCallback_t cb;
     void *userData;
-}switches[MAX_SWITCHES];
+}*switches;
 
+static int maxSwitches = 0;
 static int switchCount = 0;
+
+int switchInit(int max)
+{
+    if (max == 0)
+    {
+        maxSwitches = 0;
+        switches = NULL;
+    }
+    switches = calloc(max, sizeof(struct Switch));
+    if (switches != NULL)
+    {
+        maxSwitches = max;
+        return 0;
+    }
+    ESP_LOGE(TAG, "Failed to allocate memory for switch structures (requested max: %d)", max);
+    return 1;
+}
 
 void switchAdd(int pin, SwitchCallback_t cb, void *userData)
 {
-    if (switchCount >= MAX_SWITCHES)
+    if (switchCount >= maxSwitches)
     {
         ESP_LOGE(TAG, "No available switches! Used %d", switchCount);
         return;
@@ -82,10 +100,13 @@ static void switchThread(void* pvParameters)
 
 void switchStart()
 {
-    xTaskCreate(switchThread,
-                SWITCH_THREAD_NAME,
-                SWITCH_THREAD_STACK_WORDS,
-                NULL,
-                SWITCH_THREAD_PRIO,
-                NULL);
+    if (switchCount > 0)
+    {
+        xTaskCreate(switchThread,
+                    SWITCH_THREAD_NAME,
+                    SWITCH_THREAD_STACK_WORDS,
+                    NULL,
+                    SWITCH_THREAD_PRIO,
+                    NULL);
+    }
 }

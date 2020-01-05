@@ -3,5 +3,5 @@
 
 #include <stdint.h>
 
-void doorbellInit(int8_t pin);
+void doorbellInit(int pin);
 #endif
