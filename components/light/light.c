@@ -27,7 +27,7 @@ void lightInit(Light_t *light, int8_t pin)
     iotElementPubAdd(&light->element, &light->state);
     
     control = &light->control;
-    control->name = "ctrl";
+    control->name = IOT_DEFAULT_CONTROL;
     control->type = iotValueType_Bool;
     control->callback = (iotElementSubUpdateCallback_t)lightControl;
     control->userData = light;

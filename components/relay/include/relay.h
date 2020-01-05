@@ -11,6 +11,7 @@ typedef struct Relay {
     RelayState_t state;
 } Relay_t;
 
+void relaySetOnLevel(int level);
 void relayInit(int8_t pin, Relay_t *relay);
 void relaySetState(Relay_t *relay, RelayState_t state);
 #define relayGetState(relay) ((relay)->state)

@@ -2,9 +2,7 @@
 #define _IOT_H_
 #include <stdbool.h>
 
-#define IOT_MAX_ELEMENT 8
-#define IOT_MAX_PUB 5
-#define IOT_MAX_SUB 5
+#define IOT_DEFAULT_CONTROL NULL
 
 typedef union {
     int i;
@@ -60,7 +58,7 @@ typedef struct iotElement {
 /** Initialse the IOT subsystem.
  * This needs to be done before you can add Elements and Pub/Sub items.
  */
-void iotInit(void);
+int iotInit(void);
 
 /** Start the IOT Subsystem
  * Connects to the configured Wifi network and then to the configured MQTT server.
@@ -76,6 +74,10 @@ void iotElementSubAdd(iotElement_t *element, iotElementSub_t *sub);
 void iotElementPubAdd(iotElement_t *element, iotElementPub_t *pub);
 void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value);
 
-
+/** Convert a string value to a boolean
+ * Accepts "on"/"off", "true"/"false" (ignoring case) and returns 0;
+ * Invalid values return 1
+ */
+int iotStrToBool(const char *str, bool *out);
 
 #endif

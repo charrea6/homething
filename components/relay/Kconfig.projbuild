@@ -1,7 +1,0 @@
-menu "Relay Configuration"
-
-config RELAY_ON_HIGH
-    bool "Relay switches on high signal?"
-    
-
-endmenu

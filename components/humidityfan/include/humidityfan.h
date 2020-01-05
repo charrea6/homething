@@ -16,7 +16,6 @@ typedef struct HumidityFan{
     iotElementPub_t thresholdPub;
     iotElementPub_t humidityPub;
     iotElementSub_t ctrl;
-    iotElementSub_t thresholdSub;
     int threshold;
     int runOnSeconds;
     TimerHandle_t runOnTimer;

@@ -4,8 +4,6 @@
 #
 
 PROJECT_NAME := homething
-
-EXTRA_CFLAGS+= -DMAX_MESSAGE_HANDLERS=8 
 VER:=$(shell git describe --dirty)
 
 VERSION_PATH=$(BUILD_DIR_BASE)/include/version.h
@@ -16,9 +14,20 @@ app-version:
 	echo "char appVersion[]=\"$(VER)\";" > $(VERSION_PATH)
 	echo "char deviceProfile[]=\"$(DEVICE_PROFILE)\";" >> $(VERSION_PATH)
 
-.phony: app-version
+.phony: app-version, nvs-info
 
 all: app-version
+
+nvs-info:
+	$(eval NVS_DATA_SIZE := $(shell $(GET_PART_INFO) --type data --subtype nvs --size $(PARTITION_TABLE_BIN) || echo 0))
+	$(eval NVS_DATA_OFFSET := $(shell $(GET_PART_INFO) --type data --subtype nvs --offset $(PARTITION_TABLE_BIN)))
+
+config.bin: config.csv nvs-info
+	
+	python $(IDF_PATH)/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py --input $< --output $@ --size $(NVS_DATA_SIZE)
+
+flash-config: config.bin nvs-info
+	$(ESPTOOLPY_WRITE_FLASH) $(NVS_DATA_OFFSET) $<
 
 EXTRA_COMPONENT_DIRS:=esp-idf-lib/components
 EXCLUDE_COMPONENTS := max7219 mcp23x17
@@ -48,23 +57,15 @@ endif
 # This is used to ensure that when updating we get a new build with the same functionality.
 #
 PROFILE:= 
-ifneq ($(CONFIG_NROF_LIGHTS), 0)
-	PROFILE += L$(CONFIG_NROF_LIGHTS)
+ifeq ($(CONFIG_LIGHT), y)
+	PROFILE += L
 endif
 
 ifeq ($(CONFIG_DHT22), y)
-ifeq ($(CONFIG_DHT22_2), y)
-		PROFILE += T2
-else
-		PROFILE += T1
-endif # DHT22_2
+	PROFILE += T
 
 ifeq ($(CONFIG_FAN), y)
-ifeq ($(CONFIG_FAN_2), y)
-	PROFILE += F2
-else
-	PROFILE += F1
-endif # FAN_2
+	PROFILE += F
 endif # FAN
 endif
 
@@ -74,10 +75,6 @@ endif
 
 ifeq ($(CONFIG_MOTION), y)
 PROFILE += M
-endif
-
-ifeq ($(CONFIG_RELAY_ON_HIGH), y)
-PROFILE += +
 endif
 
 DEVICE_PROFILE=$(shell  echo $(PROFILE) | sed 's/ //g')

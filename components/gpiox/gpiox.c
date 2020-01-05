@@ -2,37 +2,85 @@
 #include <string.h>
 #include "esp_err.h"
 #include "esp_log.h"
+#include "nvs_flash.h"
 #include "esp8266/gpio_struct.h"
 #include "driver/gpio.h"
 #include "i2cdev.h"
 #include "pcf8574.h"
 #include "gpiox.h"
 
+#define MAX_EXPANDERS 4
+
 static const char *TAG="GPIOX";
 
-#if CONFIG_GPIOX_NROF_EXPANDERS > 0
-static uint8_t expander_pin_settings[CONFIG_GPIOX_NROF_EXPANDERS] = {0};
-static i2c_dev_t expander_devices[CONFIG_GPIOX_NROF_EXPANDERS];
-#endif
+static uint8_t nrofExpanders = 0;
+static uint8_t expander_pin_settings[MAX_EXPANDERS] = {0};
+static i2c_dev_t expander_devices[MAX_EXPANDERS];
 
 #define BASE_ADDR 0x20
 
 int gpioxInit(void)
 {
-#if CONFIG_GPIOX_NROF_EXPANDERS > 0
-    ESP_ERROR_CHECK(i2cdev_init());
-    for (int i=0; i < CONFIG_GPIOX_NROF_EXPANDERS; i++)
-    {
-        memset(&expander_devices[i], 0, sizeof(i2c_dev_t));
+    int result = 0;
+    nvs_handle handle;
+    uint8_t scl, sda;
 
-        if (pcf8574_init_desc(&expander_devices[i], 0, BASE_ADDR + i, CONFIG_GPIOX_SDA_PIN, CONFIG_GPIOX_SCL_PIN) != ESP_OK)
+    esp_err_t err = nvs_open("gpiox", NVS_READONLY, &handle);
+    if (err == ESP_OK)
+    {
+        err = nvs_get_u8(handle, "num", &nrofExpanders);
+        if (err != ESP_OK)
         {
-            ESP_LOGE(TAG, "Failed to create PCF8574 device for expander %d", i);
-            return 1;
+            ESP_LOGE(TAG, "Failed to retrieve number of expanders, defaulting to 0: %d", err);
+        }
+
+        if (nrofExpanders > MAX_EXPANDERS)
+        {
+            ESP_LOGW(TAG, "Number of expanders %d > %d! limiting to %d", nrofExpanders, MAX_EXPANDERS, MAX_EXPANDERS);
+            nrofExpanders = MAX_EXPANDERS;
+        }
+        if (nrofExpanders > 0)
+        {
+            err = nvs_get_u8(handle, "scl", &scl);
+            if (err != ESP_OK)
+            {
+                ESP_LOGE(TAG, "Failed to retrieve scl: %d", err);
+                result = 1;
+            }
+
+            err = nvs_get_u8(handle, "sda", &sda);
+            if (err != ESP_OK)
+            {
+                ESP_LOGE(TAG, "Failed to retrieve sda: %d", err);
+                result = 1;
+            }
+        }
+        nvs_close(handle);
+    }
+    if ((nrofExpanders > 0) && (result == 0))
+    {
+        err = i2cdev_init();
+        if (err == ESP_OK)
+        {
+            for (int i=0; i < MAX_EXPANDERS; i++)
+            {
+                memset(&expander_devices[i], 0, sizeof(i2c_dev_t));
+                err = pcf8574_init_desc(&expander_devices[i], 0, BASE_ADDR + i, sda, scl);
+                if (err != ESP_OK)
+                {
+                    ESP_LOGE(TAG, "Failed to create PCF8574 device for expander %d: %d", i, err);
+                    result = 1;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Failed to init i2cdev: %d", err);
+            result = 1;
         }
     }
-#endif
-    return 0;
+    return result;
 }
 
 int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
@@ -79,32 +127,33 @@ int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
             }
         }
     }
-#if CONFIG_GPIOX_NROF_EXPANDERS > 0
-    if (pins->pins[1] != 0)
+    if (nrofExpanders > 0)
     {
-        for (int i = 0; i < CONFIG_GPIOX_NROF_EXPANDERS; i ++)
+        if (pins->pins[1] != 0)
         {
-            uint8_t expander_pins = pins->pins[1] >> (8 * i);
-            switch(mode)
+            for (int i = 0; i < MAX_EXPANDERS; i ++)
             {
-                case GPIOX_MODE_OUT: 
-                expander_pin_settings[i] &= ~expander_pins;
-                break;
-                case GPIOX_MODE_IN_PULLUP:
-                expander_pin_settings[i] |= expander_pins;
-                break;
-                default:
-                return 1;
-            }
-            ESP_LOGI(TAG, "Setup expander %d pins 0x%02x to 0x%02x", i, expander_pins, expander_pin_settings[i]);
-            if (pcf8574_port_write(&expander_devices[i], expander_pin_settings[i]) != ESP_OK)
-            {
-                ESP_LOGE(TAG, "Pin setup failed for expander %d", i);
-                return 1;
+                uint8_t expander_pins = pins->pins[1] >> (8 * i);
+                switch(mode)
+                {
+                    case GPIOX_MODE_OUT: 
+                    expander_pin_settings[i] &= ~expander_pins;
+                    break;
+                    case GPIOX_MODE_IN_PULLUP:
+                    expander_pin_settings[i] |= expander_pins;
+                    break;
+                    default:
+                    return 1;
+                }
+                ESP_LOGI(TAG, "Setup expander %d pins 0x%02x to 0x%02x", i, expander_pins, expander_pin_settings[i]);
+                if (pcf8574_port_write(&expander_devices[i], expander_pin_settings[i]) != ESP_OK)
+                {
+                    ESP_LOGE(TAG, "Pin setup failed for expander %d", i);
+                    return 1;
+                }
             }
         }
     }
-#endif
     return 0;   
 }
 
@@ -126,22 +175,24 @@ int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
             }
         }
     }
-#if CONFIG_GPIOX_NROF_EXPANDERS > 0
-    if (pins->pins[1] != 0)
+
+    if (nrofExpanders > 0)
     {
-        for (int i = 0; i < CONFIG_GPIOX_NROF_EXPANDERS; i ++)
+        if (pins->pins[1] != 0)
         {
-            uint8_t expander_pins = pins->pins[1] >> (8 * i);
-            uint8_t value;
-            if (pcf8574_port_read(&expander_devices[i], &value) != ESP_OK)
+            for (int i = 0; i < MAX_EXPANDERS; i ++)
             {
-                ESP_LOGE(TAG, "Pin read failed for expander %d", i);
-                return 1;
+                uint8_t expander_pins = pins->pins[1] >> (8 * i);
+                uint8_t value;
+                if (pcf8574_port_read(&expander_devices[i], &value) != ESP_OK)
+                {
+                    ESP_LOGE(TAG, "Pin read failed for expander %d", i);
+                    return 1;
+                }
+                values->pins[1] |= (value & expander_pins) << (i * 8);
             }
-            values->pins[1] |= (value & expander_pins) << (i * 8);
         }
     }
-#endif
     return 0;
 }
 
@@ -159,22 +210,23 @@ int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
             }
         }
     }
-#if CONFIG_GPIOX_NROF_EXPANDERS > 0
-    if (pins->pins[1] != 0)
+    if (nrofExpanders > 0)
     {
-        for (int i = 0; i < CONFIG_GPIOX_NROF_EXPANDERS; i ++)
+        if (pins->pins[1] != 0)
         {
-            uint8_t expander_pins = pins->pins[1] >> (8 * i);
-            uint8_t value = ((values->pins[1] >> (8 * i)) & expander_pins) | (expander_pin_settings[i] & ~expander_pins);
-            if (pcf8574_port_write(&expander_devices[i], value) != ESP_OK)
+            for (int i = 0; i < MAX_EXPANDERS; i ++)
             {
-                ESP_LOGE(TAG, "Pin write failed for expander %d", i);
-                return 1;
+                uint8_t expander_pins = pins->pins[1] >> (8 * i);
+                uint8_t value = ((values->pins[1] >> (8 * i)) & expander_pins) | (expander_pin_settings[i] & ~expander_pins);
+                if (pcf8574_port_write(&expander_devices[i], value) != ESP_OK)
+                {
+                    ESP_LOGE(TAG, "Pin write failed for expander %d", i);
+                    return 1;
+                }
+                ESP_LOGI(TAG, "Set expander %d pins 0x%02x to 0x%02x", i, expander_pins, value);
+                expander_pin_settings[i] = value;
             }
-            ESP_LOGI(TAG, "Set expander %d pins 0x%02x to 0x%02x", i, expander_pins, value);
-            expander_pin_settings[i] = value;
         }
     }
-#endif
     return 0;
 }

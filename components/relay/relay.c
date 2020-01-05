@@ -5,6 +5,12 @@
 #include "esp_log.h"
 
 static const char TAG[] = "relay";
+static int relayOnLevel = 0;
+
+void relaySetOnLevel(int level)
+{
+    relayOnLevel = level & 1;
+}
 
 void relayInit(int8_t pin, Relay_t *relay)
 {
@@ -24,11 +30,15 @@ void relaySetState(Relay_t *relay, RelayState_t state)
     GPIOX_PINS_CLEAR_ALL(pins);
     GPIOX_PINS_CLEAR_ALL(values);
     GPIOX_PINS_SET(pins, relay->pin);
-#ifdef CONFIG_RELAY_ON_HIGH
-    l = state == RelayState_On ? 1:0;
-#else
-    l = state == RelayState_On ? 0:1;
-#endif
+    if (state == RelayState_On)
+    {
+        l = relayOnLevel;
+    }
+    else
+    {
+        l = relayOnLevel ^ 1;
+    }
+    
     if (l){
         GPIOX_PINS_SET(values, relay->pin);
     }

@@ -1,9 +1,12 @@
 #include <stdio.h>
+#include <string.h>
 #include "esp_log.h"
 #include "humidityfan.h"
 
+#define THRESHOLD_CMD "threshold "
+#define THRESHOLD_CMD_LEN (sizeof(THRESHOLD_CMD) - 1)
+
 static void humidityFanCtrl(void *userData, iotElementSub_t *sub, iotValue_t value);
-static void humidityFanThresholdSet(void *userData, iotElementSub_t *sub, iotValue_t value);
 static void humidityFanRunOnTimeout(TimerHandle_t xTimer);
 
 static const char TAG[] = "HFAN";
@@ -43,17 +46,11 @@ void humidityFanInit(HumidityFan_t *fan, int relayPin, int threshold)
     pub->value.i = fan->threshold;
     iotElementPubAdd(&fan->element, pub);
     sub = &fan->ctrl;
-    sub->name = "ctrl";
-    sub->type = iotValueType_Bool;
+    sub->name = IOT_DEFAULT_CONTROL;
+    sub->type = iotValueType_String;
     sub->callback = humidityFanCtrl;
     sub->userData = fan;
     iotElementSubAdd(&fan->element,sub);
-    sub = &fan->thresholdSub;
-    sub->name = "thresholdSet";
-    sub->type = iotValueType_Int;
-    sub->callback = humidityFanThresholdSet;
-    sub->userData = fan;
-    iotElementSubAdd(&fan->element, sub);
 
     fan->runOnTimer = xTimerCreate(fan->name, fan->runOnSeconds / portTICK_RATE_MS, pdFALSE, fan, humidityFanRunOnTimeout);
 }
@@ -109,25 +106,31 @@ void humidityFanUpdateHumidity(HumidityFan_t *fan, int humidityTenths)
 static void humidityFanCtrl(void *userData, iotElementSub_t *sub, iotValue_t value)
 {
     HumidityFan_t *fan = userData;
-    if (!value.b)
+    bool on;
+    if (iotStrToBool(value.s, &on))
     {
-        if (relayGetState(&fan->relay) == RelayState_On)
+        if (!on)
         {
-            fan->override = true;
-        }    
+            if (relayGetState(&fan->relay) == RelayState_On)
+            {
+                fan->override = true;
+            }    
+        }
+
+        humidityFanSetState(fan, on);
     }
-
-    humidityFanSetState(fan, value.b);
-}
-
-static void humidityFanThresholdSet(void *userData, iotElementSub_t *sub, iotValue_t value)
-{
-    HumidityFan_t *fan = userData;
-    if (value.i <= 100)
+    else if (strncmp(THRESHOLD_CMD, value.s, THRESHOLD_CMD_LEN) == 0)
     {
-        fan->threshold = value.i;
-        iotElementPubUpdate(&fan->thresholdPub, value);
-    } 
+        int threshold;
+        if (sscanf(value.s + THRESHOLD_CMD_LEN, "%d", &threshold) == 1)
+        {
+            if (threshold <= 100)
+            {
+                fan->threshold = threshold;
+                iotElementPubUpdate(&fan->thresholdPub, value);
+            }
+        }
+    }
 }
 
 static void humidityFanRunOnTimeout(TimerHandle_t xTimer)
