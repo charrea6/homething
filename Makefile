@@ -22,6 +22,9 @@ nvs-info:
 	$(eval NVS_DATA_SIZE := $(shell $(GET_PART_INFO) --type data --subtype nvs --size $(PARTITION_TABLE_BIN) || echo 0))
 	$(eval NVS_DATA_OFFSET := $(shell $(GET_PART_INFO) --type data --subtype nvs --offset $(PARTITION_TABLE_BIN)))
 
+config.csv: config.ini
+	python config/configgen.py $< $@
+
 config.bin: config.csv nvs-info
 	
 	python $(IDF_PATH)/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py --input $< --output $@ --size $(NVS_DATA_SIZE)
