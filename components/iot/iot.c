@@ -201,18 +201,21 @@ void iotElementSubAdd(iotElement_t *element, iotElementSub_t *sub)
     const char *name;
     if (sub->name == IOT_DEFAULT_CONTROL)
     {
-        sub->name = "ctrl";
+        name = IOT_DEFAULT_CONTROL_STR;
     }
-    name = sub->name;
-    
-    len = strlen(mqttPathPrefix) + 1 + strlen(element->name) + 1 + strlen(name) + 1;
-    sub->path = (char *)malloc(len);
-    if (sub->path == NULL)
+    else
     {
-        ESP_LOGE(TAG, "Failed to allocate path for Element %s Sub %s", element->name, name);
-        return;
+        name = sub->name;
+        
+        len = strlen(mqttPathPrefix) + 1 + strlen(element->name) + 1 + strlen(name) + 1;
+        sub->path = (char *)malloc(len);
+        if (sub->path == NULL)
+        {
+            ESP_LOGE(TAG, "Failed to allocate path for Element %s Sub %s", element->name, name);
+            return;
+        }
+        sprintf(sub->path, "%s/%s/%s", mqttPathPrefix, element->name, name);
     }
-    sprintf(sub->path, "%s/%s/%s", mqttPathPrefix, element->name, name);
     sub->element = element;
     sub->next = element->subs;
     element->subs = sub;
@@ -346,7 +349,16 @@ int iotStrToBool(const char *str, bool *out)
 static void iotElementSubUpdate(iotElementSub_t *sub, char *payload, size_t len)
 {
     iotValue_t value;
-    ESP_LOGI(TAG, "SUB: new message \"%s\" for \"%s\"", payload, sub->name);
+    const char *name;
+    if (sub->name == IOT_DEFAULT_CONTROL)
+    {
+        name = IOT_DEFAULT_CONTROL_STR;
+    }
+    else
+    {
+        name = sub->name;
+    }
+    ESP_LOGI(TAG, "SUB: new message \"%s\" for \"%s/%s\"", payload, sub->element->name, name);
     switch(sub->type)
     {
         case iotValueType_Bool:
@@ -499,7 +511,16 @@ static void mqttMessageArrived(MessageData* data)
                 topic += len + 1;
                 for (iotElementSub_t *sub = element->subs; sub != NULL; sub = sub->next)
                 {
-                    if (strcmp(topic, sub->name) == 0)
+                    const char *name;
+                    if (sub->name == IOT_DEFAULT_CONTROL)
+                    {
+                        name = IOT_DEFAULT_CONTROL_STR;
+                    }
+                    else
+                    {
+                        name = sub->name;
+                    }
+                    if (strcmp(topic, name) == 0)
                     {
                         iotElementSubUpdate(sub, payload, data->message->payloadlen);
                         found = true;
