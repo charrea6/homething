@@ -201,12 +201,10 @@ void iotElementSubAdd(iotElement_t *element, iotElementSub_t *sub)
     const char *name;
     if (sub->name == IOT_DEFAULT_CONTROL)
     {
-        name = "ctrl";
+        sub->name = "ctrl";
     }
-    else
-    {
-        name = sub->name;
-    }
+    name = sub->name;
+    
     len = strlen(mqttPathPrefix) + 1 + strlen(element->name) + 1 + strlen(name) + 1;
     sub->path = (char *)malloc(len);
     if (sub->path == NULL)
@@ -490,8 +488,7 @@ static void mqttMessageArrived(MessageData* data)
     }
     memcpy(payload, data->message->payload, data->message->payloadlen);
     payload[data->message->payloadlen] = 0;
-
-    if ((strncmp(topic, mqttPathPrefix, len) == 0) || (topic[len] == '/'))
+    if ((strncmp(topic, mqttPathPrefix, len) == 0) && (topic[len] == '/'))
     {
         topic += len + 1;
         for (iotElement_t *element = elements; element != NULL; element = element->next)
