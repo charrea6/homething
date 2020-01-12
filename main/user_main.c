@@ -16,6 +16,7 @@
 
 #include "MQTTClient.h"
 
+#include "sdkconfig.h"
 #include "light.h"
 #include "switch.h"
 #include "iot.h"
@@ -291,7 +292,7 @@ esp_err_t processProfile(uint8_t *profile, size_t len)
  * profile = Profile configuration string (str)
  *     <b> == byte
  * 
- *     L<b1><b2> : b1= Switch pin, b2= Relay pin
+ *     L<b1><b2> : b1= Relay pin, b2= Switch pin
  *     B<b1>     : b1= Doorbell switch pin
  *     M<b1>     : b1= Motion detector pin
  *     T<b1>     : b1= DHT22 pin
