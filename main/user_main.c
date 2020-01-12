@@ -254,7 +254,7 @@ esp_err_t processProfile(uint8_t *profile, size_t len)
             break;
             case 'F': 
 #if defined(CONFIG_FAN)
-            if (temp >= nrofTemps)
+            if (fan >= nrofTemps)
             {
                 ESP_LOGE(TAG, "More fans than temperature sensors, reducing to the same as sensors!");
             }
