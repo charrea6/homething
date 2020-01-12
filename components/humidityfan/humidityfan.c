@@ -111,7 +111,7 @@ static void humidityFanCtrl(void *userData, iotElementSub_t *sub, iotValue_t val
 {
     HumidityFan_t *fan = userData;
     bool on;
-    if (iotStrToBool(value.s, &on))
+    if (!iotStrToBool(value.s, &on))
     {
         if (!on)
         {
