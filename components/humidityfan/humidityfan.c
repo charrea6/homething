@@ -97,6 +97,10 @@ void humidityFanUpdateHumidity(HumidityFan_t *fan, int humidityTenths)
                 xTimerStart(fan->runOnTimer, 0);
             }
         }
+        else
+        {
+            fan->override = false;
+        }
     }
     sprintf(fan->humidity, "%d.%d", humidityTenths / 10, humidityTenths % 10);
     value.s = fan->humidity;
