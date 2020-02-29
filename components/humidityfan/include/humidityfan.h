@@ -16,9 +16,15 @@ typedef struct HumidityFan{
     iotElementPub_t thresholdPub;
     iotElementPub_t humidityPub;
     iotElementSub_t ctrl;
+    int lastHumidity;
     int threshold;
-    int runOnSeconds;
+    uint32_t runOnSeconds;
+    uint32_t overThresholdSeconds;
+    uint32_t manualModeSecsLeft;
+    bool manualMode;
     TimerHandle_t runOnTimer;
+    TimerHandle_t overThresholdTimer;
+    TimerHandle_t manualModeTimer;
 }HumidityFan_t;
 
 void humidityFanInit(HumidityFan_t *fan, int relayPin, int threshold);
