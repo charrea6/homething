@@ -34,6 +34,9 @@ void humidityFanInit(HumidityFan_t *fan, int relayPin, int threshold)
     fan->threshold = threshold;
     fan->runOnSeconds = 30;
     fan->overThresholdSeconds =  10;
+    fan->manualMode = false;
+    fan->manualModeSecsLeft = 0u;
+
     sprintf(fan->humidity, "0.0");
 
     relayInit(relayPin, &fan->relay);
@@ -46,18 +49,35 @@ void humidityFanInit(HumidityFan_t *fan, int relayPin, int threshold)
     pub->retain = true;
     pub->value.b = false;
     iotElementPubAdd(&fan->element, pub);
+    
     pub = &fan->humidityPub;
     pub->name = "humidity";
     pub->type = iotValueType_String;
     pub->retain = false;
     pub->value.s = fan->humidity;
     iotElementPubAdd(&fan->element,pub);
+    
     pub = &fan->thresholdPub;
     pub->name = "threshold";
     pub->type = iotValueType_Int;
     pub->retain = true;
     pub->value.i = fan->threshold;
     iotElementPubAdd(&fan->element, pub);
+
+    pub = &fan->manualModePub;
+    pub->name = "manual";
+    pub->type = iotValueType_Bool;
+    pub->retain = true;
+    pub->value.b = fan->manualMode;
+    iotElementPubAdd(&fan->element, pub);
+    
+    pub = &fan->manualModeSecsPub;
+    pub->name = "manualSecs";
+    pub->type = iotValueType_Int;
+    pub->retain = true;
+    pub->value.i = fan->manualModeSecsLeft;
+    iotElementPubAdd(&fan->element, pub);
+    
     sub = &fan->ctrl;
     sub->name = IOT_DEFAULT_CONTROL;
     sub->type = iotValueType_String;
@@ -65,9 +85,6 @@ void humidityFanInit(HumidityFan_t *fan, int relayPin, int threshold)
     sub->userData = fan;
     iotElementSubAdd(&fan->element,sub);
     
-    fan->manualMode = false;
-    fan->manualModeSecsLeft = 0u;
-
     fan->runOnTimer = xTimerCreate(fan->name, SECS_TO_TICKS(fan->runOnSeconds), pdFALSE, fan, humidityFanRunOnTimeout);
     fan->overThresholdTimer = xTimerCreate(fan->name, SECS_TO_TICKS(fan->overThresholdSeconds), pdFALSE, fan, humidityOverThresholdTimeout);
     fan->manualModeTimer = xTimerCreate(fan->name, SECS_TO_TICKS(1), pdTRUE, fan, humidityManulModeSecsTimeout);
@@ -100,23 +117,25 @@ static void humidityFanSetState(HumidityFan_t *fan, bool state)
 void humidityFanUpdateHumidity(HumidityFan_t *fan, int humidityTenths)
 {
     iotValue_t value;
-    ESP_LOGI(TAG, "%s: Humidity %d (Threshold %d)", fan->name, (humidityTenths / 10), fan->threshold);
+    RelayState_t state = relayGetState(&fan->relay);
+
+    ESP_LOGI(TAG, "%s: Humidity %d (Threshold %d) Manual Mode %d", fan->name, (humidityTenths / 10), fan->threshold, fan->manualMode);
     fan->lastHumidity = humidityTenths;
     if (fan->manualMode == false)
     {
         if ((humidityTenths / 10) >= fan->threshold)
         {
-            if (!fan->override)
+            if (!fan->override && (state == RelayState_Off))
             {
                 if (xTimerIsTimerActive(fan->overThresholdTimer) == pdFALSE)
                 {
+                    ESP_LOGI(TAG, "%s: Start over threshold timer", fan->name);
                     xTimerStart(fan->overThresholdTimer, 0);
                 }
             }
         }
         else
         {
-            RelayState_t state = relayGetState(&fan->relay);
             if (state == RelayState_On)
             {
                 if (xTimerIsTimerActive(fan->runOnTimer) == pdFALSE)
@@ -131,6 +150,7 @@ void humidityFanUpdateHumidity(HumidityFan_t *fan, int humidityTenths)
             }
             if (xTimerIsTimerActive(fan->overThresholdTimer) == pdTRUE)
             {
+                ESP_LOGI(TAG, "%s: Stop over threshold timer", fan->name);
                 xTimerStop(fan->overThresholdTimer, 0);
             }
         }
@@ -173,18 +193,25 @@ static void humidityFanCtrl(void *userData, iotElementSub_t *sub, iotValue_t val
         uint32_t secs;
         if (sscanf(value.s + MANUAL_CMD_LEN, "%u", &secs) == 1)
         {
+            iotValue_t value;
             xTimerReset(fan->manualModeTimer, 0);
             fan->manualMode = true;
             fan->manualModeSecsLeft = secs;
+            value.b = true;
+            iotElementPubUpdate(&fan->manualModePub, value);
+            value.i = secs;
+            iotElementPubUpdate(&fan->manualModeSecsPub, value);
         }
     }
-    else if (strcmp(AUTO_CMD, value.s))
+    else if (strcmp(AUTO_CMD, value.s) == 0)
     {
         if (fan->manualMode)
         {
             fan->manualMode = false;
             xTimerStop(fan->manualModeTimer, 0);
             humidityFanUpdateHumidity(fan, fan->lastHumidity);
+            value.b = false;
+            iotElementPubUpdate(&fan->manualModePub, value);
         }
     }
 }
@@ -200,13 +227,19 @@ static void humidityFanRunOnTimeout(TimerHandle_t xTimer)
 static void humidityOverThresholdTimeout(TimerHandle_t xTimer)
 {
     HumidityFan_t *fan = pvTimerGetTimerID(xTimer);
+    ESP_LOGI(TAG, "%s: Over threshold timer fired", fan->name);
     humidityFanSetState(fan, true);
 }
 
 static void humidityManulModeSecsTimeout(TimerHandle_t xTimer)
 {
+    iotValue_t value;
     HumidityFan_t *fan = pvTimerGetTimerID(xTimer);
     fan->manualModeSecsLeft --;
+    value.i = fan->manualModeSecsLeft;
+    iotElementPubUpdate(&fan->manualModeSecsPub, value);
+
+    ESP_LOGI(TAG, "%s: Manual mode seconds left %d", fan->name, fan->manualModeSecsLeft);
     if (fan->manualModeSecsLeft == 0)
     {
         fan->manualMode = false;

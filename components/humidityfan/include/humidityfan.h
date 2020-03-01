@@ -15,6 +15,8 @@ typedef struct HumidityFan{
     iotElementPub_t statePub;
     iotElementPub_t thresholdPub;
     iotElementPub_t humidityPub;
+    iotElementPub_t manualModePub;
+    iotElementPub_t manualModeSecsPub;
     iotElementSub_t ctrl;
     int lastHumidity;
     int threshold;
