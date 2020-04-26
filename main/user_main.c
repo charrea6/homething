@@ -14,8 +14,6 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 
-#include "MQTTClient.h"
-
 #include "sdkconfig.h"
 #include "light.h"
 #include "switch.h"
