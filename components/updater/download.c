@@ -114,7 +114,7 @@ static int onMessageComplete(http_parser* parser)
 
 static int onStatus(http_parser* parser, const char *at, size_t length)
 {
-    if (parser->status_code != HTTP_STATUS_OK)
+    if (parser->status_code != 200)
         {
             ESP_LOGW(TAG, "Download failed %d", parser->status_code);
             updaterUpdateStatusf("Download failed with error code %d", parser->status_code);
