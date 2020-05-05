@@ -17,7 +17,7 @@
 
 #include "tcpip_adapter.h"
 
-#include "MQTTClient.h"
+#include "mqtt_client.h"
 
 #include "iot.h"
 #include "sdkconfig.h"
@@ -45,17 +45,19 @@ static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 
 #define NVS_READ_STR(key, out) nvsReadStr(handle, key, out, sizeof(out))
 
-/* FreeRTOS event group to signal when we are connected & ready to make a request */
-static EventGroupHandle_t wifi_event_group;
-/* Event Group bits */
-const int CONNECTED_BIT = BIT0;
-const int MQTT_UPDATE_BIT = BIT1;
-
 static iotElement_t *elements = NULL;
 
 static iotElement_t deviceElement;
 static iotElementPub_t deviceIPPub;
 static iotElementPub_t deviceUptimePub;
+
+static TimerHandle_t uptimeTimer;
+static esp_mqtt_client_handle_t mqttClient;
+static SemaphoreHandle_t mqttMutex;
+static bool mqttIsConnected = false;
+
+#define MUTEX_LOCK() do{}while(xSemaphoreTake(mqttMutex, portTICK_PERIOD_MS) != pdTRUE)
+#define MUTEX_UNLOCK() xSemaphoreGive(mqttMutex)
 
 static char wifiSsid[MAX_LENGTH_WIFI_NAME];
 static char wifiPassword[MAX_LENGTH_WIFI_PASSWORD];
@@ -69,9 +71,10 @@ static char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
 static char mqttCommonCtrlSub[MQTT_COMMON_CTRL_SUB_LEN];
 static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 
-static void mqttClientThread(void* pvParameters);
-static void mqttMessageArrived(MessageData *data);
+static void mqttMessageArrived(char *mqttTopic, int mqttTopicLen, char *data, int dataLen);
+static void mqttStart(void);
 static void wifiInitialise(void);
+static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub);
 
 #ifdef CONFIG_CONNECTION_LED
 #define LED_ON 0
@@ -100,6 +103,12 @@ int iotInit(void)
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     
+    mqttMutex = xSemaphoreCreateMutex();
+    if (mqttMutex == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to create mqttMutex!");
+    }
+
     sprintf(mqttPathPrefix, "homething/%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     sprintf(mqttCommonCtrlSub, "%s/+/%s", mqttPathPrefix, IOT_DEFAULT_CONTROL_STR);
 
@@ -178,12 +187,7 @@ int iotInit(void)
 void iotStart()
 {
     wifiInitialise();
-    xTaskCreate(mqttClientThread,
-                MQTT_CLIENT_THREAD_NAME,
-                MQTT_CLIENT_THREAD_STACK_WORDS,
-                NULL,
-                MQTT_CLIENT_THREAD_PRIO,
-                NULL);
+    mqttStart();
 }
 
 void iotElementAdd(iotElement_t *element)
@@ -254,6 +258,12 @@ void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value)
         if (pub != &deviceUptimePub) {
             ESP_LOGI(TAG, "PUB: Flagging update required for %s%s%s", pub->element->name, pub->name[0]?"/":"", pub->name);
         }
+        MUTEX_LOCK();
+        if (mqttIsConnected)
+        {
+            iotElementPubSendUpdate(pub->element, pub);
+        }
+        MUTEX_UNLOCK();
     }
     else
     {
@@ -261,11 +271,12 @@ void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value)
     }    
 }
 
-static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub, MQTTClient *client)
+static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub)
 {
     char path[MAX_TOPIC_NAME + 1];
-    MQTTMessage message;
     char payload[30] = "";
+    char *message = payload;
+    int messageLen = 0;
     const char *prefix = mqttPathPrefix;
     int rc;
  
@@ -278,55 +289,58 @@ static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub,
         sprintf(path, "%s/%s/%s", prefix, element->name, pub->name);
     }
 
-    message.qos = QOS0;
-    message.retained = pub->retain?1:0;
-    
     switch(pub->type)
     {
         case iotValueType_Bool:
-        message.payload = (pub->value.b) ? "on":"off";
+        message = (pub->value.b) ? "on":"off";
         break;
         case iotValueType_Int:
-        message.payload = payload;
         sprintf(payload, "%d", pub->value.i);
         break;
         case iotValueType_Float:
-        message.payload = payload;
         sprintf(payload, "%f", pub->value.f);
         break;
         case iotValueType_String:
-        message.payload = (char*)pub->value.s;
+        message = (char*)pub->value.s;
         break;
     }
-    message.payloadlen = strlen((char*)message.payload);
+    messageLen = strlen((char*)message);
 
-    if ((rc = MQTTPublish(client, path, &message)) != 0) 
+    rc = esp_mqtt_client_publish(mqttClient, path, message, messageLen, 0, pub->retain ? 1:0);
+    if (rc != 0) 
     {
         ESP_LOGW(TAG, "PUB: Failed to send message to %s rc %d", path, rc);
         return false;
     } 
     else 
     {
-        ESP_LOGV(TAG, "PUB: Sent %s (%d) to %s", (char *)message.payload, message.payloadlen, path);
+        ESP_LOGV(TAG, "PUB: Sent %s (%d) to %s", (char *)message, messageLen, path);
     }
     pub->updateRequired = false;
     return true;
 }
 
-static bool iotElementSendUpdate(iotElement_t *element, bool force, MQTTClient *client)
+static bool iotElementSendUpdate(iotElement_t *element, bool force)
 {
-    for (iotElementPub_t *pub = element->pubs;pub != NULL; pub = pub->next)
+    bool result = true;
+    MUTEX_LOCK();
+    if (mqttIsConnected || force)
     {
-        if (pub->updateRequired || force)
+        for (iotElementPub_t *pub = element->pubs;pub != NULL; pub = pub->next)
         {
-            if (!iotElementPubSendUpdate(element, pub, client))
+            if (pub->updateRequired || force)
             {
-                return false;
+                if (!iotElementPubSendUpdate(element, pub))
+                {
+                    result = false;
+                    break;
+                }
             }
-        }
 
+        }
     }
-    return true;
+    MUTEX_UNLOCK();
+    return result;
 }
 
 int iotStrToBool(const char *str, bool *out)
@@ -396,10 +410,10 @@ static void iotElementSubUpdate(iotElementSub_t *sub, char *payload, size_t len)
     sub->callback(sub->userData, sub, value);
 }
 
-static bool iotSubscribe(MQTTClient *client, char *topic)
+static bool iotSubscribe(char *topic)
 {
     int rc;
-    if ((rc = MQTTSubscribe(client, topic, 2, mqttMessageArrived)) != 0) 
+    if ((rc = esp_mqtt_client_subscribe(mqttClient, topic, 2)) == -1) 
     {
         ESP_LOGE(TAG, "SUB: Return code from MQTT subscribe is %d for \"%s\"", rc, topic);
         return false;
@@ -411,13 +425,13 @@ static bool iotSubscribe(MQTTClient *client, char *topic)
     return true;
 }
 
-static bool iotElementSubscribe(iotElement_t *element, MQTTClient *client)
+static bool iotElementSubscribe(iotElement_t *element)
 {
     for (iotElementSub_t *sub = element->subs; sub != NULL; sub = sub->next)
     {
         if (sub->name != IOT_DEFAULT_CONTROL)
         {
-            if (!iotSubscribe(client, sub->path))
+            if (!iotSubscribe(sub->path))
             {
                 return false;
             }
@@ -434,13 +448,13 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
         sprintf(ipAddr, IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
-        xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+        IF_LED(setLedState(LED_STATE_WIFI_CONNECTED));
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         /* This is a workaround as ESP32 WiFi libs don't currently
            auto-reassociate. */
         esp_wifi_connect();
-        xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+        IF_LED(setLedState(LED_STATE_DISCONNECTED));
         break;
     default:
         break;
@@ -460,7 +474,6 @@ static void wifiInitialise(void)
     tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
     tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
 
-    wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK( esp_event_loop_init(wifiEventHandler, NULL) );
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
@@ -475,31 +488,31 @@ static void wifiInitialise(void)
     ESP_ERROR_CHECK( esp_wifi_start() );
 }
 
-static void mqttMessageArrived(MessageData* data)
+static void mqttMessageArrived(char *mqttTopic, int mqttTopicLen, char *data, int dataLen)
 {
     char *topic, *topicStart;
     char *payload;
     bool found = false;
     size_t len = strlen(mqttPathPrefix);
     
-    topicStart = topic = malloc(data->topicName->lenstring.len + 1);
+    topicStart = topic = malloc(mqttTopicLen + 1);
     if (topic == NULL)
     {
         ESP_LOGE(TAG, "Not enough memory to copy topic!");
         return;
     }
-    memcpy(topic, data->topicName->lenstring.data, data->topicName->lenstring.len);    
-    topic[data->topicName->lenstring.len] = 0;
+    memcpy(topic, mqttTopic, mqttTopicLen);    
+    topic[mqttTopicLen] = 0;
 
-    ESP_LOGI(TAG, "Message arrived, topic %s payload %d", topic, data->message->payloadlen);
-    payload = malloc(data->message->payloadlen + 1);
+    ESP_LOGI(TAG, "Message arrived, topic %s payload %d", topic, dataLen);
+    payload = malloc(dataLen + 1);
     if (payload == NULL)
     {
         ESP_LOGE(TAG, "Not enough memory to copy payload!");
         return;
     }
-    memcpy(payload, data->message->payload, data->message->payloadlen);
-    payload[data->message->payloadlen] = 0;
+    memcpy(payload, data, dataLen);
+    payload[dataLen] = 0;
     if ((strncmp(topic, mqttPathPrefix, len) == 0) && (topic[len] == '/'))
     {
         topic += len + 1;
@@ -522,7 +535,7 @@ static void mqttMessageArrived(MessageData* data)
                     }
                     if (strcmp(topic, name) == 0)
                     {
-                        iotElementSubUpdate(sub, payload, data->message->payloadlen);
+                        iotElementSubUpdate(sub, payload, dataLen);
                         found = true;
                         break;
                     }
@@ -541,108 +554,86 @@ static void mqttMessageArrived(MessageData* data)
     free(topicStart);
 }
 
-static void mqttClientThread(void* pvParameters)
+static void mqttConnected(void) 
 {
-    MQTTClient client;
-    Network network;
-    unsigned char sendbuf[80], readbuf[80] = {0};
-    int rc = 0;
-    bool loop = true;
-    unsigned int loopCount=0;
-    iotValue_t value;
+    iotSubscribe(mqttCommonCtrlSub);
 
-    MQTTPacket_connectData connectData = MQTTPacket_connectData_initializer;
-
-    ESP_LOGI(TAG, "mqtt client thread starts");
-
-    NetworkInit(&network);
-    MQTTClientInit(&client, &network, 30000, sendbuf, sizeof(sendbuf), readbuf, sizeof(readbuf));
-
-    while (true)
+    for (iotElement_t *element = elements; (element != NULL); element = element->next)
     {
-        ESP_LOGI(TAG, "Waiting for network connection");
-        IF_LED(setLedState(LED_STATE_DISCONNECTED));
-        loop = true;
-        while(loop)
+        if (iotElementSubscribe(element))
         {
-            /* Wait for the callback to set the CONNECTED_BIT in the
-            event group.
-            */
-            xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
-                                false, true, portMAX_DELAY);
-            ESP_LOGI(TAG, "Connected to AP");
-            IF_LED(setLedState(LED_STATE_WIFI_CONNECTED));
-
-            value.s = ipAddr;
-            iotElementPubUpdate(&deviceIPPub, value);
-
-            if ((rc = NetworkConnect(&network, mqttServer, mqttPort)) != 0) 
-            {
-                ESP_LOGE(TAG, "Return code from network connect is %d, pausing for 5 seconds before reconnecting", rc);
-                vTaskDelay(5000 / portTICK_RATE_MS);  //wait for 5 seconds
-            }
-            else 
-            {
-                loop = false;
-            }
+            iotElementSendUpdate(element, true);
         }
-        connectData.MQTTVersion = 3;
-        connectData.clientID.cstring = mqttPathPrefix; // We use our unique MQTT path prefix as our client id here because it's unique and identifies this device nicely.
-        if (mqttUsername[0])
-        {
-            connectData.username.cstring = mqttUsername;
-            connectData.password.cstring = mqttPassword;
-        }
-        if ((rc = MQTTConnect(&client, &connectData)) != 0) 
-        {
-            ESP_LOGE(TAG, "Return code from MQTT connect is %d", rc);
-            vTaskDelay(5000 / portTICK_RATE_MS);  //wait for 5 seconds
-        } 
-        else 
-        {
+    }
+}
+
+static esp_err_t mqttEventHandler(esp_mqtt_event_handle_t event)
+{
+    switch (event->event_id) {
+        case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT Connected");
             IF_LED(setLedState(LED_STATE_MQTT_CONNECTED));
-            loop = true;
-            iotSubscribe(&client, mqttCommonCtrlSub);
+            mqttConnected();
+            MUTEX_LOCK();
+            mqttIsConnected = true;
+            MUTEX_UNLOCK();
+            break;
 
-            for (iotElement_t *element = elements; (element != NULL) && loop; element = element->next)
-            {
-                loop = iotElementSubscribe(element, &client);
-                if (loop)
-                {
-                    loop = iotElementSendUpdate(element, true, &client);
-                }
-            }
-            
-            for (loopCount = 0; loop; loopCount++)
-            {
-                for (iotElement_t *element = elements; (element != NULL) && loop; element = element->next)
-                {
-                    loop = iotElementSendUpdate(element, false, &client);
-                }
-#if defined(MQTT_TASK)
-                MutexLock(&client.mutex);
-#endif
-                if (MQTTYield(&client, POLL_INTERVAL_MS) < 0)
-                {
-                    loop = false;
-                }
-#if defined(MQTT_TASK)
-                MutexUnlock(&client.mutex);
-#endif
-                if (loopCount == (UPTIME_UPDATE_MS / POLL_INTERVAL_MS))
-                {
-                    struct timeval tv;
-                    gettimeofday(&tv, NULL);
-                    value.i = tv.tv_sec;
-                    iotElementPubUpdate(&deviceUptimePub, value);
-                    loopCount = 0;
-                }
-            }
-        }       
-        ESP_LOGW(TAG, "Lost connection to MQTT Server");
-        network.disconnect(&network);
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGI(TAG, "MQTT Disconnected");
+            IF_LED(setLedState(LED_STATE_DISCONNECTED));
+            MUTEX_LOCK();
+            mqttIsConnected = false;
+            MUTEX_UNLOCK();
+            break;
+
+        case MQTT_EVENT_SUBSCRIBED:
+            break;
+
+        case MQTT_EVENT_UNSUBSCRIBED:
+            break;
+
+        case MQTT_EVENT_PUBLISHED:
+            break;
+
+        case MQTT_EVENT_DATA:
+            mqttMessageArrived(event->topic, event->topic_len, event->data, event->data_len);
+            break;
+
+        case MQTT_EVENT_ERROR:
+            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+            break;
     }
+    return ESP_OK;
+}
+
+static void iotUpdateUptime(TimerHandle_t xTimer)
+{
+    iotValue_t value;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    value.i = tv.tv_sec;
+    iotElementPubUpdate(&deviceUptimePub, value);
+}
+
+static void mqttStart(void)
+{
+    esp_mqtt_client_config_t mqtt_cfg = {
+        .transport = MQTT_TRANSPORT_OVER_TCP,
+        .host = mqttServer,
+        .port = mqttPort,
+        .event_handle = mqttEventHandler,
+    };
+    if (mqttUsername[0] != 0) {
+        mqtt_cfg.username = mqttUsername;
+        mqtt_cfg.password = mqttPassword;
+    }
+    
+    mqttClient = esp_mqtt_client_init(&mqtt_cfg);
+    esp_mqtt_client_start(mqttClient);
+
+    uptimeTimer = xTimerCreate("updUptime", UPTIME_UPDATE_MS / portTICK_RATE_MS, pdTRUE, NULL, iotUpdateUptime);
+    xTimerStart(uptimeTimer, 0);
 }
 
 static int nvsReadStr(nvs_handle handle, const char *key, char *out, size_t len)
