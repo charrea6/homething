@@ -4,7 +4,10 @@ import sys
 import re
 import hashlib
 import struct
+import click
+import subprocess
 
+build_action = None
 
 profile_keys = [('LIGHT', 'L'), ('DHT22', 'T'), ('FAN', 'F'), ('DOORBELL', 'D'), ('MOTION', 'M')]
 
@@ -50,6 +53,7 @@ def generate_ota_file(in_file, out_file):
             outf.write(struct.pack('<l', in_len))
             outf.write(m.digest())
 
+
 def print_dict(d, indent=0):
     sp_indent = ' ' * indent
     for k,v in d.items():
@@ -87,7 +91,67 @@ def ota_gen(action, ctx, args):
     else:
         generate_ota_file(os.path.join(build_dir, '%s.bin' % project_name), 
             os.path.join(build_dir, project_name + ota_suffix))
+
+
+def build_config(action, ctx, args, configfile=None):
+    build_dir = args['build_dir']
+    config = load_config(args)
+    idf_path = os.getenv('IDF_PATH')
+    offset = None
+    size = None
+    with open(os.path.join(idf_path, 'components', 'partition_table', config['PARTITION_TABLE_FILENAME'])) as csvfile:
+        for line in csvfile:
+            if line.startswith('#'):
+                continue
+            row = [e.strip() for e in line.split(',')]
+            if row[1] == 'data' and row[2] == 'nvs':
+                offset = row[3]
+                size = row[4]
+                break
+    if offset is None:
+        raise RuntimeError('Failed to find offset!')
     
+    csv_filename = os.path.join(build_dir, 'config.csv')
+    bin_filename = os.path.join(build_dir, 'config.bin')
+    subprocess.check_call(['python', 'config/configgen.py', configfile, csv_filename])
+
+    nvs_part_gen_path = os.path.join(idf_path, 'components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py')
+    subprocess.check_call(['python', nvs_part_gen_path, '--input', csv_filename, '--output', bin_filename, '--size', size])
+    
+    esptool_path = os.path.join(idf_path, 'components', 'esptool_py', 'esptool', 'esptool.py')
+
+    esptool_args = ['--chip', config['IDF_TARGET'], '--port', config['ESPTOOLPY_PORT'], '--baud', str(config['ESPTOOLPY_BAUD'])]
+    esptool_args += ['--before', config['ESPTOOLPY_BEFORE'], '--after', config['ESPTOOLPY_AFTER']]
+    esptool_args += ['write_flash']
+
+    if config['ESPTOOLPY_COMPRESSED']:
+        esptool_args.append('-z')
+    else:
+        esptool_args.append('-u')
+    
+    esptool_args += ['--flash_mode', config['ESPTOOLPY_FLASHMODE'], '--flash_freq', config['ESPTOOLPY_FLASHFREQ'], '--flash_size']
+    if config.get('ESPTOOLPY_FLASHSIZE_DETECT', False):
+        esptool_args.append('detect')
+    else:
+        esptool_args.append(config['ESPTOOLPY_FLASHSIZE'])
+
+    esptool_args += [offset, bin_filename]
+
+    subprocess.check_call(['python', esptool_path] + esptool_args)
+
 
 def action_extensions(base_actions, project_dir):
-    return {'actions': {'otagen' : {'callback': ota_gen}}}
+    global build_action
+    build_action = base_actions['actions']['all']['callback']
+
+    actions = {
+                'otagen' : {
+                    'callback': ota_gen
+                }, 
+                'flashconfig': {
+                    'callback': build_config, 
+                    "arguments":[{'names':['configfile'], 'type':click.Path(exists=True)}]
+                }
+            }
+
+    return {'actions': actions }
