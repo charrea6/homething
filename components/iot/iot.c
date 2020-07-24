@@ -20,6 +20,7 @@
 #include "mqtt_client.h"
 
 #include "iot.h"
+#include "wifi.h"
 #include "sdkconfig.h"
 
 static const char *TAG="IOT";
@@ -37,19 +38,16 @@ static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 #define POLL_INTERVAL_MS 10
 #define UPTIME_UPDATE_MS 5000
 
-#define MAX_LENGTH_WIFI_NAME 32
-#define MAX_LENGTH_WIFI_PASSWORD 64
 #define MAX_LENGTH_MQTT_SERVER 256
 #define MAX_LENGTH_MQTT_USERNAME 65
 #define MAX_LENGTH_MQTT_PASSWORD 65
 
-#define NVS_READ_STR(key, out) nvsReadStr(handle, key, out, sizeof(out))
 
 static iotElement_t *elements = NULL;
 
 static iotElement_t deviceElement;
-static iotElementPub_t deviceIPPub;
 static iotElementPub_t deviceUptimePub;
+static iotElementPub_t deviceIPPub;
 
 static TimerHandle_t uptimeTimer;
 static esp_mqtt_client_handle_t mqttClient;
@@ -59,9 +57,6 @@ static bool mqttIsConnected = false;
 #define MUTEX_LOCK() do{}while(xSemaphoreTake(mqttMutex, portTICK_PERIOD_MS) != pdTRUE)
 #define MUTEX_UNLOCK() xSemaphoreGive(mqttMutex)
 
-static char wifiSsid[MAX_LENGTH_WIFI_NAME];
-static char wifiPassword[MAX_LENGTH_WIFI_PASSWORD];
-
 static char mqttServer[MAX_LENGTH_MQTT_SERVER];
 static int mqttPort;
 static char mqttUsername[MAX_LENGTH_MQTT_USERNAME];
@@ -69,31 +64,30 @@ static char mqttPassword[MAX_LENGTH_MQTT_PASSWORD];
 
 static char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
 static char mqttCommonCtrlSub[MQTT_COMMON_CTRL_SUB_LEN];
-static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 
 static void mqttMessageArrived(char *mqttTopic, int mqttTopicLen, char *data, int dataLen);
 static void mqttStart(void);
-static void wifiInitialise(void);
 static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub);
+static void iotUpdateUptime(TimerHandle_t xTimer);
+static void iotWifiConnectionStatus(bool connected);
 
 #ifdef CONFIG_CONNECTION_LED
-#define LED_ON 0
-#define LED_OFF 1
 
 #define LED_STATE_DISCONNECTED 0
 #define LED_STATE_WIFI_CONNECTED 1
 #define LED_STATE_MQTT_CONNECTED 2
+#define LED_ON 0
+#define LED_OFF 1
 
 static TimerHandle_t ledTimer;
 
 static void setupLed();
 static void setLedState(int state);
-static int nvsReadStr(nvs_handle handle, const char *key, char *out, size_t len);
-
-#define IF_LED(func) func
+#define SET_LED_STATE(state) setLedState(state)
 #else
-#define IF_LED(func)
+#define SET_LED_STATE(state)
 #endif
+
 
 int iotInit(void)
 {
@@ -103,6 +97,16 @@ int iotInit(void)
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     
+    #ifdef CONFIG_CONNECTION_LED
+    setupLed();
+    #endif
+    result = wifiInit(iotWifiConnectionStatus);
+    if (result) 
+    {
+        ESP_LOGE(TAG, "Wifi init failed");
+        return result;
+    }
+
     mqttMutex = xSemaphoreCreateMutex();
     if (mqttMutex == NULL)
     {
@@ -117,68 +121,51 @@ int iotInit(void)
     deviceElement.name = "device";
     iotElementAdd(&deviceElement);
 
-    deviceIPPub.name = "ip";
-    deviceIPPub.type = iotValueType_String;
-    deviceIPPub.retain = true;
-    deviceIPPub.value.s = "?";
-    iotElementPubAdd(&deviceElement, &deviceIPPub);
-    
     deviceUptimePub.name = "uptime";
     deviceUptimePub.type = iotValueType_Int;
     deviceUptimePub.retain = true;
     deviceUptimePub.value.i = 0;
     iotElementPubAdd(&deviceElement, &deviceUptimePub);
 
-    IF_LED(setupLed());
+    deviceIPPub.name = "ip";
+    deviceIPPub.type = iotValueType_String;
+    deviceIPPub.retain = true;
+    deviceIPPub.value.s = wifiGetIPAddrStr();
+    iotElementPubAdd(&deviceElement, &deviceIPPub);
 
-    err = nvs_open("wifi", NVS_READONLY, &handle);
+    err = nvs_open("mqtt", NVS_READONLY, &handle);
     if (err == ESP_OK)
     {
-        result = NVS_READ_STR("ssid", wifiSsid);
-        if (result == 0)
+        size_t len = sizeof(mqttServer);
+        if (nvs_get_str(handle, "host", mqttServer, &len) == ESP_OK)
         {
-            result = NVS_READ_STR("pass", wifiPassword);
+            uint16_t p;
+            err = nvs_get_u16(handle, "port", &p);
+            if (err == ESP_OK)
+            {   
+                mqttPort = (int) p;
+            }
+            else
+            {
+                mqttPort = 1883;
+            }
+            len = sizeof(mqttUsername);
+            if (nvs_get_str(handle, "user", mqttUsername, &len) != ESP_OK)
+            {
+                mqttUsername[0] = 0;
+            }
+            len = sizeof(mqttPassword);
+            if (nvs_get_str(handle, "pass", mqttPassword, &len) != ESP_OK)
+            {
+                mqttPassword[0] = 0;
+            }
         }
+        else
+        {
+            mqttServer[0] = 0;
+        }
+        
         nvs_close(handle);
-    }
-    else
-    {
-        result = 1;
-    }
-    
-    if (result == 0)
-    {
-        err = nvs_open("mqtt", NVS_READONLY, &handle);
-        if (err == ESP_OK)
-        {
-            result = NVS_READ_STR("host", mqttServer);
-            if (result == 0)
-            {
-                uint16_t p;
-                err = nvs_get_u16(handle, "port", &p);
-                if (err == ESP_OK)
-                {   
-                    mqttPort = (int) p;
-                }
-                else
-                {
-                    mqttPort = 1883;
-                }
-
-            }
-            if (result == 0)
-            {
-                if (NVS_READ_STR("user", mqttUsername))
-                {
-                    mqttUsername[0] = 0;
-                }
-                if (NVS_READ_STR("pass", mqttPassword))
-                {
-                    mqttPassword[0] = 0;
-                }
-            }
-            nvs_close(handle);
-        }
     }
 
     return result;
@@ -186,8 +173,10 @@ int iotInit(void)
 
 void iotStart()
 {
-    wifiInitialise();
     mqttStart();
+    wifiStart();
+    uptimeTimer = xTimerCreate("updUptime", UPTIME_UPDATE_MS / portTICK_RATE_MS, pdTRUE, NULL, iotUpdateUptime);
+    xTimerStart(uptimeTimer, 0);
 }
 
 void iotElementAdd(iotElement_t *element)
@@ -440,52 +429,30 @@ static bool iotElementSubscribe(iotElement_t *element)
     return true;
 }
 
-static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
+static void iotUpdateUptime(TimerHandle_t xTimer)
 {
-    switch(event->event_id) {
-    case SYSTEM_EVENT_STA_START:
-        esp_wifi_connect();
-        break;
-    case SYSTEM_EVENT_STA_GOT_IP:
-        sprintf(ipAddr, IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
-        IF_LED(setLedState(LED_STATE_WIFI_CONNECTED));
-        break;
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-        /* This is a workaround as ESP32 WiFi libs don't currently
-           auto-reassociate. */
-        esp_wifi_connect();
-        IF_LED(setLedState(LED_STATE_DISCONNECTED));
-        break;
-    default:
-        break;
-    }
-    return ESP_OK;
+    iotValue_t value;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    value.i = tv.tv_sec;
+    iotElementPubUpdate(&deviceUptimePub, value);
 }
 
-static void wifiInitialise(void)
+static void iotWifiConnectionStatus(bool connected)
 {
-    uint8_t mac[6];
-    char hostname[23];
-
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    sprintf(hostname, "homething-%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-    tcpip_adapter_init();
-    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
-    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
-
-    ESP_ERROR_CHECK( esp_event_loop_init(wifiEventHandler, NULL) );
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
-    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
-    wifi_config_t wifi_config;
-    memset(&wifi_config, 0, sizeof(wifi_config));
-    strcpy((char *)wifi_config.sta.ssid, wifiSsid);
-    strcpy((char *)wifi_config.sta.password, wifiPassword);
-    ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
-    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
-    ESP_ERROR_CHECK( esp_wifi_start() );
+    iotValue_t value;
+    SET_LED_STATE(connected ? LED_STATE_WIFI_CONNECTED: LED_STATE_DISCONNECTED);
+    value.s = wifiGetIPAddrStr();
+    iotElementPubUpdate(&deviceIPPub, value);
+    if (connected)
+    {
+        esp_mqtt_client_start(mqttClient);
+    }
+    else
+    {
+        esp_mqtt_client_stop(mqttClient);
+    }
+    
 }
 
 static void mqttMessageArrived(char *mqttTopic, int mqttTopicLen, char *data, int dataLen)
@@ -572,7 +539,7 @@ static esp_err_t mqttEventHandler(esp_mqtt_event_handle_t event)
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT Connected");
-            IF_LED(setLedState(LED_STATE_MQTT_CONNECTED));
+            SET_LED_STATE(LED_STATE_MQTT_CONNECTED);
             mqttConnected();
             MUTEX_LOCK();
             mqttIsConnected = true;
@@ -581,7 +548,7 @@ static esp_err_t mqttEventHandler(esp_mqtt_event_handle_t event)
 
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT Disconnected");
-            IF_LED(setLedState(LED_STATE_DISCONNECTED));
+            SET_LED_STATE(LED_STATE_DISCONNECTED);
             MUTEX_LOCK();
             mqttIsConnected = false;
             MUTEX_UNLOCK();
@@ -607,15 +574,6 @@ static esp_err_t mqttEventHandler(esp_mqtt_event_handle_t event)
     return ESP_OK;
 }
 
-static void iotUpdateUptime(TimerHandle_t xTimer)
-{
-    iotValue_t value;
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    value.i = tv.tv_sec;
-    iotElementPubUpdate(&deviceUptimePub, value);
-}
-
 static void mqttStart(void)
 {
     esp_mqtt_client_config_t mqtt_cfg = {
@@ -630,24 +588,10 @@ static void mqttStart(void)
     }
     
     mqttClient = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_start(mqttClient);
-
-    uptimeTimer = xTimerCreate("updUptime", UPTIME_UPDATE_MS / portTICK_RATE_MS, pdTRUE, NULL, iotUpdateUptime);
-    xTimerStart(uptimeTimer, 0);
 }
 
-static int nvsReadStr(nvs_handle handle, const char *key, char *out, size_t len)
-{
-    esp_err_t err = nvs_get_str(handle, key, out, &len);
-    if (err != ESP_OK)
-    {
-        return 1;
-    }
-    return 0;
-}
 
 #ifdef CONFIG_CONNECTION_LED
-
 static void onLedTimer(TimerHandle_t xTimer)
 {
     gpio_set_level(CONFIG_CONNECTION_LED_PIN, !gpio_get_level(CONFIG_CONNECTION_LED_PIN));
@@ -688,6 +632,4 @@ static void setLedState(int state)
             break;
     }
 }
-
-
 #endif
