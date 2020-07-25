@@ -25,6 +25,8 @@
 #include "updater.h"
 #include "gpiox.h"
 
+#include "provisioning.h"
+
 static const char TAG[] = "main";
 static const char PROFILE[] = "profile";
 /* 
@@ -336,6 +338,7 @@ void app_main(void)
     nvs_close(handle);
 
     iotInit();
+    provisioningInit();
     gpioxInit();
     
     ESP_ERROR_CHECK( processProfile(profile, len));
@@ -353,4 +356,5 @@ void app_main(void)
 
     updaterInit();
     iotStart();
+    provisioningStart();
 }
