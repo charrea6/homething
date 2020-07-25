@@ -120,7 +120,7 @@ def build_config(action, ctx, args, configfile=None):
     
     esptool_path = os.path.join(idf_path, 'components', 'esptool_py', 'esptool', 'esptool.py')
 
-    esptool_args = ['--chip', config['IDF_TARGET'], '--port', config['ESPTOOLPY_PORT'], '--baud', str(config['ESPTOOLPY_BAUD'])]
+    esptool_args = ['--chip', config['IDF_TARGET'], '--port', args['port'], '--baud', str(args['baud'])]
     esptool_args += ['--before', config['ESPTOOLPY_BEFORE'], '--after', config['ESPTOOLPY_AFTER']]
     esptool_args += ['write_flash']
 
@@ -138,7 +138,6 @@ def build_config(action, ctx, args, configfile=None):
     esptool_args += [offset, bin_filename]
 
     subprocess.check_call(['python', esptool_path] + esptool_args)
-
 
 def action_extensions(base_actions, project_dir):
     global build_action

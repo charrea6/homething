@@ -73,17 +73,18 @@ static void iotWifiConnectionStatus(bool connected);
 
 #ifdef CONFIG_CONNECTION_LED
 
-#define LED_STATE_DISCONNECTED 0
-#define LED_STATE_WIFI_CONNECTED 1
-#define LED_STATE_MQTT_CONNECTED 2
+#define LED_SUBSYS_WIFI 0
+#define LED_SUBSYS_MQTT 1
+#define LED_STATE_ALL_CONNECTED ((1 << LED_SUBSYS_WIFI) | (1 << LED_SUBSYS_MQTT))
+
 #define LED_ON 0
 #define LED_OFF 1
 
 static TimerHandle_t ledTimer;
-
+static uint8_t connState = 0;
 static void setupLed();
-static void setLedState(int state);
-#define SET_LED_STATE(state) setLedState(state)
+static void setLedState(int subsystem, bool state);
+#define SET_LED_STATE(subsystem, state) setLedState(subsystem, state)
 #else
 #define SET_LED_STATE(state)
 #endif
@@ -441,7 +442,7 @@ static void iotUpdateUptime(TimerHandle_t xTimer)
 static void iotWifiConnectionStatus(bool connected)
 {
     iotValue_t value;
-    SET_LED_STATE(connected ? LED_STATE_WIFI_CONNECTED: LED_STATE_DISCONNECTED);
+    SET_LED_STATE(LED_SUBSYS_WIFI, connected);
     value.s = wifiGetIPAddrStr();
     iotElementPubUpdate(&deviceIPPub, value);
     if (connected)
@@ -539,7 +540,7 @@ static esp_err_t mqttEventHandler(esp_mqtt_event_handle_t event)
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT Connected");
-            SET_LED_STATE(LED_STATE_MQTT_CONNECTED);
+            SET_LED_STATE(LED_SUBSYS_MQTT, true);
             mqttConnected();
             MUTEX_LOCK();
             mqttIsConnected = true;
@@ -548,7 +549,7 @@ static esp_err_t mqttEventHandler(esp_mqtt_event_handle_t event)
 
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT Disconnected");
-            SET_LED_STATE(LED_STATE_DISCONNECTED);
+            SET_LED_STATE(LED_SUBSYS_MQTT, false);
             MUTEX_LOCK();
             mqttIsConnected = false;
             MUTEX_UNLOCK();
@@ -609,27 +610,37 @@ static void setupLed()
     gpio_config(&config);
     gpio_set_level(CONFIG_CONNECTION_LED_PIN, LED_OFF);
     ledTimer = xTimerCreate("CONNLED", 500 / portTICK_RATE_MS, pdTRUE, NULL, onLedTimer);
+    xTimerStart(ledTimer, 0);
 }
 
-static void setLedState(int state)
+static void setLedState(int subsystem, bool state)
 {
-    switch(state)
+    uint8_t oldState = connState;
+    if (state)
     {
-        case LED_STATE_DISCONNECTED:
-        case LED_STATE_WIFI_CONNECTED:
-            if (xTimerIsTimerActive(ledTimer) == pdFALSE)
-            {
-                xTimerStart(ledTimer, 0);
-            }
-            break;
-        case LED_STATE_MQTT_CONNECTED:
-        default:
+        connState |= 1<< subsystem;
+    }
+    else
+    {
+        connState &= ~(1<< subsystem);
+    }
+    if (oldState != connState)
+    {
+        if (connState == LED_STATE_ALL_CONNECTED)
+        {
             if (xTimerIsTimerActive(ledTimer) == pdTRUE)
             {
                 xTimerStop(ledTimer, 0);
             }
             gpio_set_level(CONFIG_CONNECTION_LED_PIN, LED_ON);
-            break;
+        }
+        else
+        {
+            if (xTimerIsTimerActive(ledTimer) == pdFALSE)
+            {
+                xTimerStart(ledTimer, 0);
+            }
+        }
     }
 }
 #endif

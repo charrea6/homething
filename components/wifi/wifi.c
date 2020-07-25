@@ -37,9 +37,10 @@ static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 static WifiConnectionCallback_t connectionCallback;
 static TimerHandle_t connectionTimer;
 
+static esp_err_t wifiEventHandler(void *ctx, system_event_t *event);
 static void wifiStartStation(void);
 static void wifiSetupStation(void);
-static void wifiSetupAP(void);
+static void wifiSetupAP(bool andStation);
 
 static void getUniqName(char *name);
 static void onConnectionTimeout(TimerHandle_t xTimer);
@@ -49,6 +50,7 @@ int wifiInit(WifiConnectionCallback_t callback)
     int result = 0;
     esp_err_t err;
     nvs_handle handle;
+    char hostname[UNIQ_NAME_LEN];
 
     connectionCallback = callback;
 
@@ -71,6 +73,17 @@ int wifiInit(WifiConnectionCallback_t callback)
     }
 
     connectionTimer = xTimerCreate("WIFICONN", (SECS_BEFORE_AP * 1000) / portTICK_RATE_MS, pdFALSE, NULL, onConnectionTimeout);
+
+    getUniqName(hostname);
+
+    tcpip_adapter_init();
+    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
+    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
+
+    ESP_ERROR_CHECK( esp_event_loop_init(wifiEventHandler, NULL) );
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
+    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
 
     return result;
 }
@@ -106,27 +119,13 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
 
 void wifiStart(void)
 {
-    char hostname[UNIQ_NAME_LEN];
-    getUniqName(hostname);
-
-    tcpip_adapter_init();
-    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
-    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
-
-    ESP_ERROR_CHECK( esp_event_loop_init(wifiEventHandler, NULL) );
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
-    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
-    //wifiSetupAP();
-    
     if (wifiSsid[0])
     {
         wifiSetupStation();
-        ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     }
     else
     {
-        ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_AP) );
+        wifiSetupAP(false);
     }
 
     ESP_ERROR_CHECK( esp_wifi_start() );
@@ -139,14 +138,10 @@ void wifiSetSSID(char *ssid, char *password)
     strcpy(wifiPassword, password);
 
     ESP_ERROR_CHECK( esp_wifi_get_mode(&mode) );
+    wifiSetupStation();
     if (mode == WIFI_MODE_STA)
     {
-        wifiSetupStation();
         ESP_ERROR_CHECK( esp_wifi_disconnect());
-    }
-    else
-    {
-        wifiSetupStation();
     }
 }
 
@@ -174,7 +169,7 @@ static void wifiStartStation(void)
     esp_wifi_connect();
 }
 
-static void wifiSetupAP(void)
+static void wifiSetupAP(bool andStation)
 {
     char name[UNIQ_NAME_LEN];
     wifi_config_t wifi_config;
@@ -185,10 +180,9 @@ static void wifiSetupAP(void)
     wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
     wifi_config.ap.max_connection = 4;
     ESP_LOGI(TAG, "Setting WiFi AP SSID %s...", wifi_config.sta.ssid);
-    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_APSTA) );
+    ESP_ERROR_CHECK( esp_wifi_set_mode(andStation ? WIFI_MODE_APSTA: WIFI_MODE_AP) );
     ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config) );
 }
-
 
 static void getUniqName(char *name)
 {
@@ -200,5 +194,5 @@ static void getUniqName(char *name)
 static void onConnectionTimeout(TimerHandle_t xTimer)
 {
     ESP_LOGI(TAG, "Timeout connecting to SSID, enabling AP...");
-    wifiSetupAP();
+    wifiSetupAP(true);
 }

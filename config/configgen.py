@@ -14,8 +14,8 @@ class ProcessedOptionInfo:
         self.optional = True
 
 defaults = dict(
-    wifi={'ssid':OptionInfo('string'), 
-          'pass':OptionInfo('string')},
+    wifi={'ssid':OptionInfo('string', True), 
+          'pass':OptionInfo('string', True)},
     mqtt={'host':OptionInfo('string'), 
           'port':OptionInfo('u16', True), 
           'user':OptionInfo('string', True), 
@@ -32,10 +32,13 @@ defaults = dict(
     )
 
 def process_wifi(options, _):
-    return '''wifi,namespace,,
+    if options['ssid']:
+        return '''wifi,namespace,,
 ssid,data,string,{ssid}
 pass,data,string,{pass}
 '''.format(**options) 
+    else:
+        return ''
 
 def process_mqtt(options, _):
     mqtt = 'mqtt,namespace,,\n'
