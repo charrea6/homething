@@ -1,4 +1,4 @@
-import ConfigParser
+import configparser
 import argparse
 import sys
 
@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    config = ConfigParser.RawConfigParser()
+    config = configparser.RawConfigParser()
     config.readfp(args.infile)
 
     csv = 'key,type,encoding,value\n'
