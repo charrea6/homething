@@ -62,7 +62,7 @@ int gpioxInit(void)
         err = i2cdev_init();
         if (err == ESP_OK)
         {
-            for (int i=0; i < MAX_EXPANDERS; i++)
+            for (int i=0; i < nrofExpanders; i++)
             {
                 memset(&expander_devices[i], 0, sizeof(i2c_dev_t));
                 err = pcf8574_init_desc(&expander_devices[i], 0, BASE_ADDR + i, sda, scl);
@@ -131,7 +131,7 @@ int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
     {
         if (pins->pins[1] != 0)
         {
-            for (int i = 0; i < MAX_EXPANDERS; i ++)
+            for (int i = 0; i < nrofExpanders; i ++)
             {
                 uint8_t expander_pins = pins->pins[1] >> (8 * i);
                 switch(mode)
@@ -180,7 +180,7 @@ int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
     {
         if (pins->pins[1] != 0)
         {
-            for (int i = 0; i < MAX_EXPANDERS; i ++)
+            for (int i = 0; i < nrofExpanders; i ++)
             {
                 uint8_t expander_pins = pins->pins[1] >> (8 * i);
                 uint8_t value;
@@ -214,7 +214,7 @@ int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
     {
         if (pins->pins[1] != 0)
         {
-            for (int i = 0; i < MAX_EXPANDERS; i ++)
+            for (int i = 0; i < nrofExpanders; i ++)
             {
                 uint8_t expander_pins = pins->pins[1] >> (8 * i);
                 uint8_t value = ((values->pins[1] >> (8 * i)) & expander_pins) | (expander_pin_settings[i] & ~expander_pins);

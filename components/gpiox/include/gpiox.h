@@ -18,7 +18,7 @@
 #define SD3 10
 #define SD2 9
 
-#if CONFIG_GPIOX_NROF_EXPANDERS > 0
+#if CONFIG_GPIOX_EXPANDERS == 1
 #define GPIOX_PINS_SIZE 2
 #define GPIOX_BASE 32
 #define X1 (GPIOX_BASE)
@@ -29,8 +29,6 @@
 #define X6 (GPIOX_BASE + 5)
 #define X7 (GPIOX_BASE + 6)
 #define X8 (GPIOX_BASE + 7)
-
-#if CONFIG_GPIOX_NROF_EXPANDERS > 1
 #define X9 (GPIOX_BASE + 8)
 #define X10 (GPIOX_BASE + 9)
 #define X11 (GPIOX_BASE + 10)
@@ -39,9 +37,6 @@
 #define X14 (GPIOX_BASE + 13)
 #define X15 (GPIOX_BASE + 14)
 #define X16 (GPIOX_BASE + 15)
-#endif
-
-#if CONFIG_GPIOX_NROF_EXPANDERS > 2
 #define X17 (GPIOX_BASE + 16)
 #define X18 (GPIOX_BASE + 17)
 #define X19 (GPIOX_BASE + 18)
@@ -50,9 +45,6 @@
 #define X22 (GPIOX_BASE + 21)
 #define X23 (GPIOX_BASE + 22)
 #define X24 (GPIOX_BASE + 23)
-#endif
-
-#if CONFIG_GPIOX_NROF_EXPANDERS > 3
 #define X25 (GPIOX_BASE + 24)
 #define X26 (GPIOX_BASE + 25)
 #define X27 (GPIOX_BASE + 26)
@@ -61,7 +53,6 @@
 #define X30 (GPIOX_BASE + 29)
 #define X31 (GPIOX_BASE + 30)
 #define X32 (GPIOX_BASE + 31)
-#endif
 
 #else
 #define GPIOX_PINS_SIZE 1
