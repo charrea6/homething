@@ -29,10 +29,6 @@ static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 #define MQTT_PATH_PREFIX_LEN 23 // homething/<MAC 12 Hexchars> \0
 #define MQTT_COMMON_CTRL_SUB_LEN (MQTT_PATH_PREFIX_LEN + 7) // "/+/ctrl"
 
-#define MQTT_CLIENT_THREAD_NAME         "mqtt_client_thread"
-#define MQTT_CLIENT_THREAD_STACK_WORDS  8192
-#define MQTT_CLIENT_THREAD_PRIO         8
-
 #define MAX_TOPIC_NAME 512
 
 #define POLL_INTERVAL_MS 10
@@ -52,6 +48,8 @@ static iotElementPub_t deviceIPPub;
 static TimerHandle_t uptimeTimer;
 static esp_mqtt_client_handle_t mqttClient;
 static SemaphoreHandle_t mqttMutex;
+
+static bool mqttIsSetup = false;
 static bool mqttIsConnected = false;
 
 #define MUTEX_LOCK() do{}while(xSemaphoreTake(mqttMutex, portTICK_PERIOD_MS) != pdTRUE)
@@ -445,15 +443,17 @@ static void iotWifiConnectionStatus(bool connected)
     SET_LED_STATE(LED_SUBSYS_WIFI, connected);
     value.s = wifiGetIPAddrStr();
     iotElementPubUpdate(&deviceIPPub, value);
-    if (connected)
+    if (mqttIsSetup)
     {
-        esp_mqtt_client_start(mqttClient);
+        if (connected)
+        {
+            esp_mqtt_client_start(mqttClient);
+        }
+        else
+        {
+            esp_mqtt_client_stop(mqttClient);
+        }
     }
-    else
-    {
-        esp_mqtt_client_stop(mqttClient);
-    }
-    
 }
 
 static void mqttMessageArrived(char *mqttTopic, int mqttTopicLen, char *data, int dataLen)
@@ -577,11 +577,16 @@ static esp_err_t mqttEventHandler(esp_mqtt_event_handle_t event)
 
 static void mqttStart(void)
 {
+    if (mqttServer[0] == 0) {
+        return;
+    } 
+
     esp_mqtt_client_config_t mqtt_cfg = {
         .transport = MQTT_TRANSPORT_OVER_TCP,
         .host = mqttServer,
         .port = mqttPort,
         .event_handle = mqttEventHandler,
+        .task_stack = 7 * 1024,
     };
     if (mqttUsername[0] != 0) {
         mqtt_cfg.username = mqttUsername;
@@ -589,6 +594,7 @@ static void mqttStart(void)
     }
     
     mqttClient = esp_mqtt_client_init(&mqtt_cfg);
+    mqttIsSetup = true;
 }
 
 

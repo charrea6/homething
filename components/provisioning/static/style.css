@@ -1,0 +1,11 @@
+.button.button-primary:disabled,
+button.button-primary:disabled,
+input[type="submit"].button-primary:disabled,
+input[type="reset"].button-primary:disabled,
+input[type="button"].button-primary:disabled {
+  color: #888888;
+  background-color: #ffffff;
+  border-color: #888888; }
+  .error{
+      color: red;
+  }

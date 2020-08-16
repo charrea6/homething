@@ -4,19 +4,28 @@
   <meta charset="utf-8">
   <title>Homething Provisioning Page</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <link href="fonts.css" rel="stylesheet" type="text/css">
-  <link rel="stylesheet" href="normalize.css">
-  <link rel="stylesheet" href="skeleton.css">
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="normalize.css" embed>
+  <link rel="stylesheet" href="skeleton.css" embed>
+  <link rel="stylesheet" href="style.css" embed>
 </head>
 <body>
   <div class="container">
     <div class="row">
-      <div class="one-half column" style="margin-top: 25%">
-        <h4>Basic Page</h4>
-        <p>This index.html page is a placeholder with the CSS, font and favicon. It's just waiting for you to add some content! If you need some help hit up the <a href="http://www.getskeleton.com">Skeleton documentation</a>.</p>
+      <div class="six column" style="margin-top: 5%">
+        <h1>Homething Provisioning Page</h1>
       </div>
     </div>
+    <div id="config"></div>
+    <div class="row">
+        <div class="three columns">
+            <button class="button-primary" onclick="saveConfig();" id="savebtn">Save and Apply</button>
+        </div>
+        <div class="nine columns" id="msg">
+        </div>
+    </div>
   </div>
+  <script src="settings.js"></script>
+  <script src="script.js" embed></script>
 </body>
 </html>

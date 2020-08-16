@@ -1,0 +1,4 @@
+flask
+requests
+pyyaml
+beautifulsoup4
