@@ -120,6 +120,7 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
     default:
         break;
     }
+    mdns_handle_system_event(ctx, event);
     return ESP_OK;
 }
 
