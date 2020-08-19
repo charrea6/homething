@@ -11,6 +11,8 @@ enum ContentType{
     CT_MAX
 };
 
+#define SIZE_FLAG_COMPRESSED 0x80000000
+#define SF_GET_SIZE(size) (size & (SIZE_FLAG_COMPRESSED - 1))
 struct static_file_data {
     uint32_t size;
     const int content_type;

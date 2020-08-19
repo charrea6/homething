@@ -8,7 +8,14 @@
 #include "wifi.h"
 #include "iot.h"
 
+#include "uzlib.h"
+
+#define DICT_SIZE 1024
+#define DECOMPRESS_BUFFER_SIZE 1024
+
 static const char *TAG="PROVISION";
+static const char *ACCEPT_ENCODING = "accept-encoding";
+static const char *CONTENT_ENCODING = "content-encoding";
 
 static const char *content_types[CT_MAX] = {
     NULL,
@@ -30,8 +37,12 @@ static const httpd_uri_t handlers[] = {{
 }
 };
 
+static bool isCompressionAcceptable(httpd_req_t *req);
+static esp_err_t sendDecompressed(httpd_req_t *req, const struct static_file_data *resp);
+
 int provisioningInit(void)
 {
+    uzlib_init();
     return 0;
 }
 
@@ -69,6 +80,78 @@ esp_err_t provisioningStaticFileHandler(httpd_req_t *req)
 {
     const struct static_file_data* resp = (const struct static_file_data*) req->user_ctx;
     provisioningSetContentType(req, resp->content_type);
-    httpd_resp_send(req, resp->data, resp->size);
+    if (resp->size & SIZE_FLAG_COMPRESSED) {
+        // Check if compression via gzip is acceptable?
+        if (!isCompressionAcceptable(req)) {
+            return sendDecompressed(req, resp);
+        }
+        httpd_resp_set_hdr(req, CONTENT_ENCODING, "gzip");
+    }
+    httpd_resp_send(req, resp->data, SF_GET_SIZE(resp->size));
+    return ESP_OK;
+}
+
+static bool isCompressionAcceptable(httpd_req_t *req) 
+{
+    size_t len = httpd_req_get_hdr_value_len(req, ACCEPT_ENCODING);
+    if (len == 0) {
+        return false;
+    }
+    char *accept_enc = malloc(len);
+    if (accept_enc == NULL) {
+        return false;
+    }
+    accept_enc[0] = 0;
+    httpd_req_get_hdr_value_str(req, ACCEPT_ENCODING, accept_enc, len);
+    bool result = (strstr(accept_enc, "gzip") != NULL);
+    free(accept_enc);
+    return result;
+}
+
+static esp_err_t sendDecompressed(httpd_req_t *req, const struct static_file_data *resp)
+{
+    int res;
+    struct uzlib_uncomp d;
+    unsigned char *buffer;
+    unsigned char *dict;
+
+    dict = malloc(DICT_SIZE);
+    if (dict == NULL) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    uzlib_uncompress_init(&d, dict, DICT_SIZE);
+    d.source = (unsigned char*) resp->data;
+    d.source_limit = (unsigned char*)resp->data + SF_GET_SIZE(resp->size) - 4;
+    res = uzlib_gzip_parse_header(&d);
+    if (res != TINF_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    buffer = malloc(DECOMPRESS_BUFFER_SIZE);
+    if (buffer == NULL) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "Decompression buffer allocated.");
+    d.dest = d.dest_start = buffer;
+    d.dest_limit = buffer + DECOMPRESS_BUFFER_SIZE;
+    int r = uzlib_uncompress(&d);
+    ESP_LOGI(TAG, "uncompress result %d", r);
+    while (r == TINF_OK) {
+        ESP_LOGI(TAG, "Decompressed chunk, dest %p (limit %p) source %p (limit %p)", d.dest, d.dest_limit, d.source, d.source_limit);
+        httpd_resp_send_chunk(req, (char*)buffer, d.dest - buffer);
+        ESP_LOGI(TAG, "Sent decompressed chunk");
+        d.dest = buffer;
+        r = uzlib_uncompress(&d);
+        ESP_LOGI(TAG, "uncompress result %d", r);
+    }
+    if (d.dest != buffer) {
+        httpd_resp_send_chunk(req, (char*)buffer, d.dest - buffer);
+    }
+    httpd_resp_send_chunk(req, NULL, 0);
+    free(buffer);
+    free(dict);
     return ESP_OK;
 }

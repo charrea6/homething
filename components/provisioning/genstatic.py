@@ -1,11 +1,24 @@
 import sys
 import os
 import re
+import io
 import datetime
 import argparse
+import gzip
+import zlib
 from bs4 import BeautifulSoup
 
-RE_FILENAME_DATA_SECTION=re.compile('[./\- ]')
+RE_FILENAME_DATA_SECTION=re.compile(r'[./\- ]')
+SIZE_FLAG_COMPRESSED = 0x80000000
+
+
+def compress(data):
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode='wb') as f:
+        f.compress = zlib.compressobj(9, zlib.DEFLATED, -10, 9, 0)
+        f.write(data)
+    return buf.getvalue()
+
 
 class StaticFile:
     def __init__(self, path, filename):
@@ -21,18 +34,24 @@ class StaticFile:
         return self.data
 
     def generate_data_section(self):
+        can_compress = True
         if self.filename.endswith('.css'):
             content_type = 'CT_CSS'
         elif self.filename.endswith('.js'):
             content_type = 'CT_JS'
-        elif self.filename.endswith('.woff2'):
-            content_type = 'CT_WOFF2'
         else:
             content_type = 'CT_HTML'
         
         data = self.load()
+        if can_compress:
+            data = compress(data)
+            size = len(data)
+            compression = '| SIZE_FLAG_COMPRESSED'
+        else:
+            size = len(data)
+            compression = ''
         data_section = f"""static const struct static_file_data {self.data_section_name} = {{
-    .size= {len(data)},
+    .size= {size} {compression},
     .content_type= {content_type},
     .data= {{
         """
