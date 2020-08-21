@@ -7,10 +7,11 @@ import argparse
 import gzip
 import zlib
 from bs4 import BeautifulSoup
+import requests
 
 RE_FILENAME_DATA_SECTION=re.compile(r'[./\- ]')
 SIZE_FLAG_COMPRESSED = 0x80000000
-
+cache_dir = None
 
 def compress(data):
     buf = io.BytesIO()
@@ -20,6 +21,41 @@ def compress(data):
     return buf.getvalue()
 
 
+def load(path):
+    if cache_dir is None:
+        with open(path, 'rb') as fp:
+            return fp.read()
+    else:
+        filename = os.path.basename(path)
+        cache_path = os.path.join(cache_dir, filename)
+        if os.path.exists(cache_path) and os.path.getmtime(path) < os.path.getmtime(cache_path):
+            with open(cache_path, 'rb') as fp:
+                return fp.read()
+        else:
+            with open(path, 'rb') as fp:
+                data = fp.read()
+
+            url = None
+            if path.endswith(".html"):
+                url = 'https://html-minifier.com/raw'
+            elif path.endswith(".js"):
+                url = 'https://javascript-minifier.com/raw'
+            elif path.endswith(".css"):
+                url = 'https://cssminifier.com/raw'
+                
+            if url is None:
+                return data
+            else:
+                response = requests.post(url, data={'input': data})
+                if response.status_code == 200:
+                    data = response.content
+                    with open(cache_path, "wb") as fp:
+                        fp.write(data)
+                    return data
+                else:
+                    print(f"Response: {response}")
+                    response.raise_for_status()
+            
 class StaticFile:
     def __init__(self, path, filename):
         self.path = path
@@ -29,8 +65,7 @@ class StaticFile:
     
     def load(self):
         if self.data is None:
-            with open(self.path, 'rb') as fp:
-                self.data = fp.read()
+            self.data = load(self.path)
         return self.data
 
     def generate_data_section(self):
@@ -152,8 +187,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('paths', type=str, nargs='+')
     parser.add_argument("--output", "-o", type=argparse.FileType('w'))
+    parser.add_argument("--cache-dir", "-c", type=str)
 
     args = parser.parse_args()
+    if args.cache_dir is not None:
+        cache_dir = args.cache_dir
+        os.makedirs(cache_dir, exist_ok=True)
+
     static_files = []
     for path in args.paths:
         if os.path.isdir(path):
