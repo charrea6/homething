@@ -10,3 +10,6 @@
 [submodule "components/tinycbor/tinycbor"]
 	path = components/tinycbor/tinycbor
 	url = https://github.com/intel/tinycbor.git
+[submodule "components/cn-cbor/cn-cbor"]
+	path = components/cn-cbor/cn-cbor
+	url = https://github.com/jimsch/cn-cbor.git
