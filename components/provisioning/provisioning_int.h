@@ -8,6 +8,7 @@ enum ContentType{
     CT_CSS,
     CT_JS,
     CT_JSON,
+    CT_CBOR,
     CT_MAX
 };
 

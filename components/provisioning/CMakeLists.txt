@@ -1,7 +1,7 @@
 idf_component_register(SRCS "config.c" "provisioning.c" "captdns.c" "${CMAKE_BINARY_DIR}/static_files.c"
                     INCLUDE_DIRS "include" 
                     PRIV_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}
-                    REQUIRES "esp_http_server" "json" "wifi" "iot" "uzlib") 
+                    REQUIRES "esp_http_server" "json" "wifi" "iot" "uzlib" "tinycbor") 
 
 file(GLOB static_file_deps static/*)
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/static_files.c
@@ -10,5 +10,5 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/static_files.c
 )
 
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/settings.h ${CMAKE_BINARY_DIR}/settings.js
-    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/gensettings.py ${CMAKE_CURRENT_SOURCE_DIR}/settings.yml ${CMAKE_BINARY_DIR}/settings.h ${CMAKE_BINARY_DIR}/settings.js
+    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/gensettings.py ${CMAKE_CURRENT_SOURCE_DIR}/settings.yml ${CMAKE_BINARY_DIR}/provisioningSettings.h ${CMAKE_BINARY_DIR}/settings.js
     DEPENDS gensettings.py settings.yml)

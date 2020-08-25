@@ -2,7 +2,6 @@
 #include <esp_system.h>
 #include <esp_http_server.h>
 #include <nvs_flash.h>
-#include <cJSON.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
@@ -14,14 +13,17 @@
 #include "wifi.h"
 #include "iot.h"
 
-#define MAX_CONTENT_LENGTH 2048
+#include "cbor.h"
+
+#define MAX_CONTENT_LENGTH 1024
 
 typedef enum FieldType {
-    FT_USERNAME,
+    FT_USERNAME = 0,
     FT_PASSWORD,
     FT_HOSTNAME,
     FT_PORT,
-    FT_CHECKBOX
+    FT_CHECKBOX,
+    FT_MAX
 }FieldType;
 
 struct variable {
@@ -39,27 +41,38 @@ struct setting {
 
 const char *TAG="CONFIG";
 
-static void addVariable(cJSON *obj, nvs_handle handle, struct variable *var);
-static esp_err_t setVariable(nvs_handle handle, struct variable *var, cJSON *obj);
 static void reboot(TimerHandle_t xTimer);
+static bool getVariables(nvs_handle handle, struct setting *setting, CborEncoder *encoder);
+static char *setVariables(nvs_handle handle, struct setting *setting, CborValue *it);
+
+typedef bool (*cborTypeTest)(const CborValue *);
+
+static const cborTypeTest fieldTypeToCborType[FT_MAX] = {
+    cbor_value_is_text_string,
+    cbor_value_is_text_string,
+    cbor_value_is_text_string,
+    cbor_value_is_unsigned_integer,
+    cbor_value_is_boolean
+};
 
 esp_err_t provisioningConfigPostHandler(httpd_req_t *req)
 {
+    char *buf = NULL;
+    char *errorMsg = NULL;
     ESP_LOGI(TAG, "/config handler read content length %d", req->content_len);
     if (req->content_len > MAX_CONTENT_LENGTH) {
-        httpd_resp_send_500(req);
-        return ESP_FAIL;
+        errorMsg = "config content length too big";
+        goto error;
     }
-
-    esp_err_t err;
+    
     nvs_handle handle;
-    char*  buf = malloc(req->content_len + 1);
     size_t off = 0;
-    int    ret,i;
+    int    ret;
 
+    buf = malloc(req->content_len);
     if (!buf) {
-        httpd_resp_send_500(req);
-        return ESP_FAIL;
+        errorMsg = "failed to allocate buffer";
+        goto error;
     }
 
     while (off < req->content_len) {
@@ -75,194 +88,323 @@ esp_err_t provisioningConfigPostHandler(httpd_req_t *req)
         off += ret;
         ESP_LOGI(TAG, "/config handler recv length %d", ret);
     }
-    buf[off] = 0;
-    cJSON *obj = cJSON_Parse(buf);
-    if (obj == NULL) {
-        httpd_resp_set_status(req, HTTPD_400);
-        httpd_resp_send(req, "Unable to parse json", -1);
-        return ESP_FAIL;
-    }
-    for (i=0; i < nrofSettings; i++) {
-        int n;
-        err = nvs_open(settings[i].name, NVS_READWRITE, &handle);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to open %s error %d", settings[i].name, err);
-            err = ESP_OK;
-            break;
-        }
 
-        cJSON *settingObj = cJSON_GetObjectItem(obj, settings[i].name);
-        if (settingObj) {
-            for (n=0; n < settings[i].nrofVariables; n++) {
-                err = setVariable(handle, &settings[i].variables[n], settingObj);
+    CborParser parser;
+    CborValue it;
+    CborError err = cbor_parser_init((uint8_t*)buf, req->content_len, 0, &parser, &it);
+    if (err || (cbor_value_get_type(&it) != CborMapType)) {
+        errorMsg = "Failed to parse payload as CBOR or not a map type";
+        goto error;
+    }
+    err = cbor_value_enter_container(&it, &it);
+    if (err) {
+        errorMsg = "Failed to enter container";
+        goto error;
+    }
+
+    while (!cbor_value_at_end(&it)) {
+        CborError err;
+        char *key;
+        size_t keyLen;
+        int i;
+
+        if (cbor_value_get_type(&it) != CborTextStringType) {
+            errorMsg = "Invalid key in map";
+            goto error;
+        }
+        err = cbor_value_dup_text_string(&it, &key, &keyLen, &it);
+        if (err) {
+            errorMsg = "Failed to extract key";
+            goto error;
+        }
+        struct setting *foundSetting = NULL;
+        for (i=0; i < nrofSettings; i++) {
+            if (strcmp(key, settings[i].name) == 0) {
+                foundSetting = &settings[i];
+                break;
             }
         }
-
-        nvs_close(handle);
+        free(key);
+        if (foundSetting == NULL) {
+            errorMsg = "Unexpected key";
+            goto error;
+        }
+        ESP_LOGI(TAG, "Processing variables for %s", foundSetting->name);
+        if (cbor_value_get_type(&it) != CborMapType) {
+            errorMsg = "Key value not a map type";
+            goto error;
+        }
+        err = nvs_open(foundSetting->name, NVS_READWRITE, &handle);
         if (err != ESP_OK) {
-            break;
+            ESP_LOGE(TAG, "Failed to open %s error %d", foundSetting->name, err);
+            errorMsg = "Failed to open NVS";
+            goto error;
+        }
+        CborValue variableIt;
+        err = cbor_value_enter_container(&it, &variableIt);
+        if (err == CborNoError) {
+            errorMsg = setVariables(handle, foundSetting, &variableIt);
+        }
+        nvs_close(handle);
+        if (errorMsg) {
+            goto error;
+        }
+        err = cbor_value_leave_container(&it, &variableIt);
+        if (err != CborNoError) {
+            errorMsg = "Leave variable container failed";
+            goto error;
         }
     }
-
-    cJSON_Delete(obj);
-    if (err != ESP_OK) { 
-        return httpd_resp_send_500(req);
-    }
-
-    httpd_send(req, "Saved, rebooting...", -1);
+    ESP_LOGI(TAG, "Finished processing settings, will now reboot");
+    httpd_send(req, "Saved, rebooting...", 10);
     xTimerStart(xTimerCreate("REBOOT", 1000 / portTICK_RATE_MS, pdTRUE, NULL, reboot), 0);
+
+    free(buf);
     return ESP_OK;
+
+error:
+    ESP_LOGE(TAG, "ERROR: %s", errorMsg);
+    httpd_resp_set_status(req, HTTPD_400);
+    httpd_resp_send(req, errorMsg, -1);
+    ESP_LOGE(TAG, errorMsg);
+
+    if (buf) {
+        free(buf);
+    }
+    return ESP_FAIL;
 }
 
 esp_err_t provisioningConfigGetHandler(httpd_req_t *req)
 {
+    char *errorMsg = NULL;
     int i;
-    char *buffer;
-    cJSON *respObj;
+    uint8_t *buf = NULL;
     esp_err_t err;
     nvs_handle handle;
-
-    respObj = cJSON_CreateObject();
-    
+    CborEncoder encoder, settingEncoder;
+    CborError cborErr;
+    buf = malloc(MAX_CONTENT_LENGTH);
+    if (buf == NULL) {
+        errorMsg = "Failed to allocate cbor buffer";
+        goto error;
+    }
+    cbor_encoder_init(&encoder, buf, MAX_CONTENT_LENGTH, 0);
+    cborErr = cbor_encoder_create_map(&encoder, &settingEncoder, CborIndefiniteLength);
+    if (cborErr != CborNoError) {
+        errorMsg = "Failed to create settings encoder";
+        goto error;
+    }
     for (i=0; i < nrofSettings; i++) {
-        int n;
+        CborEncoder variablesEncoder;
+
         err = nvs_open(settings[i].name, NVS_READONLY, &handle);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to open %s error %d", settings[i].name, err);
             err = ESP_OK;
             continue;
         }
-        cJSON *settingObj = cJSON_CreateObject();
-        if (settingObj == NULL) {
-            err = ESP_ERR_NO_MEM;
-            break;
+        cborErr = cbor_encode_text_stringz(&settingEncoder, settings[i].name);
+        if (cborErr != CborNoError) {
+            errorMsg = "Failed to add setting to map";
+            goto variableError;
         }
-        cJSON_AddItemToObject(respObj, settings[i].name, settingObj);
-
-        for (n=0; n < settings[i].nrofVariables; n++) {
-            addVariable(settingObj, handle, &settings[i].variables[n]);
+        cborErr = cbor_encoder_create_map(&settingEncoder, &variablesEncoder, CborIndefiniteLength);
+        if (cborErr != CborNoError) {
+            errorMsg = "Failed to create variables encoder";
+            goto variableError;
         }
-
+        if (!getVariables(handle, &settings[i], &variablesEncoder)) {
+            errorMsg = "Failed to add variables";
+            goto variableError;
+        }
+        cborErr = cbor_encoder_close_container(&settingEncoder, &variablesEncoder);
+        if (cborErr != CborNoError) {
+            errorMsg = "Failed to close variable container";
+        }
+variableError:
         nvs_close(handle);
-        if (err != ESP_OK) {
-            break;
+        if (errorMsg) {
+            goto error;
         }
     }
-    if (err != ESP_OK) { 
-        return httpd_resp_send_500(req);
+    cborErr = cbor_encoder_close_container(&encoder, &settingEncoder);
+    if (cborErr != CborNoError) {
+        errorMsg = "Failed to close settings container";
+        goto error;
     }
+    provisioningSetContentType(req, CT_CBOR);
+    httpd_resp_send(req, (const char*)buf, cbor_encoder_get_buffer_size(&encoder, buf));
+    free(buf);
 
-    buffer = cJSON_PrintUnformatted(respObj);
-    if (buffer == NULL)
-    {
-        ESP_LOGE(TAG, "Free heap    : %d", esp_get_free_heap_size());
-        ESP_LOGE(TAG, "Min Free heap: %d",esp_get_minimum_free_heap_size());
-        return httpd_resp_send_500(req);
-    }
-    cJSON_Delete(respObj);
-    provisioningSetContentType(req, CT_JSON);
-    httpd_resp_send(req, buffer, strlen(buffer));
-    free(buffer);
     return ESP_OK;
-}
+error:
+    ESP_LOGE(TAG, "ERROR: %s", errorMsg);
+    httpd_resp_set_status(req, HTTPD_400);
+    httpd_resp_send(req, errorMsg, -1);
+    ESP_LOGE(TAG, errorMsg);
 
-static void addVariable(cJSON *obj, nvs_handle handle, struct variable *var) {
-    esp_err_t err = ESP_OK;
-    switch(var->type) {
-        case FT_USERNAME:
-        case FT_HOSTNAME: {
-            char *value;
-            size_t length = 0;
-            err = nvs_get_str(handle, var->name, NULL, &length);
-            if (err == ESP_OK) {
-                value = malloc(length);
-                if (value == NULL) {
-                    err = ESP_ERR_NO_MEM;
-                    break;
-                }
-                err = nvs_get_str(handle, var->name, value, &length);
-                if (err == ESP_OK) {
-                    cJSON_AddStringToObject(obj, var->name, value);
-                }
-                free(value);
-            }
-        }
-        break;
-        case FT_PASSWORD:
-        /* Not exporting passwords */
-        break;
-        case FT_PORT: {
-            uint16_t value;
-            err = nvs_get_u16(handle, var->name, &value);
-            if (err == ESP_OK) {
-                cJSON_AddNumberToObject(obj, var->name, (double)value);
-            }
-        }
-        break;
-        case FT_CHECKBOX: {
-            uint8_t value;
-            err = nvs_get_u8(handle, var->name, &value);
-            if (err == ESP_OK) {
-                cJSON_AddBoolToObject(obj, var->name, value);
-            }
-        }
-        break;
-        default:
-        err = ESP_FAIL;
-        break;
+    if (buf) {
+        free(buf);
     }
-    if (err != ESP_OK){
-        ESP_LOGW(TAG, "addVariable failed for variable %s type %d err %d", var->name, var->type, err);
-    }
-}
-
-static esp_err_t setVariable(nvs_handle handle, struct variable *var, cJSON *obj) {
-    esp_err_t err = ESP_OK;
-    cJSON *varObj = cJSON_GetObjectItem(obj, var->name);
-    if (varObj == NULL) {
-        return ESP_OK;
-    } 
-
-    switch(var->type) {
-        case FT_USERNAME:
-        case FT_PASSWORD:
-        case FT_HOSTNAME: {       
-            char *value = cJSON_GetStringValue(varObj);
-            if (value) {
-                err = nvs_set_str(handle, var->name, value);
-            } else {
-                ESP_LOGW(TAG, "Variable %s was not a string", var->name);
-            }
-        }
-        break;
-        case FT_PORT: {
-            if (cJSON_IsNumber(varObj)) {
-                uint16_t value = (uint16_t)varObj->valueint;
-                err = nvs_set_u16(handle, var->name, value);
-            } else {
-                ESP_LOGW(TAG, "Variable %s was not a number", var->name);
-            }
-        }
-        break;
-        case FT_CHECKBOX: {
-            if (cJSON_IsBool(varObj)){
-                uint8_t value = (uint8_t) varObj->valueint;
-                err = nvs_set_u8(handle, var->name, value);
-            } else {
-                ESP_LOGW(TAG, "Variable %s was not a bool", var->name);
-            }
-        }
-        break;
-        default:
-        err = ESP_FAIL;
-        break;
-    }
-    if (err != ESP_OK){
-        ESP_LOGW(TAG, "setVariable failed for variable %s type %d err %d", var->name, var->type, err);
-    }
-    return err;
+    return ESP_FAIL;
 }
 
 static void reboot(TimerHandle_t xTimer) {
     esp_restart();
+}
+
+static char *setVariables(nvs_handle handle, struct setting *setting, CborValue *it)
+{
+    esp_err_t err = ESP_OK;
+    char *errorMsg = NULL;
+
+    while (!cbor_value_at_end(it)) { 
+        CborError cborErr;
+        char *key;
+        size_t keyLen;
+        int i;
+
+        if (cbor_value_get_type(it) != CborTextStringType) {
+            errorMsg = "Invalid variable key in map";
+            goto error;
+        }
+        cborErr = cbor_value_dup_text_string(it, &key, &keyLen, it);
+        if (cborErr) {
+            errorMsg = "Failed to extract variable key";
+            goto error;
+        }
+        struct variable *foundVariable = NULL;
+        for (i=0; i < setting->nrofVariables; i ++){
+            if (strcmp(key, setting->variables[i].name) == 0) {
+                foundVariable = &setting->variables[i];
+                break;
+            }
+        }
+        free(key);
+        if (foundVariable == NULL) {
+            errorMsg = "Unexpected variable key";
+            goto error;
+        }
+        if (!fieldTypeToCborType[foundVariable->type](it)) {
+            ESP_LOGE(TAG, "Unexpected variable type for %s, expected FT type %d got Cbor type %d", foundVariable->name, foundVariable->type, cbor_value_get_type(it));
+            errorMsg = "Unexpected variable type";
+            goto error;
+        }
+        switch(foundVariable->type) {
+            case FT_USERNAME:
+            case FT_PASSWORD:
+            case FT_HOSTNAME: {       
+                char *value;
+                size_t valueLen;
+                cborErr = cbor_value_dup_text_string(it, &value, &valueLen, it);
+                if (cborErr) {
+                    errorMsg = "Failed to extract string variable value";
+                    goto error;
+                }
+                ESP_LOGI(TAG,"Setting %s to \"%s\"", foundVariable->name, value);
+                err = nvs_set_str(handle, foundVariable->name, value);
+                free(value);
+            }
+            break;
+            case FT_PORT: {
+                uint64_t value;
+                cborErr = cbor_value_get_uint64(it, &value);
+                if (cborErr) {
+                    errorMsg = "Failed to extract int variable value";
+                    goto error;
+                }
+                ESP_LOGI(TAG,"Setting %s to %u", foundVariable->name, (uint16_t)value);
+                err = nvs_set_u16(handle, foundVariable->name, (uint16_t)value);
+            }
+            break;
+            case FT_CHECKBOX: {
+                bool value;
+                cborErr = cbor_value_get_boolean(it, &value);
+                if (cborErr) {
+                    errorMsg = "Failed to extract bool variable value";
+                    goto error;
+                }
+                ESP_LOGI(TAG,"Setting %s to %s", foundVariable->name, value ? "true":"false");
+                err = nvs_set_u8(handle, foundVariable->name, value);
+            }
+            break;
+            default:
+            err = ESP_FAIL;
+            break;
+        }
+        if (err != ESP_OK){
+            ESP_LOGW(TAG, "setVariable failed for variable %s type %d err %d", foundVariable->name, foundVariable->type, err);
+        }
+    }
+error:
+    return errorMsg;
+}
+
+static bool getVariables(nvs_handle handle, struct setting *setting, CborEncoder *encoder)
+{
+    int n;
+    
+    for (n = 0; n < setting->nrofVariables; n++){
+        esp_err_t err = ESP_OK;
+        CborError cborErr = CborNoError;
+        struct variable *var = &setting->variables[n];
+        CborEncoder beforeVariable = *encoder;
+        cborErr = cbor_encode_text_stringz(encoder, var->name);
+        if (cborErr != CborNoError) {
+            goto error;
+        }
+        switch(var->type) {
+            case FT_USERNAME:
+            case FT_HOSTNAME: {
+                char *value;
+                size_t length = 0;
+                err = nvs_get_str(handle, var->name, NULL, &length);
+                if (err == ESP_OK) {
+                    value = malloc(length);
+                    if (value == NULL) {
+                        err = ESP_ERR_NO_MEM;
+                        break;
+                    }
+                    err = nvs_get_str(handle, var->name, value, &length);
+                    if (err == ESP_OK) {
+                        cborErr = cbor_encode_text_string(encoder, value, length);
+                    }
+                    free(value);
+                }
+            }
+            break;
+            case FT_PASSWORD:
+            cborErr = cbor_encode_text_string(encoder, "", 0);
+            break;
+            case FT_PORT: {
+                uint16_t value;
+                err = nvs_get_u16(handle, var->name, &value);
+                if (err == ESP_OK) {
+                    cborErr = cbor_encode_uint(encoder, (uint64_t)value);
+                }
+            }
+            break;
+            case FT_CHECKBOX: {
+                uint8_t value;
+                err = nvs_get_u8(handle, var->name, &value);
+                if (err == ESP_OK) {
+                    cborErr = cbor_encode_boolean(encoder, value?true:false);
+                }
+            }
+            break;
+            default:
+            err = ESP_FAIL;
+            break;
+        }
+        if (err != ESP_OK){
+            ESP_LOGW(TAG, "addVariable failed for variable %s type %d err %d", var->name, var->type, err);
+            *encoder = beforeVariable;
+        }
+        if (cborErr != CborNoError) {
+            goto error;
+        }
+    }
+    return true;
+error:
+    return false;
 }

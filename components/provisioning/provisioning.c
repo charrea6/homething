@@ -21,7 +21,8 @@ static const char *content_types[CT_MAX] = {
     NULL,
     "text/css",
     "text/javascript",
-    "application/json"
+    "application/json",
+    "application/cbor"
 };
 
 static const httpd_uri_t handlers[] = {{
@@ -51,6 +52,7 @@ int provisioningStart(void)
     int i;
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.stack_size = 6 * 1024;
     
     ESP_LOGI(TAG, "Starting server on port: %d", config.server_port);
     if (httpd_start(&server, &config) != ESP_OK) {

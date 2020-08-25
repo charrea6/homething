@@ -22,9 +22,12 @@ function variableToStr(setting, variable){
 }
 
 function variableGetValue(setting, variable) {
-    var el = document.getElementById(variableId(setting,variable));
+    var el = document.getElementById(variableId(setting, variable));
     if (variable.type == "checkbox") {
         return el.checked;
+    }
+    if ((variable.type == "port") && (el.value != "")) {
+        return parseInt(el.value);
     }
     return el.value;
 }
@@ -73,11 +76,12 @@ function loadConfig(){
     var xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
-            var data = JSON.parse(this.responseText);
+            var data = CBOR.decode(this.response);
             loadValues(data);
         }
     };
     xhttp.open("GET", "/config", true);
+    xhttp.responseType = "arraybuffer";
     xhttp.send();
 }
 
@@ -106,16 +110,21 @@ function saveConfig() {
             if (Array.isArray(variable)) {
                 for (var subVar of variable) {    
                     var value = variableGetValue(setting, subVar);
-                    config_setting[subVar.name] = value
+                    if (value != "") {
+                        config_setting[subVar.name] = value
+                    }
                 }
             } else {       
-                config_setting[variable.name] = variableGetValue(setting, variable);
+                var value = variableGetValue(setting, variable);
+                if (value != ""){
+                    config_setting[variable.name] = value;
+                }
             }
         }
     }
     var xhttp = new XMLHttpRequest();
     xhttp.open("POST", "/config", true);
-    xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    xhttp.setRequestHeader("Content-Type", "application/cbor");
     xhttp.onreadystatechange = function() {
     if (this.readyState == 4) {
         document.getElementById('savebtn').disabled=false;
@@ -128,7 +137,7 @@ function saveConfig() {
     }
     };
     document.getElementById('savebtn').disabled=true;
-    xhttp.send(JSON.stringify(config));
+    xhttp.send(CBOR.encode(config));
 }
 
 (function(){
