@@ -21,7 +21,7 @@
 
 #define UPDATER_THREAD_NAME "updater"
 #define UPDATER_THREAD_PRIO 7
-#define UPDATER_THREAD_STACK_WORDS 8192
+#define UPDATER_THREAD_STACK_WORDS 2048
 
 static const char TAG[]="Updater";
 const int UPDATE_BIT = BIT0;
