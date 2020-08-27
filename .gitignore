@@ -3,3 +3,5 @@ sdkconfig*
 components/updater/version.h
 *.pyc
 .vscode
+.DS_Store
+components/provisioning/static.min
