@@ -12,7 +12,7 @@ static const char *TAG="switch";
 
 #define SWITCH_THREAD_NAME "switches"
 #define SWITCH_THREAD_PRIO 8
-#define SWITCH_THREAD_STACK_WORDS 8192
+#define SWITCH_THREAD_STACK_WORDS 3072
 #if defined(CONFIG_MOTION) && defined(CONFIG_DOORBELL)
 #define MAX_SWITCHES (CONFIG_NROF_LIGHTS + 2)
 #elif defined(CONFIG_MOTION) || defined(CONFIG_DOORBELL)
