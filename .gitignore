@@ -1,5 +1,6 @@
 build
 sdkconfig*
+!sdkconfig.defaults
 components/updater/version.h
 *.pyc
 .vscode
