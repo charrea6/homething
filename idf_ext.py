@@ -9,7 +9,7 @@ import subprocess
 
 build_action = None
 
-profile_keys = [('LIGHT', 'L'), ('DHT22', 'T'), ('FAN', 'F'), ('DOORBELL', 'D'), ('MOTION', 'M')]
+profile_keys = [('LIGHT', 'L'), ('DHT22', 'T'), ('FAN', 'F'), ('DOORBELL', 'B'), ('MOTION', 'M')]
 
 
 def load_project_description(args):
@@ -28,7 +28,7 @@ def get_version(args):
     build_dir = args['build_dir']
     with open(os.path.join(build_dir, 'version.c')) as f:
         line = f.readline().strip()
-        m = re.match('char version\[\]=\"([^\"]+)\";', line)
+        m = re.match('char appVersion\[\]=\"([^\"]+)\";', line)
         if m:
             return m.group(1)
     return 'unknown'
@@ -37,8 +37,8 @@ def get_version(args):
 def generate_ota_file(in_file, out_file):
     with open(in_file, 'rb') as inf:  
         with open(out_file, 'wb') as outf:
-            outf.write('OTA\0')
-            outf.write('\0' * 20)
+            outf.write(b'OTA\0')
+            outf.write(b'\0' * 20)
             m = hashlib.md5()
             in_len = 0
             while True:
