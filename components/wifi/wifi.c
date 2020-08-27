@@ -36,6 +36,7 @@ static const char *TAG="WIFI";
 static char wifiSsid[MAX_LENGTH_WIFI_NAME];
 static char wifiPassword[MAX_LENGTH_WIFI_PASSWORD];
 static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
+static bool connected = false;
 static WifiConnectionCallback_t connectionCallback;
 static TimerHandle_t connectionTimer;
 
@@ -96,26 +97,28 @@ int wifiInit(WifiConnectionCallback_t callback)
 
 static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
 {
+    ESP_LOGI(TAG, "System Event: %d", event->event_id);
     switch(event->event_id) {
     case SYSTEM_EVENT_STA_START:
+        connected = false;
         wifiStartStation();
         break;
     case SYSTEM_EVENT_STA_GOT_IP: 
         sprintf(ipAddr, IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
         ESP_LOGI(TAG, "Connected to SSID, IP=%s", ipAddr);
+        xTimerStop(connectionTimer, 0);
+        connected = true;
         if (connectionCallback != NULL) {
             connectionCallback(true);
         }
-        xTimerStop(connectionTimer, 0);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
-        if (connectionCallback != NULL) {
+        if (connected && (connectionCallback != NULL)) {
             connectionCallback(false);
         }
-        if (!xTimerIsTimerActive(connectionTimer)) {
-            wifiStartStation();
-        }
+        connected = false;
+        wifiStartStation();
         break;
     default:
         break;
@@ -172,7 +175,10 @@ static void wifiSetupStation(void)
 static void wifiStartStation(void)
 {
     /* Start connection timer */
-    xTimerReset(connectionTimer, 0);
+    ESP_LOGI(TAG, "Starting Wifi Connection...");
+    if (!xTimerIsTimerActive(connectionTimer)) {
+        xTimerReset(connectionTimer, 0);
+    }
     esp_wifi_connect();
 }
 
@@ -200,6 +206,10 @@ static void getUniqName(char *name)
 
 static void onConnectionTimeout(TimerHandle_t xTimer)
 {
-    ESP_LOGI(TAG, "Timeout connecting to SSID, enabling AP...");
-    wifiSetupAP(true);
+    wifi_mode_t mode = WIFI_MODE_NULL;
+    esp_wifi_get_mode(&mode);
+    if (!connected && (mode != WIFI_MODE_APSTA)) {
+        ESP_LOGI(TAG, "Timeout connecting to SSID, enabling AP...");
+        wifiSetupAP(true);
+    }
 }
