@@ -276,6 +276,34 @@ esp_err_t processProfile(uint8_t *profile, size_t len)
     return ESP_OK;
 }
 
+#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
+static void taskStats(TimerHandle_t xTimer)
+{
+    unsigned long nrofTasks = uxTaskGetNumberOfTasks();
+    TaskStatus_t *tasksStatus = malloc(sizeof(TaskStatus_t) * nrofTasks);
+    if (tasksStatus == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate task status array");
+        return;
+    }
+    nrofTasks = uxTaskGetSystemState( tasksStatus, nrofTasks, NULL);
+    int i;
+    for (i=0; i < 80; i++) {
+        putchar('=');
+    }
+    putchar('\n');
+    
+    printf("TASK STATS # %lu\n", nrofTasks);
+    for (i=0; i < nrofTasks; i++) {
+        printf("%-30s: % 10d % 10d\n", tasksStatus[i].pcTaskName, tasksStatus[i].eCurrentState, tasksStatus[i].usStackHighWaterMark);
+    }
+    free(tasksStatus);
+    for (i=0; i < 80; i++) {
+        putchar('=');
+    }
+    printf("\n\n");
+}
+#endif
+
 /* NVS Configuration
  *
  * NS: wifi
@@ -357,4 +385,8 @@ void app_main(void)
     updaterInit();
     iotStart();
     provisioningStart();
+
+#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
+    xTimerStart(xTimerCreate("stats", 30*1000 / portTICK_RATE_MS, pdTRUE, NULL, taskStats), 0);
+#endif
 }
