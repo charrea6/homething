@@ -36,12 +36,13 @@ typedef struct iotElementSub {
 
 typedef struct iotElementPub {
     const char *name;
-    enum iotValueType_e type;
+    struct {
+        enum iotValueType_e type:2;
+        bool retain:1;
+    };
     iotValue_t value;
-    bool retain:1;
 
     /* Private fields */
-    bool updateRequired:1;  
     struct iotElement *element;
     struct iotElementPub *next;
 }iotElementPub_t;

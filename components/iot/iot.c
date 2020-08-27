@@ -43,6 +43,8 @@ static iotElement_t *elements = NULL;
 
 static iotElement_t deviceElement;
 static iotElementPub_t deviceUptimePub;
+static iotElementPub_t deviceMemFreePub;
+static iotElementPub_t deviceMemLowPub;
 static iotElementPub_t deviceIPPub;
 
 static TimerHandle_t uptimeTimer;
@@ -63,10 +65,14 @@ static char mqttPassword[MAX_LENGTH_MQTT_PASSWORD];
 static char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
 static char mqttCommonCtrlSub[MQTT_COMMON_CTRL_SUB_LEN];
 
+static int memoryStatsFree;
+static int memoryStatsLowFree;
+
 static void mqttMessageArrived(char *mqttTopic, int mqttTopicLen, char *data, int dataLen);
 static void mqttStart(void);
 static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub);
 static void iotUpdateUptime(TimerHandle_t xTimer);
+static void iotUpdateMemoryStats(void);
 static void iotWifiConnectionStatus(bool connected);
 
 #ifdef CONFIG_CONNECTION_LED
@@ -84,7 +90,7 @@ static void setupLed();
 static void setLedState(int subsystem, bool state);
 #define SET_LED_STATE(subsystem, state) setLedState(subsystem, state)
 #else
-#define SET_LED_STATE(state)
+#define SET_LED_STATE(subsystem, state)
 #endif
 
 
@@ -115,7 +121,7 @@ int iotInit(void)
     sprintf(mqttPathPrefix, "homething/%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     sprintf(mqttCommonCtrlSub, "%s/+/%s", mqttPathPrefix, IOT_DEFAULT_CONTROL_STR);
 
-    ESP_LOGI(TAG, "Initialised IOT - device path: %s", mqttPathPrefix);
+    ESP_LOGI(TAG, "Initialised IOT - device path: %s sizeof iotElementPub_t %u", mqttPathPrefix, sizeof(iotElementPub_t));
     
     deviceElement.name = "device";
     iotElementAdd(&deviceElement);
@@ -131,6 +137,18 @@ int iotInit(void)
     deviceIPPub.retain = true;
     deviceIPPub.value.s = wifiGetIPAddrStr();
     iotElementPubAdd(&deviceElement, &deviceIPPub);
+
+    iotUpdateMemoryStats();
+    deviceMemFreePub.name = "memFree";
+    deviceMemFreePub.type = iotValueType_Int;
+    deviceMemFreePub.retain = true;
+    deviceMemFreePub.value.i = memoryStatsFree;
+    iotElementPubAdd(&deviceElement, &deviceMemFreePub);
+    deviceMemLowPub.name = "memLow";
+    deviceMemLowPub.type = iotValueType_Int;
+    deviceMemLowPub.retain = true;
+    deviceMemLowPub.value.i = memoryStatsLowFree;
+    iotElementPubAdd(&deviceElement, &deviceMemLowPub);
 
     err = nvs_open("mqtt", NVS_READONLY, &handle);
     if (err == ESP_OK)
@@ -219,32 +237,32 @@ void iotElementPubAdd(iotElement_t *element, iotElementPub_t *pub)
     pub->next = element->pubs;
     element->pubs = pub;
     pub->element = element;
-    pub->updateRequired = false;
     ESP_LOGI(TAG, "Added pub \"%s\" to element \"%s\"", pub->name, element->name);
 }
 
 void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value)
 {
+    bool updateRequired = false;
     switch(pub->type)
     {
         case iotValueType_Bool:
-        pub->updateRequired = value.b != pub->value.b;
+        updateRequired = value.b != pub->value.b;
         break;
         case iotValueType_Int:
-        pub->updateRequired = value.i != pub->value.i;
+        updateRequired = value.i != pub->value.i;
         break;
         case iotValueType_Float:
-        pub->updateRequired = value.f != pub->value.f;
+        updateRequired = value.f != pub->value.f;
         break;
         case iotValueType_String:
-        pub->updateRequired = true;
+        updateRequired = true;
         break;
     }
-    pub->value = value;
-    if (pub->updateRequired)
+    if (updateRequired)
     {
+        pub->value = value;
         if (pub != &deviceUptimePub) {
-            ESP_LOGI(TAG, "PUB: Flagging update required for %s%s%s", pub->element->name, pub->name[0]?"/":"", pub->name);
+            ESP_LOGI(TAG, "PUB: Update required for %s%s%s", pub->element->name, pub->name[0]?"/":"", pub->name);
         }
         MUTEX_LOCK();
         if (mqttIsConnected)
@@ -255,7 +273,7 @@ void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value)
     }
     else
     {
-        ESP_LOGI(TAG, "PUB: No update required for %s%s%s",pub->element->name, pub->name[0]?"/":"", pub->name);
+        ESP_LOGD(TAG, "PUB: No update required for %s%s%s", pub->element->name, pub->name[0]?"/":"", pub->name);
     }    
 }
 
@@ -304,30 +322,20 @@ static bool iotElementPubSendUpdate(iotElement_t *element, iotElementPub_t *pub)
     {
         ESP_LOGV(TAG, "PUB: Sent %s (%d) to %s", (char *)message, messageLen, path);
     }
-    pub->updateRequired = false;
     return true;
 }
 
-static bool iotElementSendUpdate(iotElement_t *element, bool force)
+static bool iotElementSendUpdate(iotElement_t *element)
 {
     bool result = true;
-    MUTEX_LOCK();
-    if (mqttIsConnected || force)
+    
+    for (iotElementPub_t *pub = element->pubs;pub != NULL && result; pub = pub->next)
     {
-        for (iotElementPub_t *pub = element->pubs;pub != NULL; pub = pub->next)
-        {
-            if (pub->updateRequired || force)
-            {
-                if (!iotElementPubSendUpdate(element, pub))
-                {
-                    result = false;
-                    break;
-                }
-            }
-
-        }
+        MUTEX_LOCK();
+        result = iotElementPubSendUpdate(element, pub);
+        MUTEX_UNLOCK();
     }
-    MUTEX_UNLOCK();
+    
     return result;
 }
 
@@ -428,6 +436,12 @@ static bool iotElementSubscribe(iotElement_t *element)
     return true;
 }
 
+static void iotUpdateMemoryStats(void) 
+{
+    memoryStatsFree = (int) esp_get_free_heap_size();
+    memoryStatsLowFree = (int)esp_get_minimum_free_heap_size();
+}
+
 static void iotUpdateUptime(TimerHandle_t xTimer)
 {
     iotValue_t value;
@@ -435,6 +449,12 @@ static void iotUpdateUptime(TimerHandle_t xTimer)
     gettimeofday(&tv, NULL);
     value.i = tv.tv_sec;
     iotElementPubUpdate(&deviceUptimePub, value);
+   
+    iotUpdateMemoryStats();
+    value.i = memoryStatsFree;
+    iotElementPubUpdate(&deviceMemFreePub, value);
+    value.i = memoryStatsLowFree;
+    iotElementPubUpdate(&deviceMemLowPub, value);
 }
 
 static void iotWifiConnectionStatus(bool connected)
@@ -530,7 +550,7 @@ static void mqttConnected(void)
     {
         if (iotElementSubscribe(element))
         {
-            iotElementSendUpdate(element, true);
+            iotElementSendUpdate(element);
         }
     }
 }
