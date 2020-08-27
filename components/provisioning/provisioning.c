@@ -65,8 +65,11 @@ int provisioningStart(void)
     for (i = 0; i < sizeof(handlers)/sizeof(httpd_uri_t); i++) {
         httpd_register_uri_handler(server, &handlers[i]);
     }
-
-    captdnsInit();
+    
+    // Disable Captive Portal DNS
+    // TODO: Reduce task memory requirements
+    ///    : wasn't responding to `dig @<ESP IP> www.google.com` as arcount wasn't 0
+    //captdnsInit();
     return 0;
 }
 
