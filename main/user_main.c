@@ -292,11 +292,17 @@ static void taskStats(TimerHandle_t xTimer)
     }
     putchar('\n');
     
-    printf("TASK STATS # %lu\n", nrofTasks);
+    printf("TASK STATS # %lu\n"
+           "----------------\n", nrofTasks);
     for (i=0; i < nrofTasks; i++) {
-        printf("%-30s: % 10d % 10d\n", tasksStatus[i].pcTaskName, tasksStatus[i].eCurrentState, tasksStatus[i].usStackHighWaterMark);
+        printf("%-20s: % 10d % 10d\n", tasksStatus[i].pcTaskName, tasksStatus[i].eCurrentState, tasksStatus[i].usStackHighWaterMark);
     }
     free(tasksStatus);
+    printf("\nMEMORY STATS\n"
+             "------------\n"
+             "Free: %u\n"
+             "Low : %u\n\n", esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
+    
     for (i=0; i < 80; i++) {
         putchar('=');
     }
