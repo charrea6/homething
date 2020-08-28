@@ -23,14 +23,28 @@
 #define UPDATER_THREAD_PRIO 7
 #define UPDATER_THREAD_STACK_WORDS 2048
 
+static void updateVersion(void *userData, iotElement_t element, iotValue_t value);
+
 static const char TAG[]="Updater";
 const int UPDATE_BIT = BIT0;
 
 static iotElement_t updaterElement;
-static iotElementSub_t updateSub;
-static iotElementPub_t versionPub;
-static iotElementPub_t statusPub;
-static iotElementPub_t profilePub;
+
+#define PUB_INDEX_VERSION 0
+#define PUB_INDEX_STATUS  1
+#define PUB_INDEX_PROFILE 2
+
+IOT_DESCRIBE_ELEMENT(
+    elementDescription,
+    IOT_PUB_DESCRIPTIONS(
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "version"),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "status"),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "profile")
+    ),
+    IOT_SUB_DESCRIPTIONS(
+        IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_STRING, "update", updateVersion)
+    )
+);
 
 static EventGroupHandle_t updateEventGroup;
 
@@ -103,7 +117,7 @@ static void updaterThread(void *pvParameter)
     }
 }
 
-static void updateVersion(void *userData, struct iotElementSub *sub, iotValue_t value)
+static void updateVersion(void *userData, iotElement_t element, iotValue_t value)
 {
     ESP_LOGI(TAG, "Updating to version %s", value.s);
     if (strlen(value.s) <= MAX_VERSION_LEN)
@@ -119,33 +133,14 @@ static void updateVersion(void *userData, struct iotElementSub *sub, iotValue_t 
 
 void updaterInit()
 {
+    iotValue_t value;
     ESP_LOGI(TAG, "Updater initialised, Version: %s Profile: %s", appVersion, deviceProfile);
-    updaterElement.name = "sw";
-    iotElementAdd(&updaterElement);
+    updaterElement = iotNewElement(&elementDescription, NULL, "sw");
+    value.s = appVersion;
+    iotElementPublish(updaterElement, PUB_INDEX_VERSION, value);
 
-    versionPub.name = "version";
-    versionPub.type = iotValueType_String;
-    versionPub.retain = true;
-    versionPub.value.s = appVersion;
-    iotElementPubAdd(&updaterElement, &versionPub);
-    
-    statusPub.name = "status";
-    statusPub.type = iotValueType_String;
-    statusPub.retain = true;
-    statusPub.value.s = "";
-    iotElementPubAdd(&updaterElement, &statusPub);
-
-    profilePub.name = "profile";
-    profilePub.type = iotValueType_String;
-    profilePub.retain = true;
-    profilePub.value.s = deviceProfile;
-    iotElementPubAdd(&updaterElement, &profilePub);
-
-    updateSub.name = "update";
-    updateSub.type = iotValueType_String;
-    updateSub.callback = updateVersion;
-    updateSub.userData = NULL;
-    iotElementSubAdd(&updaterElement, &updateSub);
+    value.s = deviceProfile;
+    iotElementPublish(updaterElement, PUB_INDEX_PROFILE, value);
     
     updateEventGroup = xEventGroupCreate();
     xTaskCreate(updaterThread,
@@ -160,5 +155,5 @@ void updaterUpdateStatus(char *status)
 {
     iotValue_t value;
     value.s = status;
-    iotElementPubUpdate(&statusPub, value);
+    iotElementPublish(updaterElement, PUB_INDEX_STATUS, value);
 }

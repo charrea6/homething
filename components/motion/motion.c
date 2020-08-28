@@ -8,26 +8,24 @@ static int motionCount = 0;
 static const char motionDetected[] = "motion detected";
 static const char motionStopped[] = "motion stopped";
 
+IOT_DESCRIBE_ELEMENT_NO_SUBS(
+    elementDescription,
+    IOT_PUB_DESCRIPTIONS(
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_STRING, IOT_PUB_USE_ELEMENT)
+    )
+);
+
 static void motionCallback(void *userData, int state)
 {
     Motion_t *motion = userData;
     iotValue_t value;
     value.s = state?motionDetected:motionStopped;
-    iotElementPubUpdate(&motion->pub, value);
+    iotElementPublish(motion->element, 0, value);
 }
 
 void motionInit(Motion_t *motion, int pin)
-{
-    iotElementPub_t *pub;
-    sprintf(motion->name, "motion%d", motionCount);
+{   
+    motion->element = iotNewElement(&elementDescription, NULL, "motion%d", motionCount);
     motionCount++;
-    motion->element.name = motion->name;
-    iotElementAdd(&motion->element);
-    pub = &motion->pub;
-    pub->name = "";
-    pub->type = iotValueType_String;
-    pub->retain = false;
-    pub->value.s = motionStopped;
-    iotElementPubAdd(&motion->element, &motion->pub);
     switchAdd(pin, motionCallback, motion);
 }

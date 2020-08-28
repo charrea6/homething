@@ -7,17 +7,11 @@
 #include "relay.h"
 
 typedef struct HumidityFan{
-    char name[5];
+    int id;
     char humidity[6];
     bool override;
     Relay_t relay;
     iotElement_t element;
-    iotElementPub_t statePub;
-    iotElementPub_t thresholdPub;
-    iotElementPub_t humidityPub;
-    iotElementPub_t manualModePub;
-    iotElementPub_t manualModeSecsPub;
-    iotElementSub_t ctrl;
     int lastHumidity;
     int threshold;
     uint32_t runOnSeconds;

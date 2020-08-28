@@ -10,23 +10,23 @@ static void doorbellSwitchCallback(void *userData, int state);
 static const char released[] = "released";
 static const char pressed[] = "pressed";
 static iotElement_t element;
-static iotElementPub_t alertPub;
+
+IOT_DESCRIBE_ELEMENT_NO_SUBS(
+    elementDescription,
+    IOT_PUB_DESCRIPTIONS(
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_STRING, IOT_PUB_USE_ELEMENT)
+    )
+);
 
 void doorbellInit(int pin)
 {
     switchAdd(pin, doorbellSwitchCallback, NULL);
-    element.name = "doorbell";
-    iotElementAdd(&element);
-    alertPub.name = "";
-    alertPub.type = iotValueType_String;
-    alertPub.value.s = released;
-    alertPub.retain = false;
-    iotElementPubAdd(&element, &alertPub);
+    element = iotNewElement(&elementDescription, NULL, "doorbell");
 }
 
 static void doorbellSwitchCallback(void *userData, int state)
 {
     iotValue_t value;
     value.s = state == 0 ? pressed:released;
-    iotElementPubUpdate(&alertPub, value);
+    iotElementPublish(element, 0, value);
 }

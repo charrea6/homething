@@ -80,10 +80,16 @@ struct TemperatureSensor {
     DHT22Sensor_t sensor;
     char name[13];
     char temperatureStr[6];
-    iotElement_t temperatureElement;
-    iotElementPub_t temperaturePub;
+    iotElement_t element;
 };
 static struct TemperatureSensor *thSensors;
+
+IOT_DESCRIBE_ELEMENT_NO_SUBS(
+    tsElementDescription,
+    IOT_PUB_DESCRIPTIONS(
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_STRING, IOT_PUB_USE_ELEMENT)
+    )
+);
 
 #if defined(CONFIG_FAN)
 static HumidityFan_t *fans;
@@ -101,24 +107,19 @@ static void temperatureUpdate(void *userData, int16_t tenthsUnit)
     iotValue_t value;
     sprintf(thSensor->temperatureStr, "%d.%d", tenthsUnit / 10, tenthsUnit % 10);
     value.s = thSensor->temperatureStr;
-    iotElementPubUpdate(&thSensor->temperaturePub, value);
+    iotElementPublish(thSensor->element, 0, value);
 }
 
 static void initTHSensor(struct TemperatureSensor *thSensor, int id, int pin)
 {
-    sprintf(thSensor->name, "temperature%d", id);
+    iotValue_t value;
     dht22Init(&thSensor->sensor, pin);
 
     sprintf(thSensor->temperatureStr, "0.0");
+    thSensor->element = iotNewElement(&tsElementDescription, thSensor, "temperature%d", id);
     
-    thSensor->temperatureElement.name = thSensor->name;
-    iotElementAdd(&thSensor->temperatureElement);
-
-    thSensor->temperaturePub.name = "";
-    thSensor->temperaturePub.type = iotValueType_String;
-    thSensor->temperaturePub.retain = false;
-    thSensor->temperaturePub.value.s = thSensor->temperatureStr;
-    iotElementPubAdd(&thSensor->temperatureElement, &thSensor->temperaturePub);
+    value.s = thSensor->temperatureStr;
+    iotElementPublish(thSensor->element, 0, value);
 
     dht22AddTemperatureCallback(&thSensor->sensor, temperatureUpdate, thSensor);
 }

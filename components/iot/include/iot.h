@@ -11,50 +11,60 @@ typedef union {
     const char *s;
 } iotValue_t;
 
-enum iotValueType_e {
-    iotValueType_Bool,
-    iotValueType_Int,
-    iotValueType_Float,
-    iotValueType_String
-};
+typedef struct iotElement *iotElement_t;
 
-struct iotElementSub;
+typedef void (*iotElementSubUpdateCallback_t)(void *userData, iotElement_t element, iotValue_t value);
 
-typedef void (*iotElementSubUpdateCallback_t)(void *userData, struct iotElementSub *sub, iotValue_t value);
-
-typedef struct iotElementSub {
-    const char *name;
-    enum iotValueType_e type;
+typedef struct iotElementSubDescription {
+    const char *type_name;
     iotElementSubUpdateCallback_t callback;
-    void *userData;
+}iotElementSubDescription_t;
 
-    /* Private fields */
-    char *path;
-    struct iotElement *element;
-    struct iotElementSub *next;
-}iotElementSub_t;
+typedef struct iotElementDescription {
+    const char * const *pubs;
+    const int nrofPubs;
+    const iotElementSubDescription_t const *subs;
+    const int nrofSubs;
+}iotElementDescription_t;
 
-typedef struct iotElementPub {
-    const char *name;
-    struct {
-        enum iotValueType_e type:2;
-        bool retain:1;
-    };
-    iotValue_t value;
+#define IOT_VALUE_TYPE_BOOL            0
+#define IOT_VALUE_TYPE_INT             1
+#define IOT_VALUE_TYPE_FLOAT           2
+#define IOT_VALUE_TYPE_STRING          3
+#define IOT_VALUE_TYPE_RETAINED_BOOL   4
+#define IOT_VALUE_TYPE_RETAINED_INT    5
+#define IOT_VALUE_TYPE_RETAINED_FLOAT  6
+#define IOT_VALUE_TYPE_RETAINED_STRING 7
 
-    /* Private fields */
-    struct iotElement *element;
-    struct iotElementPub *next;
-}iotElementPub_t;
+#define IOT_SUB_DEFAULT_NAME ""
+#define IOT_PUB_USE_ELEMENT ""
 
-typedef struct iotElement {
-    const char *name;
-    
-    /* Private fields */
-    struct iotElement *next;
-    iotElementSub_t *subs;
-    iotElementPub_t *pubs;
-}iotElement_t;
+#define _IOT_STRINGIFY(x) #x
+#define _IOT_DEFINE_TYPE(t) _IOT_STRINGIFY(\0 ## t)
+
+#define IOT_DESCRIBE_PUB(type, name) _IOT_DEFINE_TYPE(type) name
+#define IOT_PUB_DESCRIPTIONS(pubs...) { pubs }
+#define IOT_DESCRIBE_SUB(type, name, _callback) { .type_name = _IOT_DEFINE_TYPE(type) name, .callback=_callback }
+#define IOT_SUB_DESCRIPTIONS(subs...) { subs }
+
+#define IOT_DESCRIBE_ELEMENT(name, pub_descriptions, sub_descriptions) \
+    static const char * const name ## _pubs[] = pub_descriptions; \
+    static const iotElementSubDescription_t name ## _subs[] = sub_descriptions; \
+    static const iotElementDescription_t name = { \
+        .pubs = name ## _pubs,\
+        .nrofPubs = sizeof(name ## _pubs) / sizeof(char*),\
+        .subs = name ## _subs,\
+        .nrofSubs= sizeof(name ## _subs) / sizeof(iotElementSubDescription_t)\
+        }
+
+#define IOT_DESCRIBE_ELEMENT_NO_SUBS(name, pub_descriptions) \
+    static const char *name ## _pubs[] = pub_descriptions; \
+    static const iotElementDescription_t name = { \
+        .pubs = name ## _pubs,\
+        .nrofPubs = sizeof(name ## _pubs) / sizeof(char*),\
+        .subs = NULL,\
+        .nrofSubs= 0\
+        }
 
 /** Initialse the IOT subsystem.
  * This needs to be done before you can add Elements and Pub/Sub items.
@@ -63,17 +73,16 @@ int iotInit(void);
 
 /** Start the IOT Subsystem
  * Connects to the configured Wifi network and then to the configured MQTT server.
- * Once connected any updates to Pub items will be reflected to the MQTT server every
- * period (a period is currently 0.1 seconds).
- * Any message sent to subscribe topics (iotElementSub_t) will be reflected to the specified 
+ * Once connected any updates to Pub items will be reflected to the MQTT server if
+ * connected or stored for transmission when a connection is established.
+ * Any message sent to subscribe topics will be reflected to the specified 
  * callback as soon as they are recieved.
  */
 void iotStart();
 
-void iotElementAdd(iotElement_t *element);
-void iotElementSubAdd(iotElement_t *element, iotElementSub_t *sub);
-void iotElementPubAdd(iotElement_t *element, iotElementPub_t *pub);
-void iotElementPubUpdate(iotElementPub_t *pub, iotValue_t value);
+iotElement_t iotNewElement(const iotElementDescription_t *desc, void *userContext, char *nameFormat, ...);
+
+void iotElementPublish(iotElement_t element, int pubId, iotValue_t value);
 
 /** Convert a string value to a boolean
  * Accepts "on"/"off", "true"/"false" (ignoring case) and returns 0;
