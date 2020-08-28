@@ -21,7 +21,7 @@ static const char *TAG="DHT";
 
 #define DHT_THREAD_NAME "dht"
 #define DHT_THREAD_PRIO 8
-#define DHT_THREAD_STACK_WORDS 8192
+#define DHT_THREAD_STACK_WORDS 2048
 
 // DHT timer precision in microseconds
 #define DHT_TIMER_INTERVAL 2
