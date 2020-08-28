@@ -28,7 +28,7 @@ def get_version(args):
     build_dir = args['build_dir']
     with open(os.path.join(build_dir, 'version.c')) as f:
         line = f.readline().strip()
-        m = re.match('char appVersion\[\]=\"([^\"]+)\";', line)
+        m = re.match(r'char appVersion\[\]=\"([^\"]+)\";', line)
         if m:
             return m.group(1)
     return 'unknown'
