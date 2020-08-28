@@ -37,7 +37,7 @@ struct setting {
     struct variable *variables;
 };
 
-#include "settings.h"
+#include "provisioningSettings.h"
 
 const char *TAG="CONFIG";
 
