@@ -26,7 +26,7 @@
 #define MAC_STR "%02x%02x%02x%02x%02x%02x"
 #define UNIQ_NAME_LEN (sizeof(UNIQ_NAME_PREFIX) + (6 * 2)) /* 6 bytes for mac address as 2 hex chars */
 
-#define SECS_BEFORE_AP 60 /* Number of seconds attempting to connect to an SSID before starting an AP */
+#define SECS_BEFORE_AP 30 /* Number of seconds attempting to connect to an SSID before starting an AP */
 
 #define MAX_LENGTH_WIFI_NAME 32
 #define MAX_LENGTH_WIFI_PASSWORD 64
@@ -37,8 +37,8 @@ static char wifiSsid[MAX_LENGTH_WIFI_NAME];
 static char wifiPassword[MAX_LENGTH_WIFI_PASSWORD];
 static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 static bool connected = false;
+static time_t disconnectedSeconds = 0;
 static WifiConnectionCallback_t connectionCallback;
-static TimerHandle_t connectionTimer;
 
 static esp_err_t wifiEventHandler(void *ctx, system_event_t *event);
 static void wifiStartStation(void);
@@ -46,7 +46,6 @@ static void wifiSetupStation(void);
 static void wifiSetupAP(bool andStation);
 
 static void getUniqName(char *name);
-static void onConnectionTimeout(TimerHandle_t xTimer);
 
 int wifiInit(WifiConnectionCallback_t callback)
 {
@@ -75,8 +74,6 @@ int wifiInit(WifiConnectionCallback_t callback)
         nvs_close(handle);
     }
 
-    connectionTimer = xTimerCreate("WIFICONN", (SECS_BEFORE_AP * 1000) / portTICK_RATE_MS, pdFALSE, NULL, onConnectionTimeout);
-
     getUniqName(hostname);
 
     tcpip_adapter_init();
@@ -97,28 +94,44 @@ int wifiInit(WifiConnectionCallback_t callback)
 
 static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
 {
-    ESP_LOGI(TAG, "System Event: %d", event->event_id);
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    ESP_LOGI(TAG, "System Event: %d (secs %ld disconnectedSeconds %ld)", event->event_id, tv.tv_sec, disconnectedSeconds);
     switch(event->event_id) {
     case SYSTEM_EVENT_STA_START:
         connected = false;
+        disconnectedSeconds = tv.tv_sec;
         wifiStartStation();
         break;
     case SYSTEM_EVENT_STA_GOT_IP: 
         sprintf(ipAddr, IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
         ESP_LOGI(TAG, "Connected to SSID, IP=%s", ipAddr);
-        xTimerStop(connectionTimer, 0);
         connected = true;
+        disconnectedSeconds = 0;
         if (connectionCallback != NULL) {
             connectionCallback(true);
         }
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
-        if (connected && (connectionCallback != NULL)) {
-            connectionCallback(false);
-        }
-        connected = false;
         wifiStartStation();
+        if (connected){
+            if (connectionCallback != NULL) {
+                connectionCallback(false);
+            }
+            connected = false;
+            disconnectedSeconds = tv.tv_sec;
+        } else {
+            if ((disconnectedSeconds + SECS_BEFORE_AP) <= tv.tv_sec) {
+                wifi_mode_t mode = WIFI_MODE_NULL;
+                esp_wifi_get_mode(&mode);
+                if (mode != WIFI_MODE_APSTA) {
+                    ESP_LOGI(TAG, "Timeout connecting to SSID, enabling AP...");
+                    wifiSetupAP(true);
+                }
+            }
+        }
+        
         break;
     default:
         break;
@@ -168,6 +181,7 @@ static void wifiSetupStation(void)
     strcpy((char *)wifi_config.sta.ssid, wifiSsid);
     strcpy((char *)wifi_config.sta.password, wifiPassword);
     ESP_LOGI(TAG, "Setting WiFi station SSID %s...", wifi_config.sta.ssid);
+    ESP_ERROR_CHECK( esp_wifi_set_ps(WIFI_PS_NONE) );
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
 }
@@ -176,9 +190,6 @@ static void wifiStartStation(void)
 {
     /* Start connection timer */
     ESP_LOGI(TAG, "Starting Wifi Connection...");
-    if (!xTimerIsTimerActive(connectionTimer)) {
-        xTimerReset(connectionTimer, 0);
-    }
     esp_wifi_connect();
 }
 
@@ -202,14 +213,4 @@ static void getUniqName(char *name)
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     sprintf(name, UNIQ_NAME_PREFIX MAC_STR, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-}
-
-static void onConnectionTimeout(TimerHandle_t xTimer)
-{
-    wifi_mode_t mode = WIFI_MODE_NULL;
-    esp_wifi_get_mode(&mode);
-    if (!connected && (mode != WIFI_MODE_APSTA)) {
-        ESP_LOGI(TAG, "Timeout connecting to SSID, enabling AP...");
-        wifiSetupAP(true);
-    }
 }
