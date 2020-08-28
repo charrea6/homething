@@ -80,6 +80,7 @@ struct TemperatureSensor {
     DHT22Sensor_t sensor;
     char name[13];
     char temperatureStr[6];
+    char humidityStr[6];
     iotElement_t element;
 };
 static struct TemperatureSensor *thSensors;
@@ -87,7 +88,8 @@ static struct TemperatureSensor *thSensors;
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
     tsElementDescription,
     IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_STRING, IOT_PUB_USE_ELEMENT)
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_STRING, IOT_PUB_USE_ELEMENT),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_STRING, "humidity")
     )
 );
 
@@ -110,18 +112,31 @@ static void temperatureUpdate(void *userData, int16_t tenthsUnit)
     iotElementPublish(thSensor->element, 0, value);
 }
 
+static void humidityUpdate(void *userData, int16_t tenthsUnit)
+{
+    struct TemperatureSensor *thSensor = userData;
+    iotValue_t value;
+    sprintf(thSensor->humidityStr, "%d.%d", tenthsUnit / 10, tenthsUnit % 10);
+    value.s = thSensor->humidityStr;
+    iotElementPublish(thSensor->element, 1, value);
+}
+
 static void initTHSensor(struct TemperatureSensor *thSensor, int id, int pin)
 {
     iotValue_t value;
     dht22Init(&thSensor->sensor, pin);
 
     sprintf(thSensor->temperatureStr, "0.0");
+    sprintf(thSensor->humidityStr, "0.0");
     thSensor->element = iotNewElement(&tsElementDescription, thSensor, "temperature%d", id);
     
     value.s = thSensor->temperatureStr;
     iotElementPublish(thSensor->element, 0, value);
-
+    
+    value.s = thSensor->humidityStr;
+    iotElementPublish(thSensor->element, 1, value);
     dht22AddTemperatureCallback(&thSensor->sensor, temperatureUpdate, thSensor);
+    dht22AddHumidityCallback(&thSensor->sensor, humidityUpdate, thSensor);
 }
 
 #endif
@@ -294,9 +309,11 @@ static void taskStats(TimerHandle_t xTimer)
     putchar('\n');
     
     printf("TASK STATS # %lu\n"
-           "----------------\n", nrofTasks);
+           "----------------\n\n", nrofTasks);
+    printf("Name                : St Pr Stack Left\n"
+           "--------------------------------------\n");
     for (i=0; i < nrofTasks; i++) {
-        printf("%-20s: % 10d % 10d\n", tasksStatus[i].pcTaskName, tasksStatus[i].eCurrentState, tasksStatus[i].usStackHighWaterMark);
+        printf("%-20s: %2d %2lu % 10d\n", tasksStatus[i].pcTaskName, tasksStatus[i].eCurrentState, tasksStatus[i].uxCurrentPriority, tasksStatus[i].usStackHighWaterMark);
     }
     free(tasksStatus);
     printf("\nMEMORY STATS\n"
