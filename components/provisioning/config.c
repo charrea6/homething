@@ -156,11 +156,11 @@ esp_err_t provisioningConfigPostHandler(httpd_req_t *req)
         }
     }
     ESP_LOGI(TAG, "Finished processing settings, will now reboot");
-    httpd_send(req, "Saved, rebooting...", 10);
-    xTimerStart(xTimerCreate("REBOOT", 1000 / portTICK_RATE_MS, pdTRUE, NULL, reboot), 0);
+    httpd_send(req, "Saved", 5);
+    xTimerStart(xTimerCreate("REBOOT", 10000 / portTICK_RATE_MS, pdTRUE, NULL, reboot), 0);
 
     free(buf);
-    return ESP_OK;
+    return ESP_FAIL;
 
 error:
     ESP_LOGE(TAG, "ERROR: %s", errorMsg);
@@ -265,6 +265,7 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
         int i;
 
         if (cbor_value_get_type(it) != CborTextStringType) {
+            ESP_LOGE(TAG, "Was execting string got %d", cbor_value_get_type(it));
             errorMsg = "Invalid variable key in map";
             goto error;
         }
@@ -301,7 +302,7 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
                     errorMsg = "Failed to extract string variable value";
                     goto error;
                 }
-                ESP_LOGI(TAG,"Setting %s to \"%s\"", foundVariable->name, value);
+                ESP_LOGI(TAG,"Setting %s to \"%s\" (len %u)", foundVariable->name, value, valueLen);
                 err = nvs_set_str(handle, foundVariable->name, value);
                 free(value);
             }
@@ -313,6 +314,7 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
                     errorMsg = "Failed to extract int variable value";
                     goto error;
                 }
+                cbor_value_advance(it);
                 ESP_LOGI(TAG,"Setting %s to %u", foundVariable->name, (uint16_t)value);
                 err = nvs_set_u16(handle, foundVariable->name, (uint16_t)value);
             }
@@ -324,6 +326,7 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
                     errorMsg = "Failed to extract bool variable value";
                     goto error;
                 }
+                cbor_value_advance(it);
                 ESP_LOGI(TAG,"Setting %s to %s", foundVariable->name, value ? "true":"false");
                 err = nvs_set_u8(handle, foundVariable->name, value);
             }
@@ -367,7 +370,10 @@ static bool getVariables(nvs_handle handle, struct setting *setting, CborEncoder
                     }
                     err = nvs_get_str(handle, var->name, value, &length);
                     if (err == ESP_OK) {
-                        cborErr = cbor_encode_text_string(encoder, value, length);
+                        /* nvs includes the \0 in the length which we don't want for cbor,
+                           use strlen to find the true lenght of the string.
+                        */
+                        cborErr = cbor_encode_text_string(encoder, value, strlen(value));
                     }
                     free(value);
                 }
