@@ -28,6 +28,7 @@
 #define UNIQ_NAME_LEN (sizeof(UNIQ_NAME_PREFIX) + (6 * 2)) /* 6 bytes for mac address as 2 hex chars */
 
 #define SECS_BEFORE_AP 30 /* Number of seconds attempting to connect to an SSID before starting an AP */
+#define SECS_BEFORE_REBOOT (60 * 5) /* Number of seconds before rebooting */
 
 #define MAX_LENGTH_WIFI_NAME 32
 #define MAX_LENGTH_WIFI_PASSWORD 64
@@ -129,6 +130,10 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
                 if (mode != WIFI_MODE_APSTA) {
                     ESP_LOGI(TAG, "Timeout connecting to SSID, enabling AP...");
                     wifiSetupAP(true);
+                }
+                if ((disconnectedSeconds + SECS_BEFORE_REBOOT) <tv.tv_sec) {
+                    ESP_LOGI(TAG, "Timeout connecting to SSID, rebooting...");
+                    esp_restart();
                 }
             }
         }
