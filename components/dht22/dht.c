@@ -29,7 +29,7 @@ static const char *TAG="DHT";
 
 #define DEBUG_DHT
 #ifdef DEBUG_DHT
-#define debug(fmt, ...) ESP_LOGI("DHT", fmt , ## __VA_ARGS__);
+#define debug(fmt, ...) ESP_LOGI("DHT", "(pin=%d) " fmt , pin, ## __VA_ARGS__);
 #else
 #define debug(fmt, ...) /* (do nothing) */
 #endif
