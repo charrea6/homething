@@ -16,6 +16,7 @@
 #include "driver/gpio.h"
 
 #include "dht.h"
+#include "notifications.h"
 
 static const char *TAG="DHT";
 
@@ -33,6 +34,15 @@ static const char *TAG="DHT";
 #else
 #define debug(fmt, ...) /* (do nothing) */
 #endif
+
+typedef struct DHT22Sensor {
+    int8_t pin;
+    bool lastSet;
+    int16_t lastTemperature;
+    int16_t lastHumidity;
+
+    struct DHT22Sensor *next;
+}DHT22Sensor_t;
 
 static int sensorCount = 0;
 static DHT22Sensor_t *sensors = NULL;
@@ -205,39 +215,36 @@ bool dht_read_data(uint8_t pin, int16_t *humidity, int16_t *temperature)
     return true;
 }
 
-static void dhtCallCbs(int nrofEntries, DHT22CBEntry_t *entries, int16_t value)
-{
-    int i;
-    for (i = 0; i < nrofEntries; i++)
-    {
-        entries[i].cb(entries[i].userData, value);
-    }
-}
 
 static void dhtThread(void* pvParameters)
 {
     bool lastNotSet = true;
-    int16_t temp, hum, lastTemp=0, lastHum=0;
+    int16_t temp, hum;
     DHT22Sensor_t *sensor = sensors;
+    NotificationsData_t data;
     ESP_LOGI(TAG, "DHT thread starting");
     while(true)
     {
+        lastNotSet = !sensor->lastSet;
+
         bool ok = dht_read_data(sensor->pin, &hum, &temp);
         if (ok)
         {
-            if ((lastTemp != temp) || lastNotSet)
+            if ((sensor->lastTemperature != temp) || lastNotSet)
             {
                 // Update temp callbacks
-                dhtCallCbs(sensor->nrofTemperatureCBs, sensor->temperatureCBs, temp);
-                lastTemp = temp;
+                data.temperature = temp;
+                notificationsNotify(Notifications_Class_Temperature, NOTIFICATIONS_MAKE_ID( DHT22, sensor->pin), &data);
+                
+                sensor->lastTemperature = temp;
             }
-            if ((lastHum != hum) || lastNotSet)
+            if ((sensor->lastHumidity != hum) || lastNotSet)
             {
                 // Update humidity callbacks
-                dhtCallCbs(sensor->nrofHumidityCBs, sensor->humidityCBs, hum);
-                lastHum = hum;
+                notificationsNotify(Notifications_Class_Humidity, NOTIFICATIONS_MAKE_ID( DHT22, sensor->pin), &data);
+                sensor->lastHumidity = hum;
             }
-            lastNotSet = false;
+            sensor->lastSet = true;
         }
         vTaskDelay(5000 / (portTICK_RATE_MS * sensorCount));  //send every 5 seconds
         sensor = sensor->next;
@@ -249,36 +256,20 @@ static void dhtThread(void* pvParameters)
 }
 
 
-void dht22Init(DHT22Sensor_t *sensor, int8_t pin)
+Notifications_ID_t dht22Add(uint8_t pin)
 {
+    DHT22Sensor_t *sensor = malloc(sizeof(DHT22Sensor_t));
+    if (sensor == NULL){
+        ESP_LOGE(TAG, "dht22Init: Failed to allocate memory for sensor, pin %d", pin);
+        return NOTIFICATIONS_ID_ERROR;
+    }
     sensor->pin = pin;
-    sensor->nrofHumidityCBs = sensor->nrofTemperatureCBs = 0;
     sensor->next = sensors;
+    sensor->lastSet = false;
     sensors = sensor;
     sensorCount++;
     setupGpio(pin);
-}
-
-void dht22AddHumidityCallback(DHT22Sensor_t *sensor, DHT22CallBack_t cb, void *userData)
-{
-    if (sensor->nrofHumidityCBs >= DHT22_MAX_CALLBACKS)
-    {
-        return;
-    }
-    sensor->humidityCBs[sensor->nrofHumidityCBs].cb = cb;
-    sensor->humidityCBs[sensor->nrofHumidityCBs].userData = userData;
-    sensor->nrofHumidityCBs ++;
-}
-
-void dht22AddTemperatureCallback(DHT22Sensor_t *sensor, DHT22CallBack_t cb, void *userData)
-{
-    if (sensor->nrofTemperatureCBs >= DHT22_MAX_CALLBACKS)
-    {
-        return;
-    }
-    sensor->temperatureCBs[sensor->nrofTemperatureCBs].cb = cb;
-    sensor->temperatureCBs[sensor->nrofTemperatureCBs].userData = userData;
-    sensor->nrofTemperatureCBs ++;
+    return NOTIFICATIONS_MAKE_ID(DHT22, pin);
 }
 
 void dht22Start(void)

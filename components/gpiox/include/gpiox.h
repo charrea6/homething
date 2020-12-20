@@ -2,8 +2,35 @@
 #define _GPIOX_H_
 #include <stdint.h>
 #include "sdkconfig.h"
+ 
+/* 
+  Nodemcu Pin Names
 
-// Nodemcu Pin Names
+  |    Pins       |
+  |GPIO | NodeMcu |
+  |-----|---------|
+  |  0  |   D3    |
+  |  1  |   TX    |
+  |  2  |   D4    |
+  |  3  |   RX    |
+  |  4  |   D2    |
+  |  5  |   D1    |
+  |6-11 |   --    |
+  | 12  |   D6    |
+  | 13  |   D7    |
+  | 14  |   D5    |
+  | 15  |   D8    |
+  | 16  |   D0    |
+
+GPIO0(D3) - used to indicate to bootloader to go into upload mode + tied to Flash button.
+GPIO16(D0) - possibly tied to RST to allow exit from deep sleep by pulling GPIO16 low.
+
+| LED | Pin |
+|-----|-----|
+| Red | 16  |
+| Blue|  2  |
+
+*/
 #define D0 16
 #define D1 5
 #define D2 4
@@ -54,8 +81,19 @@
 #define X31 (GPIOX_BASE + 30)
 #define X32 (GPIOX_BASE + 31)
 
+#define GPIOX_PINS_SET(_pins, _pin) (_pins).pins[_pin/32] |= 1 << (_pin % 32)
+#define GPIOX_PINS_CLEAR(_pins, _pin) ((_pins).pins[_pin/32] = ((_pins).pins[_pin/32] & ~(1 << (_pin % 32))))
+#define GPIOX_PINS_CLEAR_ALL(_pins) do{(_pins).pins[0] = 0;(_pins).pins[1] = 0;}while(0)
+#define GPIOX_PINS_IS_SET(_pins, _pin) (((_pins).pins[_pin/32] & 1 << (_pin % 32)) != 0)
+#define GPIOX_PINS_DIFF(_result, _pins1, _pins2) do{(_result).pins[0] = (_pins1).pins[0] ^ (_pins2).pins[0]; (_result).pins[1] = (_pins1).pins[1] ^ (_pins2).pins[1]; }while(0)
 #else
+
 #define GPIOX_PINS_SIZE 1
+#define GPIOX_PINS_SET(_pins, _pin) _pins.pins[0] |= 1 << (_pin % 32)
+#define GPIOX_PINS_CLEAR(_pins, _pin) ((_pins).pins[0] = ((_pins).pins[0] & ~(1 << (_pin % 32))))
+#define GPIOX_PINS_CLEAR_ALL(_pins)  (_pins).pins[0] = 0
+#define GPIOX_PINS_IS_SET(_pins, _pin) (((_pins).pins[0] & 1 << (_pin % 32)) != 0)
+#define GPIOX_PINS_DIFF(_result, _pins1, _pins2) (_result).pins[0] = (_pins1).pins[0] ^ (_pins2).pins[0]
 #endif
 
 typedef struct {
@@ -69,10 +107,7 @@ typedef enum {
     GPIOX_MODE_IN_PULLDOWN,
 }GPIOX_Mode_t;
 
-#define GPIOX_PINS_SET(_pins, pin) ((_pins).pins[pin/32] |= 1 << (pin % 32))
-#define GPIOX_PINS_CLEAR(_pins, pin) ((_pins).pins[pin/32] = ((pins).pins[pin/32] & ~(1 << (pin % 32))))
-#define GPIOX_PINS_CLEAR_ALL(_pins) do{int i; for (i = 0; i < GPIOX_PINS_SIZE;i++) (_pins).pins[i] = 0; }while(0)
-#define GPIOX_PINS_IS_SET(_pins, pin) (((_pins).pins[pin/32] & 1 << (pin % 32)) != 0)
+#define GPIOX_PINS_MAX (GPIOX_PINS_SIZE * 32)
 
 int gpioxInit(void);
 int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode);

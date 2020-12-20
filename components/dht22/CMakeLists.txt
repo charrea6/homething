@@ -1,2 +1,3 @@
 idf_component_register(SRCS "dht.c"
-                    INCLUDE_DIRS "include")
+                    INCLUDE_DIRS "include"
+                    REQUIRES "notifications")

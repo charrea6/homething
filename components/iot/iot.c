@@ -23,6 +23,7 @@
 #include "iot.h"
 #include "wifi.h"
 #include "sdkconfig.h"
+#include "deviceprofile.h"
 
 static const char *TAG="IOT";
 static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
@@ -52,6 +53,23 @@ static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 #define SUB_GET_NAME(_element, _subId) (&(_element)->desc->subs[_subId].type_name[SUB_INDEX_NAME])
 #define SUB_GET_CALLBACK(_element, _subId) ((_element)->desc->subs[_subId].callback)
 
+#define _HEX_TYPE(v) 0x0 ## v
+#define HEX_TYPE(type) _HEX_TYPE(type)
+
+#define VT_BOOL   HEX_TYPE(IOT_VALUE_TYPE_BOOL)
+#define VT_INT    HEX_TYPE(IOT_VALUE_TYPE_INT)
+#define VT_FLOAT  HEX_TYPE(IOT_VALUE_TYPE_FLOAT)
+#define VT_STRING HEX_TYPE(IOT_VALUE_TYPE_STRING)
+#define VT_BINARY HEX_TYPE(IOT_VALUE_TYPE_BINARY)
+
+#define VT_RETAINED_BOOL   HEX_TYPE(IOT_VALUE_TYPE_RETAINED_BOOL)
+#define VT_RETAINED_INT    HEX_TYPE(IOT_VALUE_TYPE_RETAINED_INT)
+#define VT_RETAINED_FLOAT  HEX_TYPE(IOT_VALUE_TYPE_RETAINED_FLOAT)
+#define VT_RETAINED_STRING HEX_TYPE(IOT_VALUE_TYPE_RETAINED_STRING)
+#define VT_RETAINED_BINARY HEX_TYPE(IOT_VALUE_TYPE_RETAINED_BINARY)
+
+#define VT_BARE_TYPE(type) (type & 0x7f)
+#define VT_IS_RETAINED(type) ((type & 0x80) == 0x80) ? 1:0
 struct iotElement {
     const iotElementDescription_t *desc;
     char *name;
@@ -95,6 +113,7 @@ static bool iotElementSubscribe(iotElement_t element);
 static void iotUpdateUptime(TimerHandle_t xTimer);
 static void iotUpdateMemoryStats(void);
 static void iotWifiConnectionStatus(bool connected);
+static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value);
 
 #ifdef CONFIG_CONNECTION_LED
 
@@ -114,13 +133,16 @@ static void setLedState(int subsystem, bool state);
 #define SET_LED_STATE(subsystem, state)
 #endif
 
-IOT_DESCRIBE_ELEMENT_NO_SUBS(
+IOT_DESCRIBE_ELEMENT(
     deviceElementDescription,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "uptime"),
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "ip"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_INT, "memFree"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_INT, "memLow")
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memFree"),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memLow")
+    ),
+    IOT_SUB_DESCRIPTIONS(
+        IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_STRING, IOT_SUB_DEFAULT_NAME, iotDeviceControl)
     )
 );
 
@@ -202,7 +224,7 @@ void iotStart()
     xTimerStart(uptimeTimer, 0);
 }
 
-iotElement_t iotNewElement(const iotElementDescription_t *desc, void *userContext, char *nameFormat, ...)
+iotElement_t iotNewElement(const iotElementDescription_t *desc, void *userContext, const char const *nameFormat, ...)
 {
     va_list args;
     struct iotElement *newElement = malloc(sizeof(struct iotElement) + (sizeof(iotValue_t) * desc->nrofPubs));
@@ -236,22 +258,19 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value)
         return;
     }
 
-    switch(PUB_GET_TYPE(element, pubId))
+    switch(VT_BARE_TYPE(PUB_GET_TYPE(element, pubId)))
     {
-        case IOT_VALUE_TYPE_BOOL:
-        case IOT_VALUE_TYPE_RETAINED_BOOL:
+        case VT_BOOL:
             updateRequired = value.b != element->values[pubId].b;
             break;
-        case IOT_VALUE_TYPE_INT:
-        case IOT_VALUE_TYPE_RETAINED_INT:
+        case VT_INT:
             updateRequired = value.i != element->values[pubId].i;
             break;
-        case IOT_VALUE_TYPE_FLOAT:
-        case IOT_VALUE_TYPE_RETAINED_FLOAT:
+        case VT_FLOAT:
             updateRequired = value.f != element->values[pubId].f;
             break;
-        case IOT_VALUE_TYPE_STRING:
-        case IOT_VALUE_TYPE_RETAINED_STRING:
+        case VT_STRING:
+        case VT_BINARY:
             updateRequired = true;
             break;
         default:
@@ -261,11 +280,7 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value)
     if (updateRequired)
     {
         element->values[pubId] = value;
-        /*
-        if (pub != &deviceUptimePub) {
-            ESP_LOGI(TAG, "PUB: Update required for %s%s%s", pub->element->name, pub->name[0]?"/":"", pub->name);
-        }
-        */
+
         MUTEX_LOCK();
         if (mqttIsConnected)
         {
@@ -280,7 +295,7 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
     char *path;
     char payload[30] = "";
     char *message = payload;
-    int messageLen = 0;
+    int messageLen = -1;
     const char *prefix = mqttPathPrefix;
     int rc;
  
@@ -298,41 +313,45 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
         ESP_LOGE(TAG, "Failed to allocate path when publishing message");
         return false;
     }
-    int retain = 0;
-    switch(PUB_GET_TYPE(element, pubId))
+    char valueType = PUB_GET_TYPE(element, pubId);
+    int retain = VT_IS_RETAINED(valueType);
+
+    switch(VT_BARE_TYPE(valueType))
     {
-        case IOT_VALUE_TYPE_RETAINED_BOOL:
-            retain = 1;
-        case IOT_VALUE_TYPE_BOOL:
+        case VT_BOOL:
             message = (value.b) ? "on":"off";
             break;
 
-        case IOT_VALUE_TYPE_RETAINED_INT:
-            retain = 1;
-        case IOT_VALUE_TYPE_INT:
+        case VT_INT:
             sprintf(payload, "%d", value.i);
             break;
 
-        case IOT_VALUE_TYPE_RETAINED_FLOAT:
-            retain = 1;
-        case IOT_VALUE_TYPE_FLOAT:
+        case VT_FLOAT:
             sprintf(payload, "%f", value.f);
             break;
 
-        case IOT_VALUE_TYPE_RETAINED_STRING:
-            retain = 1;
-        case IOT_VALUE_TYPE_STRING:        
+        case VT_STRING:        
             message = (char*)value.s;
             if (message == NULL) {
                 message = "";
             }
             break;
-    
+
+        case VT_BINARY:
+            if (value.bin == NULL) {
+                return false;
+            }
+            message = (char*)value.bin->data;
+            messageLen = (int)value.bin->len;
+            break;
+        
         default:
             free(path);
             return false;
     }
-    messageLen = strlen((char*)message);
+    if (messageLen == -1) {
+        messageLen = strlen((char*)message);
+    }
 
     rc = esp_mqtt_client_publish(mqttClient, path, message, messageLen, 0, retain);
     free(path);
@@ -343,7 +362,11 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
     } 
     else 
     {
-        ESP_LOGV(TAG, "PUB: Sent %s (%d) to %s", (char *)message, messageLen, path);
+        if (VT_BARE_TYPE(valueType) == VT_BINARY) {
+            ESP_LOGV(TAG, "PUB: Sent %d bytes to %s (retain: %d)", messageLen, path, retain);
+        } else {
+            ESP_LOGV(TAG, "PUB: Sent %s (%d) to %s (retain: %d)", (char *)message, messageLen, path, retain);
+        }
     }
     return true;
 }
@@ -382,6 +405,7 @@ int iotStrToBool(const char *str, bool *out)
 static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, size_t len)
 {
     iotValue_t value;
+    iotBinaryValue_t binValue;
     const char *name;
     if (element->desc->subs[subId].type_name[SUB_INDEX_NAME] == 0)
     {
@@ -392,10 +416,9 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
         name = SUB_GET_NAME(element, subId);
     }
     ESP_LOGI(TAG, "SUB: new message \"%s\" for \"%s/%s\"", payload, element->name, name);
-    switch(SUB_GET_TYPE(element, subId))
+    switch(VT_BARE_TYPE(SUB_GET_TYPE(element, subId)))
     {
-        case IOT_VALUE_TYPE_BOOL:
-        case IOT_VALUE_TYPE_RETAINED_BOOL:
+        case VT_BOOL:
         if (iotStrToBool(payload, &value.b))
         {
             ESP_LOGW(TAG, "Invalid value for bool type (%s)", payload);
@@ -403,8 +426,7 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
         }
         break;
         
-        case IOT_VALUE_TYPE_INT:
-        case IOT_VALUE_TYPE_RETAINED_INT:
+        case VT_INT:
         if (sscanf(payload, "%d", &value.i) == 0)
         {
             ESP_LOGW(TAG, "Invalid value for int type (%s)", payload);
@@ -412,8 +434,7 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
         }
         break;
         
-        case IOT_VALUE_TYPE_FLOAT:
-        case IOT_VALUE_TYPE_RETAINED_FLOAT:
+        case VT_FLOAT:
         if (sscanf(payload, "%f", &value.f) == 0)
         {
             ESP_LOGW(TAG, "Invalid value for float type (%s)", payload);
@@ -421,11 +442,16 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
         }
         break;
 
-        case IOT_VALUE_TYPE_STRING:
-        case IOT_VALUE_TYPE_RETAINED_STRING:
+        case VT_STRING:
         value.s = payload;
         break;
-        
+
+        case VT_BINARY:
+        binValue.data = (uint8_t*)payload;
+        binValue.len = len;
+        value.bin = &binValue;
+        break;
+
         default:
         ESP_LOGE(TAG, "Unknown value type %d for %s/%s", SUB_GET_TYPE(element, subId), element->name, name);
         return;
@@ -495,6 +521,28 @@ static void iotUpdateUptime(TimerHandle_t xTimer)
     iotElementPublish(deviceElement, DEVICE_PUB_INDEX_UPTIME, value);
    
     iotUpdateMemoryStats();
+}
+
+static int _safestrcmp(const char *constant, int conLen, const char *variable, int len) {
+    if (conLen > len) {
+        return -1;
+    }
+    return strncmp(constant, variable, len);
+}
+#define safestrcmp(constant, variable, len) _safestrcmp(constant, sizeof(constant), variable, len)
+#define SETPROFILE "setprofile"
+static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value)
+{
+    if (safestrcmp("restart", (const char *) value.bin->data, (int)value.bin->len) == 0) {
+        esp_restart();
+    }
+    else if (safestrcmp(SETPROFILE, (const char *) value.bin->data, (int)value.bin->len) == 0) {
+        uint8_t *profile = value.bin->data + sizeof(SETPROFILE);
+        size_t profileLen = value.bin->len - sizeof(SETPROFILE);
+        if (deviceProfileSetProfile(profile, profileLen) == 0) {
+            esp_restart();
+        }
+    }
 }
 
 static void iotWifiConnectionStatus(bool connected)

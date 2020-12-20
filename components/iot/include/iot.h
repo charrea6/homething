@@ -1,14 +1,21 @@
 #ifndef _IOT_H_
 #define _IOT_H_
 #include <stdbool.h>
+#include <stdint.h>
 
 #define IOT_DEFAULT_CONTROL NULL
+
+typedef struct {
+    uint8_t *data;
+    int32_t len;
+} iotBinaryValue_t;
 
 typedef union {
     int i;
     float f;
     bool b;
     const char *s;
+    const iotBinaryValue_t *bin;
 } iotValue_t;
 
 typedef struct iotElement *iotElement_t;
@@ -27,20 +34,23 @@ typedef struct iotElementDescription {
     const int nrofSubs;
 }iotElementDescription_t;
 
-#define IOT_VALUE_TYPE_BOOL            0
-#define IOT_VALUE_TYPE_INT             1
-#define IOT_VALUE_TYPE_FLOAT           2
-#define IOT_VALUE_TYPE_STRING          3
-#define IOT_VALUE_TYPE_RETAINED_BOOL   4
-#define IOT_VALUE_TYPE_RETAINED_INT    5
-#define IOT_VALUE_TYPE_RETAINED_FLOAT  6
-#define IOT_VALUE_TYPE_RETAINED_STRING 7
+#define IOT_VALUE_TYPE_BOOL            00
+#define IOT_VALUE_TYPE_INT             01
+#define IOT_VALUE_TYPE_FLOAT           02
+#define IOT_VALUE_TYPE_STRING          03
+#define IOT_VALUE_TYPE_BINARY          04
+
+#define IOT_VALUE_TYPE_RETAINED_BOOL   80
+#define IOT_VALUE_TYPE_RETAINED_INT    81
+#define IOT_VALUE_TYPE_RETAINED_FLOAT  82
+#define IOT_VALUE_TYPE_RETAINED_STRING 83
+#define IOT_VALUE_TYPE_RETAINED_BINARY 84
 
 #define IOT_SUB_DEFAULT_NAME ""
 #define IOT_PUB_USE_ELEMENT ""
 
 #define _IOT_STRINGIFY(x) #x
-#define _IOT_DEFINE_TYPE(t) _IOT_STRINGIFY(\0 ## t)
+#define _IOT_DEFINE_TYPE(t) _IOT_STRINGIFY(\x ## t)
 
 #define IOT_DESCRIBE_PUB(type, name) _IOT_DEFINE_TYPE(type) name
 #define IOT_PUB_DESCRIPTIONS(pubs...) { pubs }
@@ -80,7 +90,7 @@ int iotInit(void);
  */
 void iotStart();
 
-iotElement_t iotNewElement(const iotElementDescription_t *desc, void *userContext, char *nameFormat, ...);
+iotElement_t iotNewElement(const iotElementDescription_t *desc, void *userContext, const char const *nameFormat, ...);
 
 void iotElementPublish(iotElement_t element, int pubId, iotValue_t value);
 

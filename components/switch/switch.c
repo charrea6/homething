@@ -7,106 +7,66 @@
 #include "sdkconfig.h"
 #include "switch.h"
 #include "gpiox.h"
+#include "notifications.h"
 
 static const char *TAG="switch";
 
 #define SWITCH_THREAD_NAME "switches"
 #define SWITCH_THREAD_PRIO 8
 #define SWITCH_THREAD_STACK_WORDS 3072
-#if defined(CONFIG_MOTION) && defined(CONFIG_DOORBELL)
-#define MAX_SWITCHES (CONFIG_NROF_LIGHTS + 2)
-#elif defined(CONFIG_MOTION) || defined(CONFIG_DOORBELL)
-#define MAX_SWITCHES (CONFIG_NROF_LIGHTS + 1)
-#else
-#define MAX_SWITCHES CONFIG_NROF_LIGHTS 
-#endif
 
-static struct Switch{
-    int pin;
-    int state;
-    SwitchCallback_t cb;
-    void *userData;
-}*switches;
+static GPIOX_Pins_t switchPins, switchValues;
 
-static int maxSwitches = 0;
-static int switchCount = 0;
-
-int switchInit(int max)
-{
-    if (max == 0)
-    {
-        maxSwitches = 0;
-        switches = NULL;
-    }
-    switches = calloc(max, sizeof(struct Switch));
-    if (switches != NULL)
-    {
-        maxSwitches = max;
-        return 0;
-    }
-    ESP_LOGE(TAG, "Failed to allocate memory for switch structures (requested max: %d)", max);
-    return 1;
+int switchInit() {
+    GPIOX_PINS_CLEAR_ALL(switchPins);
+    return 0;
 }
 
-void switchAdd(int pin, SwitchCallback_t cb, void *userData)
-{
-    if (switchCount >= maxSwitches)
-    {
-        ESP_LOGE(TAG, "No available switches! Used %d", switchCount);
-        return;
+Notifications_ID_t switchAdd(int pin) {
+    if (pin > GPIOX_PINS_MAX) {
+        ESP_LOGE(TAG, "switchAdd: Invalid Pin number %d", pin);
+        return -1;
     }
-    switches[switchCount].pin = pin;
-    switches[switchCount].cb = cb;
-    switches[switchCount].userData = userData;
-    switchCount++;
+    GPIOX_PINS_SET(switchPins, pin);
+    return NOTIFICATIONS_MAKE_ID(GPIOSWITCH, pin);
 }
 
+static void switchThread(void* pvParameters) {
+    int i;
+    GPIOX_Pins_t newValues, diff;
+    NotificationsData_t data;
+    
+    ESP_LOGI(TAG, "Switch thread starting");
+    
+    gpioxSetup(&switchPins, GPIOX_MODE_IN_PULLUP);
+    gpioxGetPins(&switchPins, &switchValues);
 
-static void switchThread(void* pvParameters)
-{
-    int new_state, i;
-    GPIOX_Pins_t pins, values;
-    GPIOX_PINS_CLEAR_ALL(pins);
-
-    ESP_LOGI(TAG, "Switch thread starting, count %d", switchCount);
-    for (i=0; i < switchCount; i++)
-    {
-        ESP_LOGI(TAG, "Configuring switch %d pin %d", i, switches[i].pin);
-        GPIOX_PINS_SET(pins, switches[i].pin);
-    }
-    gpioxSetup(&pins, GPIOX_MODE_IN_PULLUP);
-    gpioxGetPins(&pins, &values);
-    for (i=0; i < switchCount; i++)
-    {
-        switches[i].state = GPIOX_PINS_IS_SET(values, switches[i].pin);
-        ESP_LOGI(TAG, "Switch %d configured pin %d state %d", i, switches[i].pin, switches[i].state);
-    }
     ESP_LOGI(TAG, "Switches configured");
-    while(true)
-    {
+    while(true) {
         vTaskDelay(10 / portTICK_RATE_MS);  //send every 0.01 seconds
-        gpioxGetPins(&pins, &values);
-        for (i=0; i < switchCount; i++)
-        {
-            new_state = GPIOX_PINS_IS_SET(values, switches[i].pin);
-            if (new_state != switches[i].state) 
-            {
-                switches[i].cb(switches[i].userData, new_state);
-                switches[i].state = new_state;
+        gpioxGetPins(&switchPins, &newValues);
+        GPIOX_PINS_DIFF(diff, newValues, switchValues);
+        for (i=0; i < GPIOX_PINS_MAX; i++) {
+            if (GPIOX_PINS_IS_SET(diff, i)) {
+                data.switchState = GPIOX_PINS_IS_SET(newValues, i);
+                notificationsNotify(Notifications_Class_Switch, NOTIFICATIONS_MAKE_ID(GPIOSWITCH, i), &data);
             }
         }
+        switchValues = newValues;
     }
 }
 
-void switchStart()
-{
-    if (switchCount > 0)
-    {
-        xTaskCreate(switchThread,
-                    SWITCH_THREAD_NAME,
-                    SWITCH_THREAD_STACK_WORDS,
-                    NULL,
-                    SWITCH_THREAD_PRIO,
-                    NULL);
+void switchStart() {
+    int i;
+    for (i=0; i < GPIOX_PINS_MAX; i++) {
+        if (GPIOX_PINS_IS_SET(switchPins, i)) {
+            xTaskCreate(switchThread,
+                        SWITCH_THREAD_NAME,
+                        SWITCH_THREAD_STACK_WORDS,
+                        NULL,
+                        SWITCH_THREAD_PRIO,
+                        NULL);
+            return;
+        }
     }
 }

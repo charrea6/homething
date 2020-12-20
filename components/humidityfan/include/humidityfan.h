@@ -5,12 +5,13 @@
 
 #include "iot.h"
 #include "relay.h"
+#include "notifications.h"
 
 typedef struct HumidityFan{
     int id;
     char humidity[6];
     bool override;
-    Relay_t relay;
+    Relay_t *relay;
     iotElement_t element;
     int lastHumidity;
     int threshold;
@@ -23,8 +24,6 @@ typedef struct HumidityFan{
     TimerHandle_t manualModeTimer;
 }HumidityFan_t;
 
-void humidityFanInit(HumidityFan_t *fan, int relayPin, int threshold);
-
-void humidityFanUpdateHumidity(HumidityFan_t *fan, int humidityTenths);
+void humidityFanInit(HumidityFan_t *fan, Relay_t *relay, Notifications_ID_t humiditySensor, int threshold);
 
 #endif
