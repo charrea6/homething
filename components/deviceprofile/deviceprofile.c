@@ -130,8 +130,17 @@ static int nextUint32(CborValue *it, uint32_t *result) {
             return -1;
         }
         *result = (uint32_t)uintValue;
+        cbor_value_advance(it);
     } else { 
          return -1; 
     }
+    return 0;
+}
+
+int deviceProfileParserCloseEntry(DeviceProfile_Parser_t *parser, CborValue *entry) {
+    while (!cbor_value_at_end(entry)){
+        cbor_value_advance(entry);
+    }
+    cbor_value_leave_container(&parser->arrayIt, entry);
     return 0;
 }

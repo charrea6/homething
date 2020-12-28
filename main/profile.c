@@ -14,8 +14,6 @@
 #include "dht.h"
 #include "humidityfan.h"
 
-static void advanceToEnd(CborValue *it);
-
 static const char TAG[] = "profile";
 
 int setupRelay(CborValue *entry, uint8_t relayId, Relay_t *relay, Notifications_ID_t *ids, uint32_t idCount) {
@@ -57,7 +55,7 @@ int setupRelay(CborValue *entry, uint8_t relayId, Relay_t *relay, Notifications_
     if (controlled) {
         switch(controller) {
             case DeviceProfile_RelayController_Switch:
-            notificationsRegister(Notifications_Class_Switch, id, switchRelayController, relay);
+            notificationsRegister(Notifications_Class_Switch, ids[id], switchRelayController, relay);
             break;
             case DeviceProfile_RelayController_Temperature:
             break;
@@ -108,9 +106,11 @@ int processProfile(void)
             nrofRelays ++;
         }
         entryCount ++;
-        advanceToEnd(&entry);
+        deviceProfileParserCloseEntry(&parser, &entry);
     }
-
+    
+    ESP_LOGW(TAG, "Switches: %d Relays: %d", nrofSwitches, nrofRelays);
+    
     if (initSwitches(nrofSwitches) == -1) {
         goto error;
     }
@@ -139,7 +139,7 @@ int processProfile(void)
         }
         
         entryIndex ++;
-        advanceToEnd(&entry);
+        deviceProfileParserCloseEntry(&parser, &entry);
     }
     
     /* Process relays last so we can find sensor/switch ids */
@@ -151,7 +151,7 @@ int processProfile(void)
             }
             relayIndex ++;
         }
-        advanceToEnd(&entry);
+        deviceProfileParserCloseEntry(&parser, &entry);
     }
 
     free(ids);
@@ -169,10 +169,4 @@ error:
         free(profile);
     }    
     return -1;
-}
-
-static void advanceToEnd(CborValue *it) {
-    while (!cbor_value_at_end(it)){
-        cbor_value_advance(it);
-    }
 }

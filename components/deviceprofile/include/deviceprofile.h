@@ -11,7 +11,7 @@ typedef enum {
     DeviceProfile_EntryType_DHT22,
     DeviceProfile_EntryType_SI7021,
     DeviceProfile_EntryType_TSL2561,
-    DeviceProfile_EntryType_BMP280,
+    DeviceProfile_EntryType_BME280,
     DeviceProfile_EntryType_Max
 }DeviceProfile_EntryType_e;
 
@@ -51,6 +51,7 @@ int deviceProfileValidateProfile(const uint8_t *profile, size_t profileLen);
 
 int deviceProfileParseProfile(const uint8_t *profile, size_t profileLen, DeviceProfile_Parser_t *parser);
 int deviceProfileParserNextEntry(DeviceProfile_Parser_t *parser, CborValue *entry, DeviceProfile_EntryType_e *entryType);
+int deviceProfileParserCloseEntry(DeviceProfile_Parser_t *parser, CborValue *entry);
 
 int deviceProfileParserEntryGetUint32(CborValue *parserEntry, uint32_t *result);
 int deviceProfileParserEntryGetI2CDetails(CborValue *parserEntry, DeviceProfile_I2CDetails_t *details);
