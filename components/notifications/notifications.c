@@ -25,7 +25,7 @@ void notificationsRegister(Notifications_Class_e clazz, uint32_t id, Notificatio
         return;
     }
     
-    NotificationsCallbackDetails_t *details;
+    NotificationsCallbackDetails_t *details, *end;
     details = malloc(sizeof(NotificationsCallbackDetails_t));
     if (details == NULL) {
         ESP_LOGE(TAG, "Register: Failed to allocate callback details struct");
@@ -35,8 +35,13 @@ void notificationsRegister(Notifications_Class_e clazz, uint32_t id, Notificatio
     details->id = id;
     details->callback = callback;
     details->user = user; 
-    details->next = callbacks[clazz];
-    callbacks[clazz] = details;
+    details->next = NULL;
+    if (callbacks[clazz] == NULL) {
+        callbacks[clazz] = details;
+    } else {
+        for (end = callbacks[clazz]; end->next != NULL; end = end->next);
+        end->next = details;
+    }
 }
 
 void notificationsNotify(Notifications_Class_e clazz, uint32_t id, NotificationsData_t *data){
