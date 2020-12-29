@@ -79,8 +79,6 @@ int wifiInit(WifiConnectionCallback_t callback)
     getUniqName(hostname);
 
     tcpip_adapter_init();
-    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
-    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
 
     ESP_ERROR_CHECK( esp_event_loop_init(wifiEventHandler, NULL) );
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -97,12 +95,20 @@ int wifiInit(WifiConnectionCallback_t callback)
 static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
 {
     struct timeval tv;
+    char hostname[UNIQ_NAME_LEN];
+    esp_err_t err;
+
     gettimeofday(&tv, NULL);
     ESP_LOGI(TAG, "System Event: %d (secs %ld disconnectedSeconds %ld)", event->event_id, tv.tv_sec, disconnectedSeconds);
     switch(event->event_id) {
     case SYSTEM_EVENT_STA_START:
         connected = false;
         disconnectedSeconds = tv.tv_sec;
+        getUniqName(hostname);
+        err = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, \"%s\") == %d", hostname, err);
+        }
         wifiStartStation();
         break;
     case SYSTEM_EVENT_STA_GOT_IP: 
@@ -137,8 +143,15 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
                 }
             }
         }
-        
         break;
+    case SYSTEM_EVENT_AP_START:
+        getUniqName(hostname);
+        err = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, \"%s\") == %d", hostname, err);
+        }
+        break;
+
     default:
         break;
     }
