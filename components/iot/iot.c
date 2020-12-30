@@ -80,14 +80,14 @@ struct iotElement {
 
 static iotElement_t elementsHead = NULL;
 
-#define DEVICE_PUB_INDEX_UPTIME   0
-#define DEVICE_PUB_INDEX_IP       1
-#define DEVICE_PUB_INDEX_MEM_FREE 2
-#define DEVICE_PUB_INDEX_MEM_LOW  3
+#define DEVICE_PUB_INDEX_UPTIME     0
+#define DEVICE_PUB_INDEX_IP         1
+#define DEVICE_PUB_INDEX_MEM_FREE   2
+#define DEVICE_PUB_INDEX_MEM_LOW    3
+#define DEVICE_PUB_INDEX_TASK_STATS 4
 
 static iotElement_t deviceElement;
 
-static TimerHandle_t uptimeTimer;
 static esp_mqtt_client_handle_t mqttClient;
 static SemaphoreHandle_t mqttMutex;
 
@@ -112,6 +112,11 @@ static bool iotElementSendUpdate(iotElement_t element);
 static bool iotElementSubscribe(iotElement_t element);
 static void iotUpdateUptime(TimerHandle_t xTimer);
 static void iotUpdateMemoryStats(void);
+#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
+static uint8_t taskStatsBuffer[1024];
+static iotBinaryValue_t taskStatsBinaryValue;
+static void iotUpdateTaskStats(TimerHandle_t xTimer);
+#endif
 static void iotWifiConnectionStatus(bool connected);
 static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value);
 
@@ -140,6 +145,9 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "ip"),
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memFree"),
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memLow")
+#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
+        , IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "taskStats")
+#endif
     ),
     IOT_SUB_DESCRIPTIONS(
         IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_STRING, IOT_SUB_DEFAULT_NAME, iotDeviceControl)
@@ -220,8 +228,12 @@ void iotStart()
 {
     mqttStart();
     wifiStart();
-    uptimeTimer = xTimerCreate("updUptime", UPTIME_UPDATE_MS / portTICK_RATE_MS, pdTRUE, NULL, iotUpdateUptime);
-    xTimerStart(uptimeTimer, 0);
+
+    xTimerStart(xTimerCreate("updUptime", UPTIME_UPDATE_MS / portTICK_RATE_MS, pdTRUE, NULL, iotUpdateUptime), 0);
+
+#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
+    xTimerStart(xTimerCreate("stats", 30*1000 / portTICK_RATE_MS, pdTRUE, NULL, iotUpdateTaskStats), 0);
+#endif
 }
 
 iotElement_t iotNewElement(const iotElementDescription_t *desc, void *userContext, const char const *nameFormat, ...)
@@ -522,6 +534,67 @@ static void iotUpdateUptime(TimerHandle_t xTimer)
    
     iotUpdateMemoryStats();
 }
+
+#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
+static void iotUpdateTaskStats(TimerHandle_t xTimer)
+{
+    iotValue_t value;
+    CborEncoder encoder, taskArrayEncoder, taskEntryEncoder;
+    CborError cborErr;
+    int i;
+    unsigned long nrofTasks = uxTaskGetNumberOfTasks();
+    TaskStatus_t *tasksStatus = malloc(sizeof(TaskStatus_t) * nrofTasks);
+    if (tasksStatus == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate task status array");
+        return;
+    }
+    nrofTasks = uxTaskGetSystemState( tasksStatus, nrofTasks, NULL);
+    taskStatsBinaryValue.data = taskStatsBuffer;
+    value.bin = &taskStatsBinaryValue;
+    cbor_encoder_init(&encoder, taskStatsBuffer, sizeof(taskStatsBuffer), 0);
+
+    cborErr = cbor_encoder_create_array(&encoder, &taskArrayEncoder, nrofTasks);
+    if (cborErr != CborNoError) {
+        ESP_LOGE(TAG, "Failed to create task stats array");
+        goto error;
+    }
+
+    for (i=0; i < 80; i++) {
+        putchar('=');
+    }
+    putchar('\n');
+    printf("Name                : Stack Left\n"
+           "--------------------------------\n");
+
+    for (i=0; i < nrofTasks; i++) {
+        cborErr = cbor_encoder_create_array(&taskArrayEncoder, &taskEntryEncoder, 2);
+        if (cborErr != CborNoError) {
+            ESP_LOGE(TAG, "Failed to create task entry array");
+            goto error;
+        }
+        cbor_encode_text_stringz(&taskEntryEncoder, tasksStatus[i].pcTaskName);
+        cbor_encode_uint(&taskEntryEncoder, tasksStatus[i].usStackHighWaterMark);
+        cbor_encoder_close_container(&taskArrayEncoder, &taskEntryEncoder);
+        printf("%-20s: % 10d\n", tasksStatus[i].pcTaskName, tasksStatus[i].usStackHighWaterMark);
+    }
+    cbor_encoder_close_container(&encoder, &taskArrayEncoder);
+    taskStatsBinaryValue.len = cbor_encoder_get_buffer_size(&encoder, taskStatsBuffer);
+    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_TASK_STATS, value);
+    for (i=0; i < 80; i++) {
+        putchar('=');
+    }
+    putchar('\n');
+
+    free(tasksStatus);
+    return;
+
+error:
+    taskStatsBinaryValue.len = 0;
+    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_TASK_STATS, value);
+    free(tasksStatus);
+}
+#endif
+
 
 static int _safestrcmp(const char *constant, int conLen, const char *variable, int len) {
     if (conLen > len) {

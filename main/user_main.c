@@ -28,42 +28,6 @@
 
 static const char TAG[] = "main";
 
-#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
-static void taskStats(TimerHandle_t xTimer)
-{
-    unsigned long nrofTasks = uxTaskGetNumberOfTasks();
-    TaskStatus_t *tasksStatus = malloc(sizeof(TaskStatus_t) * nrofTasks);
-    if (tasksStatus == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate task status array");
-        return;
-    }
-    nrofTasks = uxTaskGetSystemState( tasksStatus, nrofTasks, NULL);
-    int i;
-    for (i=0; i < 80; i++) {
-        putchar('=');
-    }
-    putchar('\n');
-    
-    printf("TASK STATS # %lu\n"
-           "----------------\n\n", nrofTasks);
-    printf("Name                : St Pr Stack Left\n"
-           "--------------------------------------\n");
-    for (i=0; i < nrofTasks; i++) {
-        printf("%-20s: %2d %2lu % 10d\n", tasksStatus[i].pcTaskName, tasksStatus[i].eCurrentState, tasksStatus[i].uxCurrentPriority, tasksStatus[i].usStackHighWaterMark);
-    }
-    free(tasksStatus);
-    printf("\nMEMORY STATS\n"
-             "------------\n"
-             "Free: %u\n"
-             "Low : %u\n\n", esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
-    
-    for (i=0; i < 80; i++) {
-        putchar('=');
-    }
-    printf("\n\n");
-}
-#endif
-
 void app_main(void)
 {
     struct timeval tv = {.tv_sec = 0, .tv_usec=0};
@@ -91,8 +55,4 @@ void app_main(void)
     updaterInit();
     iotStart();
     provisioningStart();
-
-#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
-    xTimerStart(xTimerCreate("stats", 30*1000 / portTICK_RATE_MS, pdTRUE, NULL, taskStats), 0);
-#endif
 }
