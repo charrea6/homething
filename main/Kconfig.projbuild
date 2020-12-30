@@ -3,23 +3,14 @@ menu "Thing Configuration"
 config DHT22
     bool "Enable DHT22 support"
 
-config FAN
+config HUMIDISTAT
     bool "Enable Humidistat Fan support"
     
-config FAN_HUMIDITY
-    int "Percent Relative Humidty at which to turn on the fan"
+config HUMIDISTAT_THRESHOLD
+    int "Percent Relative Humidity at which to turn on the fan"
     default 75
     range 0 100
-    depends on FAN
-
-config LIGHT
-    bool "Enable light switch support"
-
-config MOTION
-    bool "Enable Motion detection support"
-
-config DOORBELL
-    bool "Enable Doorbell function"
+    depends on HUMIDISTAT
 
 config CONNECTION_LED
     bool "Enable Wifi/MQTT connection LED"

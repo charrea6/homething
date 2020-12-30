@@ -9,8 +9,6 @@ import subprocess
 
 build_action = None
 
-profile_keys = [('LIGHT', 'L'), ('DHT22', 'T'), ('FAN', 'F'), ('DOORBELL', 'B'), ('MOTION', 'M')]
-
 
 def load_project_description(args):
     build_dir = args['build_dir']
@@ -68,18 +66,13 @@ def ota_gen(action, ctx, args):
     config = load_config(args)
     project_desc = load_project_description(args)
     project_name = project_desc['project_name']
-    profile = ''
-    for key, profile_id in profile_keys:
-        if config[key]:
-            profile += profile_id
     version = get_version(args)
     
     print("Generating OTA file(s)")
     print('Project: %s' % project_name)
-    print('Profile: %s' % profile)
     print('Version: %s' % version)
 
-    ota_suffix = '__%s__%s.ota' % (profile, version)
+    ota_suffix = f'__{version}.ota'
     build_dir = args['build_dir']
 
     if config['ESPTOOLPY_FLASHSIZE_1MB']:

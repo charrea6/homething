@@ -46,11 +46,7 @@ void app_main(void)
     dht22Start();
 #endif
 
-#if defined(CONFIG_LIGHT) || \
-    defined(CONFIG_MOTION) || \
-    defined(CONFIG_DOORBELL)
     switchStart();
-#endif
 
     updaterInit();
     iotStart();

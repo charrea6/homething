@@ -39,7 +39,7 @@ IOT_DESCRIBE_ELEMENT(
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "version"),
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "status"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "profile")
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "capabilities")
     ),
     IOT_SUB_DESCRIPTIONS(
         IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_STRING, "update", updateVersion)
@@ -54,21 +54,12 @@ char updaterStatusBuffer[UPDATER_STATUS_BUFFER_SIZE];
 static char updatePath[256];
 
 /* Device profile string creation - start */
-static char deviceProfile[] = ""
-#ifdef CONFIG_LIGHT
-    "L"
-#endif
+static char capabilities[] = ""
 #ifdef CONFIG_DHT22
-    "T"
-#ifdef CONFIG_FAN
-    "F"
+    "dht"
+#ifdef HUMIDISTAT
+    ",humidistat"
 #endif // FAN
-#endif
-#ifdef CONFIG_DOORBELL
-    "B"
-#endif
-#ifdef CONFIG_MOTION
-    "M"
 #endif
 ;
 /* Device profile string creation - finish */
@@ -107,10 +98,10 @@ static void updaterThread(void *pvParameter)
             {
                 partitionId = 1;
             }
-            snprintf(updatePath, sizeof(updatePath),"%s/homething.app%d__%s__%s.ota", CONFIG_UPDATER_PATH_PREFIX, partitionId, deviceProfile, newVersion);
+            snprintf(updatePath, sizeof(updatePath),"%s/homething.app%d__%s.ota", CONFIG_UPDATER_PATH_PREFIX, partitionId, newVersion);
         }
 #else
-        snprintf(updatePath, sizeof(updatePath),"%s/homething__%s__%s.ota", CONFIG_UPDATER_PATH_PREFIX, deviceProfile, newVersion);
+        snprintf(updatePath, sizeof(updatePath),"%s/homething__%s.ota", CONFIG_UPDATER_PATH_PREFIX, newVersion);
 #endif
 
         updaterUpdate(CONFIG_UPDATER_HOST, CONFIG_UPDATER_PORT, updatePath);
@@ -134,12 +125,12 @@ static void updateVersion(void *userData, iotElement_t element, iotValue_t value
 void updaterInit()
 {
     iotValue_t value;
-    ESP_LOGI(TAG, "Updater initialised, Version: %s Profile: %s", appVersion, deviceProfile);
+    ESP_LOGI(TAG, "Updater initialised, Version: %s Capabilities: %s", appVersion, capabilities);
     updaterElement = iotNewElement(&elementDescription, NULL, "sw");
     value.s = appVersion;
     iotElementPublish(updaterElement, PUB_INDEX_VERSION, value);
 
-    value.s = deviceProfile;
+    value.s = capabilities;
     iotElementPublish(updaterElement, PUB_INDEX_PROFILE, value);
     
     updateEventGroup = xEventGroupCreate();

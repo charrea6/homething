@@ -73,10 +73,16 @@ int addRelay(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount) {
             case DeviceProfile_RelayController_Temperature:
             break;
             case DeviceProfile_RelayController_Humidity:{
+#ifdef CONFIG_HUMIDISTAT
                 HumidityFan_t *fanController = malloc(sizeof(HumidityFan_t));
                 if (fanController) {
-                    humidityFanInit(fanController, relay, ids[id], CONFIG_FAN_HUMIDITY);
+                    humidityFanInit(fanController, relay, ids[id], CONFIG_HUMIDISTAT_THRESHOLD);
+                } else {
+                    ESP_LOGE(TAG, "setupRelay: Failed to allocate memory for humidistat");
                 }
+#else 
+            ESP_LOGW(TAG, "setupRelay: Unsupported humidistat controller!");
+#endif
             }
             break;
             default:
