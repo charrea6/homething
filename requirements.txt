@@ -2,3 +2,5 @@ flask
 requests
 pyyaml
 beautifulsoup4
+parsimonious
+cbor2
