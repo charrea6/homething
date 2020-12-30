@@ -6,79 +6,34 @@
 #include "esp_log.h"
 
 #include "deviceprofile.h"
+#include "iot.h"
+
+#include "relays.h"
 #include "relay.h"
 
 #include "switches.h"
 #include "switch.h"
-#include "iot.h"
+
+#include "sensors.h"
 #include "dht.h"
 #include "humidityfan.h"
 
 static const char TAG[] = "profile";
 
-int setupRelay(CborValue *entry, uint8_t relayId, Relay_t *relay, Notifications_ID_t *ids, uint32_t idCount) {
-    uint32_t pin;
-    uint32_t onLevel;
-    bool controlled = false;
-    uint32_t controller;
-    uint32_t id;
+typedef int (*initFunc_t)(int);
 
-    if (deviceProfileParserEntryGetUint32(entry, &pin) == -1) {
-        ESP_LOGE(TAG, "setupRelay: Failed to get pin");
-        return  -1;
-    }
-
-    if (deviceProfileParserEntryGetUint32(entry, &onLevel) == -1) {
-        ESP_LOGE(TAG, "setupRelay: Failed to get on levels");
-        return  -1;
-    }
-
-    if (deviceProfileParserEntryGetUint32(entry, &controller) == 0) {
-        controlled = true;
-        if (controller >= DeviceProfile_RelayController_Max){
-            ESP_LOGE(TAG, "setupRelay: Controller type %u invalid!", controller);
-            return  -1;
-        }
-        if (controller != DeviceProfile_RelayController_None) {
-            if (deviceProfileParserEntryGetUint32(entry, &id) == -1) {
-                ESP_LOGE(TAG, "setupRelay: Failed to get controller id");
-                return  -1;
-            }
-            if (id >= idCount) {
-                ESP_LOGE(TAG, "setupRelay: Controller id %u too big!", id);
-                return  -1;
-            }
-        }
-    }
-
-    relayInit(relayId, (uint8_t)pin, (uint8_t)onLevel, relay);
-    if (controlled) {
-        switch(controller) {
-            case DeviceProfile_RelayController_Switch:
-            notificationsRegister(Notifications_Class_Switch, ids[id], switchRelayController, relay);
-            break;
-            case DeviceProfile_RelayController_Temperature:
-            break;
-            case DeviceProfile_RelayController_Humidity:{
-                HumidityFan_t *fanController = malloc(sizeof(HumidityFan_t));
-                if (fanController) {
-                    humidityFanInit(fanController, relay, ids[id], CONFIG_FAN_HUMIDITY);
-                }
-            }
-            break;
-            default:
-            ESP_LOGW(TAG, "setupRelay: Unknown controller type %u", controller);
-            break;
-        }
-    }
-    return 0;
-}
-
+static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
+    initSwitches,
+    initRelays,
+    initDHT22,
+    NULL,
+    NULL,
+    NULL,
+};
 
 int processProfile(void)
 {
-    Relay_t *relays = NULL;
-    int nrofRelays=0, nrofSwitches=0;
+    int nrofEntryTypes[DeviceProfile_EntryType_Max] = {0};
     uint8_t relayIndex = 0;
     int entryCount = 0, entryIndex = 0;
     int i;
@@ -99,20 +54,19 @@ int processProfile(void)
     }
     
     while(!deviceProfileParserNextEntry(&parser, &entry, &entryType)) {
-        if (entryType == DeviceProfile_EntryType_GPIOSwitch) {
-            nrofSwitches ++;
-        }
-        if (entryType == DeviceProfile_EntryType_Relay){
-            nrofRelays ++;
+        if (entryType < DeviceProfile_EntryType_Max) {
+            nrofEntryTypes[entryType]++;
         }
         entryCount ++;
         deviceProfileParserCloseEntry(&parser, &entry);
     }
-    
-    ESP_LOGW(TAG, "Switches: %d Relays: %d", nrofSwitches, nrofRelays);
-    
-    if (initSwitches(nrofSwitches) == -1) {
-        goto error;
+
+    for (i=DeviceProfile_EntryType_GPIOSwitch; i <DeviceProfile_EntryType_Max; i++) {
+        if (initFuncs[i] != NULL){
+            if (initFuncs[i](nrofEntryTypes[i])) {
+                goto error;
+            }
+        }
     }
 
     ids = calloc(entryCount, sizeof(Notifications_ID_t));
@@ -125,19 +79,22 @@ int processProfile(void)
         ids[i] = NOTIFICATIONS_ID_ERROR;
     }
 
-    relays = calloc(nrofRelays, sizeof(Relay_t));
-    if (relays == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for relays");
-        goto error;
-    }
-
     /* Process sensors and switches */
     deviceProfileParseProfile(profile, profileLen, &parser);
     while(!deviceProfileParserNextEntry(&parser, &entry, &entryType)) {
-        if (entryType == DeviceProfile_EntryType_GPIOSwitch) {
-            ids[entryIndex] = addSwitch(&entry);
+        Notifications_ID_t id = NOTIFICATIONS_ID_ERROR;
+        switch(entryType){
+            case DeviceProfile_EntryType_GPIOSwitch:
+                id = addSwitch(&entry);
+                break;
+            case DeviceProfile_EntryType_DHT22:
+                id = addDHT22(&entry);
+                break;
+
+            default:
+                break;
         }
-        
+        ids[entryIndex] = id;
         entryIndex ++;
         deviceProfileParserCloseEntry(&parser, &entry);
     }
@@ -146,7 +103,7 @@ int processProfile(void)
     deviceProfileParseProfile(profile, profileLen, &parser);
     while(!deviceProfileParserNextEntry(&parser, &entry, &entryType)) {
         if (entryType == DeviceProfile_EntryType_Relay){
-            if (setupRelay(&entry, relayIndex, &relays[relayIndex], ids, entryCount)) {
+            if (addRelay(&entry, ids, entryCount)) {
                 goto error;
             }
             relayIndex ++;
@@ -160,9 +117,6 @@ int processProfile(void)
 error:
     if (ids) {
         free(ids);
-    }
-    if (relays) {
-        free(relays);
     }
 
     if (profile){
