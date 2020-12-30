@@ -17,11 +17,18 @@ function variableToStr(setting, variable){
         break;
     case 'checkbox':html=`<div class="six columns"><label><input type="checkbox" id="${varId}"}><span class="label-body">${variable.title}</span></label></div>`;
         break;
+    case 'device_id':html=`<div><label for="${varId}">${variable.title}</label><input readonly class="u-full-width" type="text" placeholder="${variable.title}" id="${varId}"></div>`;
+        break;
+    case 'string':html=`<div><label for="${varId}">${variable.title}</label><input class="u-full-width" type="text" placeholder="${variable.title}" id="${varId}"></div>`;
+        break;
     }
     return html;
 }
 
 function variableGetValue(setting, variable) {
+    if (variable.type == 'device_id') {
+        return "";
+    }
     var el = document.getElementById(variableId(setting, variable));
     if (variable.type == "checkbox") {
         return el.checked;
@@ -44,10 +51,23 @@ function variableSetValue(setting, variable, values) {
     }
     var el = document.getElementById(variableId(setting,variable));
     var value = values[setting.name][variable.name];
-    if (variable.type == "checkbox") {
-        el.checked = value;
-    } else {
-        el.value = value;
+    switch(variable.type) {
+        case "checkbox": el.checked = value;
+            break;
+        case "device_id":
+            mac = ''
+            for (var i of value) {
+                let byte = i.toString(16);
+                if (byte.length < 2) {
+                    byte = '0' + byte;
+                }
+                mac += byte;
+            }
+            el.value = 'homething-' + mac;
+            break;
+        default:
+            el.value = value;
+            break;
     }
 }
 
@@ -111,7 +131,7 @@ function saveConfig() {
                 for (var subVar of variable) {    
                     var value = variableGetValue(setting, subVar);
                     if (value != "") {
-                        config_setting[subVar.name] = value
+                        config_setting[subVar.name] = value;
                     }
                 }
             } else {       

@@ -23,6 +23,8 @@ typedef enum FieldType {
     FT_HOSTNAME,
     FT_PORT,
     FT_CHECKBOX,
+    FT_DEVICE_ID,
+    FT_STRING,
     FT_MAX
 }FieldType;
 
@@ -52,7 +54,9 @@ static const cborTypeTest fieldTypeToCborType[FT_MAX] = {
     cbor_value_is_text_string,
     cbor_value_is_text_string,
     cbor_value_is_unsigned_integer,
-    cbor_value_is_boolean
+    cbor_value_is_boolean,
+    cbor_value_is_text_string,
+    cbor_value_is_text_string,
 };
 
 esp_err_t provisioningConfigPostHandler(httpd_req_t *req)
@@ -124,11 +128,14 @@ esp_err_t provisioningConfigPostHandler(httpd_req_t *req)
                 break;
             }
         }
-        free(key);
+        
         if (foundSetting == NULL) {
+            ESP_LOGE(TAG, "Unexpected key \"%s\"", key);
+            free(key);
             errorMsg = "Unexpected key";
             goto error;
         }
+        free(key);
         ESP_LOGI(TAG, "Processing variables for %s", foundSetting->name);
         if (cbor_value_get_type(&it) != CborMapType) {
             errorMsg = "Key value not a map type";
@@ -292,6 +299,7 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
             goto error;
         }
         switch(foundVariable->type) {
+            case FT_STRING:
             case FT_USERNAME:
             case FT_PASSWORD:
             case FT_HOSTNAME: {       
@@ -331,6 +339,8 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
                 err = nvs_set_u8(handle, foundVariable->name, value);
             }
             break;
+            case FT_DEVICE_ID:
+            break;
             default:
             err = ESP_FAIL;
             break;
@@ -357,6 +367,7 @@ static bool getVariables(nvs_handle handle, struct setting *setting, CborEncoder
             goto error;
         }
         switch(var->type) {
+            case FT_STRING:
             case FT_USERNAME:
             case FT_HOSTNAME: {
                 char *value;
@@ -396,6 +407,12 @@ static bool getVariables(nvs_handle handle, struct setting *setting, CborEncoder
                 if (err == ESP_OK) {
                     cborErr = cbor_encode_boolean(encoder, value?true:false);
                 }
+            }
+            break;
+            case FT_DEVICE_ID:{
+                uint8_t mac[6];
+                esp_read_mac(mac, ESP_MAC_WIFI_STA);
+                cborErr = cbor_encode_byte_string(encoder, mac, sizeof(mac));
             }
             break;
             default:
