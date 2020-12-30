@@ -10,6 +10,8 @@
 
 #include "uzlib.h"
 
+#define HTTPD_TASK_STACK_SIZE 2048
+
 #define DICT_SIZE 1024
 #define DECOMPRESS_BUFFER_SIZE 1024
 
@@ -52,7 +54,7 @@ int provisioningStart(void)
     int i;
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.stack_size = 6 * 1024;
+    config.stack_size = HTTPD_TASK_STACK_SIZE;
     
     ESP_LOGI(TAG, "Starting server on port: %d", config.server_port);
     if (httpd_start(&server, &config) != ESP_OK) {

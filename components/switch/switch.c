@@ -13,7 +13,7 @@ static const char *TAG="switch";
 
 #define SWITCH_THREAD_NAME "switches"
 #define SWITCH_THREAD_PRIO 8
-#define SWITCH_THREAD_STACK_WORDS 3072
+#define SWITCH_THREAD_STACK_WORDS 2048
 
 static GPIOX_Pins_t switchPins, switchValues;
 

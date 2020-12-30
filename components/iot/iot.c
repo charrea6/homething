@@ -28,6 +28,8 @@
 static const char *TAG="IOT";
 static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 
+#define MQTT_TASK_STACK_SIZE (3 * 1024)
+
 #define MQTT_PATH_PREFIX_LEN 23 // homething/<MAC 12 Hexchars> \0
 #define MQTT_COMMON_CTRL_SUB_LEN (MQTT_PATH_PREFIX_LEN + 7) // "/+/ctrl"
 
@@ -771,7 +773,7 @@ static void mqttStart(void)
         .host = mqttServer,
         .port = mqttPort,
         .event_handle = mqttEventHandler,
-        .task_stack = 7 * 1024,
+        .task_stack = MQTT_TASK_STACK_SIZE,
     };
     if (mqttUsername[0] != 0) {
         mqtt_cfg.username = mqttUsername;
