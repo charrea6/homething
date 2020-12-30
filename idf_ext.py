@@ -113,8 +113,11 @@ def build_config(action, ctx, args, configfile=None):
     
     csv_filename = os.path.join(build_dir, 'config.csv')
     bin_filename = os.path.join(build_dir, 'config.bin')
-    subprocess.check_call(['python', 'config/configgen.py', configfile, csv_filename])
-
+    if configfile.endswith('.yml'):
+        subprocess.check_call(['python', 'config/newconfiggen.py', configfile, csv_filename])    
+    else:
+        subprocess.check_call(['python', 'config/configgen.py', configfile, csv_filename])
+    
     nvs_part_gen_path = os.path.join(idf_path, 'components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py')
     subprocess.check_call(['python', nvs_part_gen_path, '--input', csv_filename, '--output', bin_filename, '--size', size])
     
@@ -136,7 +139,6 @@ def build_config(action, ctx, args, configfile=None):
         esptool_args.append(config['ESPTOOLPY_FLASHSIZE'])
 
     esptool_args += [offset, bin_filename]
-
     subprocess.check_call(['python', esptool_path] + esptool_args)
 
 def action_extensions(base_actions, project_dir):
