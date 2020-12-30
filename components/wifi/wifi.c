@@ -18,8 +18,6 @@
 
 #include "tcpip_adapter.h"
 
-#include "mdns.h"
-
 #include "wifi.h"
 #include "sdkconfig.h"
 
@@ -84,10 +82,6 @@ int wifiInit(WifiConnectionCallback_t callback)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
-
-    ESP_ERROR_CHECK( mdns_init() );
-
-    mdns_hostname_set(hostname);
 
     return result;
 }
@@ -155,7 +149,6 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
     default:
         break;
     }
-    mdns_handle_system_event(ctx, event);
     return ESP_OK;
 }
 
