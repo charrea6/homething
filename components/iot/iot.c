@@ -86,7 +86,8 @@ static iotElement_t elementsHead = NULL;
 #define DEVICE_PUB_INDEX_IP         1
 #define DEVICE_PUB_INDEX_MEM_FREE   2
 #define DEVICE_PUB_INDEX_MEM_LOW    3
-#define DEVICE_PUB_INDEX_TASK_STATS 4
+#define DEVICE_PUB_INDEX_PROFILE    4
+#define DEVICE_PUB_INDEX_TASK_STATS 5
 
 static iotElement_t deviceElement;
 
@@ -106,6 +107,8 @@ static char mqttPassword[MAX_LENGTH_MQTT_PASSWORD];
 
 static char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
 static char mqttCommonCtrlSub[MQTT_COMMON_CTRL_SUB_LEN];
+
+static iotBinaryValue_t deviceProfileBinaryValue;
 
 static void mqttMessageArrived(char *mqttTopic, int mqttTopicLen, char *data, int dataLen);
 static void mqttStart(void);
@@ -146,7 +149,8 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "uptime"),
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "ip"),
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memFree"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memLow")
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memLow"),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "profile")
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
         , IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "taskStats")
 #endif
@@ -187,7 +191,11 @@ int iotInit(void)
     ESP_LOGI(TAG, "Initialised IOT - device path: %s", mqttPathPrefix);
     deviceElement = iotNewElement(&deviceElementDescription, NULL, "device");
     iotUpdateMemoryStats();
-
+    if (deviceProfileGetProfile(&deviceProfileBinaryValue.data, (size_t*)&deviceProfileBinaryValue.len) == 0){
+        iotValue_t value;
+        value.bin = &deviceProfileBinaryValue;
+        iotElementPublish(deviceElement, DEVICE_PUB_INDEX_PROFILE, value);
+    }
     err = nvs_open("mqtt", NVS_READONLY, &handle);
     if (err == ESP_OK)
     {

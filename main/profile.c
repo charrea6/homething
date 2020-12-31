@@ -33,6 +33,7 @@ static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
 
 int processProfile(void)
 {
+    int ret = -1;
     int nrofEntryTypes[DeviceProfile_EntryType_Max] = {0};
     uint8_t relayIndex = 0;
     int entryCount = 0, entryIndex = 0;
@@ -110,17 +111,10 @@ int processProfile(void)
         }
         deviceProfileParserCloseEntry(&parser, &entry);
     }
-
-    free(ids);
-    free(profile);
-    return 0;
+    ret = 0;
 error:
     if (ids) {
         free(ids);
     }
-
-    if (profile){
-        free(profile);
-    }    
-    return -1;
+    return ret;
 }

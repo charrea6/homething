@@ -15,25 +15,30 @@
 static const char TAG[] = "devprofile";
 static const char THING[] = "thing";
 static const char PROFILE[] = "deviceprofile";
+static uint8_t *deviceProfile = NULL;
+static uint32_t deviceProfileLen = 0u;
 
 static int nextUint32(CborValue *it, uint32_t *result);
 
 int deviceProfileGetProfile(uint8_t **profile, size_t *profileLen) {
     nvs_handle handle;
-    
-    ESP_RETURN_ON_ERR(nvs_open(THING, NVS_READONLY, &handle));
+    if (deviceProfile == NULL) {
+        ESP_RETURN_ON_ERR(nvs_open(THING, NVS_READONLY, &handle));
 
-    ESP_RETURN_ON_ERR( nvs_get_blob(handle, PROFILE, NULL, profileLen) );
-    *profile = malloc(*profileLen);
-    if (*profile == NULL)
-    {  
-        printf("Failed to allocate memory for profile string (%d bytes required)\n", *profileLen);
-        return -1;
+        ESP_RETURN_ON_ERR( nvs_get_blob(handle, PROFILE, NULL, &deviceProfileLen) );
+        deviceProfile = malloc(deviceProfileLen);
+        if (deviceProfile == NULL)
+        {  
+            printf("Failed to allocate memory for profile string (%d bytes required)\n", *profileLen);
+            return -1;
+        }
+
+        ESP_RETURN_ON_ERR( nvs_get_blob(handle, PROFILE, deviceProfile, &deviceProfileLen) );
+
+        nvs_close(handle);
     }
-
-    ESP_RETURN_ON_ERR( nvs_get_blob(handle, PROFILE, *profile, profileLen) );
-
-    nvs_close(handle);
+    *profile = deviceProfile;
+    *profileLen = deviceProfileLen;
     return 0;
 }
 
