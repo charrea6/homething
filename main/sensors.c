@@ -20,8 +20,8 @@ static char const TAG[]="sensors";
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
     humidityElementDescription,
     IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_STRING, IOT_PUB_USE_ELEMENT),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_STRING, "temperature")
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, IOT_PUB_USE_ELEMENT),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "temperature")
     )
 );
 
@@ -80,7 +80,14 @@ static void temperatureUpdated(void *user,  NotificationsMessage_t *message) {
 
     for (i = 0; i < dht22Count; i ++) {
         if (dht22Sensors[i].id == message->id){
-            sprintf(dht22Sensors[i].temperatureStr, "%d.%d", message->data.temperature / 10, message->data.temperature % 10);
+            int16_t temperature = message->data.temperature;
+            char *str = dht22Sensors[i].temperatureStr;
+            if (temperature < 0) {
+                temperature *= -1;
+                str[0] = '-';
+                str++;
+            }
+            sprintf(str, "%d.%d", temperature / 10, temperature % 10);
             value.s = dht22Sensors[i].temperatureStr;
             iotElementPublish(dht22Sensors[i].element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
             break;
