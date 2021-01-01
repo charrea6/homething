@@ -75,15 +75,59 @@ def ota_gen(action, ctx, args):
     ota_suffix = f'__{version}.ota'
     build_dir = args['build_dir']
 
+    build_action('app', ctx, args)
+    
     if config['ESPTOOLPY_FLASHSIZE_1MB']:
-        generate_ota_file(os.path.join(build_dir, '%s.app0.bin' % project_name), 
-            os.path.join(build_dir, '%s.app0%s' % (project_name, ota_suffix)))
+        os.makedirs(build_dir, exist_ok=True)
+        new_sdkconfig = os.path.join(build_dir, 'ota_part1_sdkconfig')
+        new_parttable = os.path.join(build_dir, 'ota_part1_parttable.csv')
+        
+        sdkconfig = os.path.join(args.project_dir, 'sdkconfig')
+        define_cache_entry = []
+        for d in args.define_cache_entry:
+            if d.startswith('SDKCONFIG='):
+                sdkconfig = os.path.join(args.project_dir, d[10:])
+                continue
+            define_cache_entry.append(d)
+        define_cache_entry.append('SDKCONFIG=' + new_sdkconfig)
+        args.define_cache_entry = define_cache_entry
 
-        generate_ota_file(os.path.join(build_dir, '%s.app1.bin' % project_name), 
-            os.path.join(build_dir, '%s.app1%s' % (project_name, ota_suffix)))    
+        with open(sdkconfig) as sdkconfig_in:
+            with open(new_sdkconfig, 'w') as sdkconfig_out:
+                for line in sdkconfig_in:
+                    sdkconfig_out.write(line)
+                sdkconfig_out.write(f'''
+# Added by OTAGEN
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="{new_parttable}"''')
+        
+        idf_path = os.getenv('IDF_PATH')
+
+        with open(os.path.join(idf_path, "components/partition_table/partitions_two_ota.1MB.csv")) as csv_in:
+            with open(new_parttable, 'w') as csv_out:
+                for line in csv_in:
+                    if line.startswith('ota_0,'):
+                        continue
+                    csv_out.write(line)
+                    
+        ota_part1_build_dir = os.path.join(build_dir, 'ota_part1')
+        args.build_dir = ota_part1_build_dir
+        build_action('app', ctx, args)
+
+        ota_files = [os.path.join(build_dir, '%s.app0%s' % (project_name, ota_suffix)),
+                    os.path.join(build_dir, '%s.app1%s' % (project_name, ota_suffix))]
+        
+        generate_ota_file(os.path.join(build_dir, '%s.bin' % project_name), ota_files[0])
+
+        generate_ota_file(os.path.join(ota_part1_build_dir, '%s.bin' % project_name), ota_files[1])    
     else:
-        generate_ota_file(os.path.join(build_dir, '%s.bin' % project_name), 
-            os.path.join(build_dir, project_name + ota_suffix))
+        ota_files = [os.path.join(build_dir, project_name + ota_suffix)]
+        generate_ota_file(os.path.join(build_dir, '%s.bin' % project_name), ota_files[0])
+    
+    print(f"Generated {len(ota_files)} ota file{'s' if len(ota_files) > 1 else ''}")
+    for ota_file in ota_files:
+        print(f'    {ota_file}')
+    
 
 
 def build_config(action, ctx, args, configfile=None):
@@ -136,7 +180,7 @@ def build_config(action, ctx, args, configfile=None):
 
 def action_extensions(base_actions, project_dir):
     global build_action
-    build_action = base_actions['actions']['all']['callback']
+    build_action = base_actions['actions']['app']['callback']
 
     actions = {
                 'otagen' : {
