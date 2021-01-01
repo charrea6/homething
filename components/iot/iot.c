@@ -156,7 +156,7 @@ IOT_DESCRIBE_ELEMENT(
 #endif
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_STRING, IOT_SUB_DEFAULT_NAME, iotDeviceControl)
+        IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_BINARY, IOT_SUB_DEFAULT_NAME, iotDeviceControl)
     )
 );
 
@@ -616,7 +616,7 @@ static int _safestrcmp(const char *constant, int conLen, const char *variable, i
 #define SETPROFILE "setprofile"
 static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value)
 {
-    if (safestrcmp("restart", (const char *) value.bin->data, (int)value.bin->len) == 0) {
+    if (strcmp("restart", (const char *) value.bin->data) == 0) {
         esp_restart();
     }
     else if (safestrcmp(SETPROFILE, (const char *) value.bin->data, (int)value.bin->len) == 0) {
