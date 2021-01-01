@@ -27,19 +27,20 @@ static const char const *switchTypes[] = {
 
 static const char const *switchStateOn[] = {
     "toggled",
-    "on",
-    "pressed",
-    "closed",
-    "motion detected"
-};
-static const char const *switchStateOff[] = {
-    "toggled",
     "off",
     "released",
     "open",
-    "motion stopped"
+    "motion detected"
 };
 
+static const char const *switchStateOff[] ={
+    "toggled",
+    "on",
+    "pressed",
+    "closed",
+    "motion stopped"
+};
+ 
 static const char TAG[] = "switches";
 
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
