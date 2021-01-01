@@ -89,7 +89,7 @@ GPIO16(D0) - possibly tied to RST to allow exit from deep sleep by pulling GPIO1
 #else
 
 #define GPIOX_PINS_SIZE 1
-#define GPIOX_PINS_SET(_pins, _pin) _pins.pins[0] |= 1 << (_pin % 32)
+#define GPIOX_PINS_SET(_pins, _pin) (_pins).pins[0] |= 1 << (_pin % 32)
 #define GPIOX_PINS_CLEAR(_pins, _pin) ((_pins).pins[0] = ((_pins).pins[0] & ~(1 << (_pin % 32))))
 #define GPIOX_PINS_CLEAR_ALL(_pins)  (_pins).pins[0] = 0
 #define GPIOX_PINS_IS_SET(_pins, _pin) (((_pins).pins[0] & 1 << (_pin % 32)) != 0)
