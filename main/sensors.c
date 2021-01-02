@@ -9,6 +9,7 @@
 #include "deviceprofile.h"
 #include "dht.h"
 #include "bmp280.h"
+#include "si7021.h"
 #include "sensors.h"
 
 #define HUMIDITY_PUB_INDEX_HUMIDITY   0
@@ -37,12 +38,20 @@ struct BME280_t {
     uint32_t lastHumidity;
 };
 
+struct SI7021_t {
+    i2c_dev_t dev;
+    struct HumiditySensor *sensor;
+    float lastTemperature;
+    float lastHumidity;
+};
+
 static int addHumiditySensor(struct HumiditySensor **sensor, uint32_t *sensorId);
 
 static void temperatureUpdated(void *user,  NotificationsMessage_t *message);
 static void humidityUpdated(void *user,  NotificationsMessage_t *message);
 static void pressureUpdated(void *user, NotificationsMessage_t *message);
 static void bme280MeasureTimer(TimerHandle_t xTimer);
+static void si7021MeasureTimer(TimerHandle_t xTimer);
 
 static char const TAG[]="sensors";
 
@@ -76,6 +85,7 @@ static uint32_t humiditySensorCount = 0;
 
 static struct HumiditySensor *humiditySensors = NULL;
 static struct BME280_t *bme280Devices;
+static struct SI7021_t *si7021Devices;
 
 int initDHT22(int nrofSensors) {
     nrofHumiditySensors += nrofSensors;
@@ -185,7 +195,7 @@ static void bme280MeasureTimer(TimerHandle_t xTimer) {
     int32_t temperature;
     uint32_t humidity, pressure;
     esp_err_t err;
-    Notifications_ID_t id = NOTIFICATIONS_MAKE_I2C_ID(dev->dev.i2c_dev.cfg.sda_io_num, dev->dev.i2c_dev.cfg.scl_io_num, dev->dev.i2c_dev.addr);
+    Notifications_ID_t id = dev->sensor->id;
     NotificationsData_t data;
     err = bmp280_read_fixed(&dev->dev, &temperature, &pressure, &humidity);
     if (err != ESP_OK) {
@@ -207,6 +217,84 @@ static void bme280MeasureTimer(TimerHandle_t xTimer) {
         data.pressure = pressure / 256;
         dev->lastPressure = pressure;
         notificationsNotify(Notifications_Class_Pressure, id, &data);
+    }
+}
+
+int initSI7021(int nrofSensors) {
+    si7021Devices = calloc(nrofSensors, sizeof(struct SI7021_t));
+    if (si7021Devices == NULL) {
+        return -1;
+    }
+    nrofHumiditySensors += nrofSensors;
+    
+    return 0; 
+}
+
+Notifications_ID_t addSI7021(CborValue *entry) {
+    struct HumiditySensor *sensor;
+    iotValue_t value;
+    uint32_t sensorId;
+    DeviceProfile_I2CDetails_t i2cDetails;
+    struct SI7021_t *dev;
+    esp_err_t err;
+    
+    if (deviceProfileParserEntryGetI2CDetails(entry, &i2cDetails)){
+        ESP_LOGE(TAG, "Failed to get I2C details!");
+        return NOTIFICATIONS_ID_ERROR;
+    }
+    
+    if (addHumiditySensor(&sensor, &sensorId)) {
+        return NOTIFICATIONS_ID_ERROR;
+    }
+
+    dev = si7021Devices;
+    memset(dev, 0, sizeof(struct SI7021_t));
+    dev->sensor = sensor;
+    err = si7021_init_desc(&dev->dev, 0, i2cDetails.sda, i2cDetails.scl);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "addSI7021: Failed to init %d", err);
+        return NOTIFICATIONS_ID_ERROR;
+    }
+    si7021Devices++;
+
+    sensor->element = iotNewElement(&humidityElementDescription, sensor, "humidity%d", sensorId);
+    value.s = sensor->humidityStr;
+    iotElementPublish(sensor->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
+    value.s = sensor->temperatureStr;
+    iotElementPublish(sensor->element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
+    sensor->id = NOTIFICATIONS_MAKE_I2C_ID(i2cDetails.sda, i2cDetails.scl, SI7021_I2C_ADDR);
+    xTimerStart(xTimerCreate("si7021", SECS_TO_TICKS(5), pdTRUE, dev, si7021MeasureTimer), 0);
+    return sensor->id;
+}
+
+static void si7021MeasureTimer(TimerHandle_t xTimer) {
+    struct SI7021_t *dev = pvTimerGetTimerID(xTimer);
+    esp_err_t err;
+    float temperature, humidity;
+    NotificationsData_t data;
+
+    err = si7021_measure_temperature(&dev->dev, &temperature);
+    if (err != ESP_OK){
+        ESP_LOGE(TAG, "si7021MeasureTimer: Failed to read temperature %d", err);
+        return;
+    }
+    
+    if (temperature != dev->lastTemperature){
+        data.temperature = (int32_t) (temperature * 100.0);
+        notificationsNotify(Notifications_Class_Temperature, dev->sensor->id, &data);
+        dev->lastTemperature = temperature;
+    }
+
+    err = si7021_measure_humidity(&dev->dev, &humidity);
+    if (err != ESP_OK){
+        ESP_LOGE(TAG, "si7021MeasureTimer: Failed to read humidity %d", err);
+        return;
+    }
+    
+    if (humidity != dev->lastHumidity){
+        data.humidity = (int32_t) (humidity * 100.0);
+        notificationsNotify(Notifications_Class_Humidity, dev->sensor->id, &data);
+        dev->lastHumidity = humidity;
     }
 }
 

@@ -27,7 +27,7 @@ static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
     initSwitches,
     initRelays,
     initDHT22,
-    NULL,
+    initSI7021,
     NULL,
     initBME280,
 };
@@ -36,7 +36,7 @@ static const addFunc_t addFuncs[DeviceProfile_EntryType_Max] = {
     addSwitch,
     NULL,
     addDHT22,
-    NULL,
+    addSI7021,
     NULL,
     addBME280
 };
