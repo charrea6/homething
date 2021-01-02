@@ -4,6 +4,6 @@
 #include "notifications.h"
 
 int initSwitches(int norfSwitches);
-int addSwitch(CborValue *entry);
+Notifications_ID_t addSwitch(CborValue *entry);
 void switchRelayController(void *user, NotificationsMessage_t *message);
 #endif

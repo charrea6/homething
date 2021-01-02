@@ -9,12 +9,14 @@ typedef enum{
     Notifications_Class_Switch = 0,
     Notifications_Class_Temperature,
     Notifications_Class_Humidity,
+    Notifications_Class_Pressure,
     Notifications_Class_Max
 }Notifications_Class_e;
 
 typedef union {
-    uint32_t humidity;
-    uint32_t temperature;
+    uint32_t humidity;  // %RH * 100
+    uint32_t pressure;  // hPa * 100
+    int32_t temperature; // degrees C * 100
     bool switchState;
 } NotificationsData_t; 
 
@@ -30,11 +32,12 @@ typedef void (*NotificationsCallback_t)(void *user,  NotificationsMessage_t *mes
 
 #define NOTIFICATIONS_ID_GPIOSWITCH_BASE  0x00000000
 #define NOTIFICATIONS_ID_DHT22_BASE       0x00000000
-
+#define NOTIFICATIONS_ID_I2C_BASE         0x01000000
 #define NOTIFICATIONS_ID_ALL              0xffffffff
 #define NOTIFICATIONS_ID_ERROR            0xffffffff
 
 #define NOTIFICATIONS_MAKE_ID(_name, _id) ( NOTIFICATIONS_ID_ ## _name ## _BASE | _id)
+#define NOTIFICATIONS_MAKE_I2C_ID(sda, scl, addr) ( NOTIFICATIONS_ID_I2C_BASE | (sda) << 16 | (scl) << 8 | (addr))
 
 void notificationsInit(void);
 void notificationsRegister(Notifications_Class_e clazz, Notifications_ID_t id, NotificationsCallback_t callback, void *user);

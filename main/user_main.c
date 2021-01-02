@@ -15,6 +15,7 @@
 #include "freertos/event_groups.h"
 
 #include "sdkconfig.h"
+#include "i2cdev.h"
 #include "switch.h"
 #include "iot.h"
 #include "dht.h"
@@ -34,6 +35,7 @@ void app_main(void)
     settimeofday(&tv, NULL);
 
     ESP_ERROR_CHECK( nvs_flash_init() );
+    ESP_ERROR_CHECK( i2cdev_init() );
 
     notificationsInit();
     iotInit();
@@ -41,14 +43,13 @@ void app_main(void)
     gpioxInit();
     switchInit();
     processProfile();
+    
+    updaterInit();
 
 #if defined(CONFIG_DHT22)
     dht22Start();
 #endif
-
     switchStart();
-
-    updaterInit();
     iotStart();
     provisioningStart();
 }

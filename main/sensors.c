@@ -1,19 +1,48 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 #include "iot.h"
 #include "notifications.h"
 #include "deviceprofile.h"
 #include "dht.h"
-
+#include "bmp280.h"
 #include "sensors.h"
 
 #define HUMIDITY_PUB_INDEX_HUMIDITY   0
 #define HUMIDITY_PUB_INDEX_TEMPERTURE 1
+#define HUMIDITY_PUB_INDEX_PRESSURE   2
+
+#define TEMPERATURE_PUB_INDEX_TEMPERATURE 0
+#define TEMPERATURE_PUB_INDEX_PRESSURE    1
+
+#define SECS_TO_TICKS(secs) ((secs * 1000) / portTICK_RATE_MS)
+
+
+struct HumiditySensor {
+    Notifications_ID_t id;
+    iotElement_t element;
+    char temperatureStr[8];
+    char humidityStr[8];
+};
+
+struct BME280_t {
+    bmp280_t dev;
+    struct HumiditySensor *sensor;
+    char pressureStr[8];
+    int32_t lastTemperature;
+    uint32_t lastPressure;
+    uint32_t lastHumidity;
+};
+
+static int addHumiditySensor(struct HumiditySensor **sensor, uint32_t *sensorId);
 
 static void temperatureUpdated(void *user,  NotificationsMessage_t *message);
 static void humidityUpdated(void *user,  NotificationsMessage_t *message);
+static void pressureUpdated(void *user, NotificationsMessage_t *message);
+static void bme280MeasureTimer(TimerHandle_t xTimer);
 
 static char const TAG[]="sensors";
 
@@ -25,71 +54,179 @@ IOT_DESCRIBE_ELEMENT_NO_SUBS(
     )
 );
 
+IOT_DESCRIBE_ELEMENT_NO_SUBS(
+    htpElementDescription, // Humidity / Temperature / Pressure
+    IOT_PUB_DESCRIPTIONS(
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, IOT_PUB_USE_ELEMENT),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "temperature"),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "pressure")
+    )
+);
+
+IOT_DESCRIBE_ELEMENT_NO_SUBS(
+    tpElementDescription, // Temperature / Pressure
+    IOT_PUB_DESCRIPTIONS(
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, IOT_PUB_USE_ELEMENT),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "pressure")
+    )
+);
+
+static uint32_t nrofHumiditySensors = 0;
 static uint32_t humiditySensorCount = 0;
 
+static struct HumiditySensor *humiditySensors = NULL;
+static struct BME280_t *bme280Devices;
 
-struct DHT22 {
-    Notifications_ID_t id;
-    char temperatureStr[6];
-    char humidityStr[6];
-    iotElement_t element;
-};
-static int dht22Count = 0;
-static struct DHT22 *dht22Sensors = NULL;
-
-int initDHT22(int nrofDHT22) {
-    dht22Sensors = calloc(sizeof(struct DHT22), nrofDHT22);
-    if (dht22Sensors == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for DHT22 sensors");
-        return -1;
-    }
-    notificationsRegister(Notifications_Class_Temperature, NOTIFICATIONS_ID_ALL, temperatureUpdated, NULL);
-    notificationsRegister(Notifications_Class_Humidity, NOTIFICATIONS_ID_ALL, humidityUpdated, NULL);
+int initDHT22(int nrofSensors) {
+    nrofHumiditySensors += nrofSensors;
     return 0;
 }
 
 Notifications_ID_t addDHT22(CborValue *entry) {
-    struct DHT22 *dht;
+    struct HumiditySensor *dht;
     iotValue_t value;
     uint32_t pin;
+    uint32_t sensorId;
 
     if (deviceProfileParserEntryGetUint32(entry, &pin)){
         ESP_LOGE(TAG, "addDHT22: Failed to get pin!");
         return NOTIFICATIONS_ID_ERROR;
     }
-    dht = &dht22Sensors[dht22Count];
-    dht22Count++;
-    
+    if (addHumiditySensor(&dht, &sensorId)){
+        return NOTIFICATIONS_ID_ERROR;
+    }
     dht->id = dht22Add(pin);
-    
-    sprintf(dht->temperatureStr, "0.0");
-    sprintf(dht->humidityStr, "0.0");
-    dht->element = iotNewElement(&humidityElementDescription, dht, "humidity%d", humiditySensorCount);
-    humiditySensorCount++;
+    dht->element = iotNewElement(&humidityElementDescription, dht, "humidity%d", sensorId);
 
     value.s = dht->humidityStr;
     iotElementPublish(dht->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
     value.s = dht->temperatureStr;
     iotElementPublish(dht->element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
     return dht->id;
-} 
+}
+
+int initBME280(int nrofSensors) {
+    bme280Devices = calloc(nrofSensors, sizeof(struct BME280_t));
+    if (bme280Devices == NULL) {
+        return -1;
+    }
+    nrofHumiditySensors += nrofSensors;
+    
+    return 0; 
+}
+
+Notifications_ID_t addBME280(CborValue *entry) {
+    struct HumiditySensor *bme;
+    iotValue_t value;
+    uint32_t sensorId;
+    DeviceProfile_I2CDetails_t i2cDetails;
+    bmp280_params_t params;
+    bmp280_init_default_params(&params);
+    struct BME280_t *dev;
+    esp_err_t err;
+    
+    if (deviceProfileParserEntryGetI2CDetails(entry, &i2cDetails)){
+        ESP_LOGE(TAG, "Failed to get I2C details!");
+        return NOTIFICATIONS_ID_ERROR;
+    }
+    
+    if (addHumiditySensor(&bme, &sensorId)) {
+        return NOTIFICATIONS_ID_ERROR;
+    }
+
+    dev = bme280Devices;
+    memset(dev, 0, sizeof(struct BME280_t));
+    dev->sensor = bme;
+    err = bmp280_init_desc(&dev->dev, i2cDetails.addr, 0, i2cDetails.sda, i2cDetails.scl);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "addBME280: init desc failed! err = %d", err);
+        return NOTIFICATIONS_ID_ERROR;
+    }
+    err = bmp280_init(&dev->dev, &params);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "addBME280: init failed! err = %d", err);
+        return NOTIFICATIONS_ID_ERROR;
+    }
+    bme280Devices ++;
+    
+    bool bme280p = dev->dev.id == BME280_CHIP_ID;
+    ESP_LOGI(TAG, "addBME280: found %s\n", bme280p ? "BME280" : "BMP280");
+
+    if (bme280p) {
+        bme->element = iotNewElement(&htpElementDescription, bme, "humidity%d", sensorId);
+
+        value.s = bme->humidityStr;
+        iotElementPublish(bme->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
+        value.s = bme->temperatureStr;
+        iotElementPublish(bme->element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
+        strcpy(dev->pressureStr, "0.00");
+        value.s = dev->pressureStr;
+        iotElementPublish(bme->element, HUMIDITY_PUB_INDEX_PRESSURE, value);
+    } else {
+        bme->element = iotNewElement(&tpElementDescription, bme, "temperature%d", sensorId);
+
+        value.s = bme->temperatureStr;
+        iotElementPublish(bme->element, TEMPERATURE_PUB_INDEX_TEMPERATURE, value);
+        strcpy(dev->pressureStr, "0.00");
+        value.s = dev->pressureStr;
+        iotElementPublish(bme->element, TEMPERATURE_PUB_INDEX_PRESSURE, value);
+
+    }
+
+    bme->id = NOTIFICATIONS_MAKE_I2C_ID(i2cDetails.sda, i2cDetails.scl, i2cDetails.addr);
+    notificationsRegister(Notifications_Class_Pressure, bme->id, pressureUpdated, dev);
+    xTimerStart(xTimerCreate("bme", SECS_TO_TICKS(5), pdTRUE, dev, bme280MeasureTimer), 0);
+
+    return bme->id;
+}
+
+static void bme280MeasureTimer(TimerHandle_t xTimer) {
+    struct BME280_t *dev = pvTimerGetTimerID(xTimer);
+    int32_t temperature;
+    uint32_t humidity, pressure;
+    esp_err_t err;
+    Notifications_ID_t id = NOTIFICATIONS_MAKE_I2C_ID(dev->dev.i2c_dev.cfg.sda_io_num, dev->dev.i2c_dev.cfg.scl_io_num, dev->dev.i2c_dev.addr);
+    NotificationsData_t data;
+    err = bmp280_read_fixed(&dev->dev, &temperature, &pressure, &humidity);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "bme280MeasureTimer: Failed reading sensor %d", err);
+        return;
+    }
+    if (temperature != dev->lastTemperature) {
+        data.temperature = temperature;
+        dev->lastTemperature = temperature;
+        notificationsNotify(Notifications_Class_Temperature, id, &data);
+    }
+    if ((dev->dev.id == BME280_CHIP_ID) && (humidity != dev->lastHumidity)) {
+        data.humidity = (humidity * 100) / 1024;
+        dev->lastHumidity = humidity;
+        notificationsNotify(Notifications_Class_Humidity, id, &data);
+    }
+
+    if (pressure != dev->lastPressure) {
+        data.pressure = pressure / 256;
+        dev->lastPressure = pressure;
+        notificationsNotify(Notifications_Class_Pressure, id, &data);
+    }
+}
 
 static void temperatureUpdated(void *user,  NotificationsMessage_t *message) {
     uint32_t i;
     iotValue_t value;
 
-    for (i = 0; i < dht22Count; i ++) {
-        if (dht22Sensors[i].id == message->id){
+    for (i = 0; i < humiditySensorCount; i ++) {
+        if (humiditySensors[i].id == message->id){
             int16_t temperature = message->data.temperature;
-            char *str = dht22Sensors[i].temperatureStr;
+            char *str = humiditySensors[i].temperatureStr;
             if (temperature < 0) {
                 temperature *= -1;
                 str[0] = '-';
                 str++;
             }
-            sprintf(str, "%d.%d", temperature / 10, temperature % 10);
-            value.s = dht22Sensors[i].temperatureStr;
-            iotElementPublish(dht22Sensors[i].element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
+            sprintf(str, "%d.%02d", temperature / 100, temperature % 100);
+            ESP_LOGI(TAG, "Temperature Updated: 0x%08x %s", message->id, humiditySensors[i].temperatureStr);
+            value.s = humiditySensors[i].temperatureStr;
+            iotElementPublish(humiditySensors[i].element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
             break;
         }
     }
@@ -99,12 +236,47 @@ static void humidityUpdated(void *user,  NotificationsMessage_t *message) {
     uint32_t i;
     iotValue_t value;
 
-    for (i = 0; i < dht22Count; i ++) {
-        if (dht22Sensors[i].id == message->id){
-            sprintf(dht22Sensors[i].humidityStr, "%d.%d", message->data.humidity / 10, message->data.humidity % 10);
-            value.s = dht22Sensors[i].humidityStr;
-            iotElementPublish(dht22Sensors[i].element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
+    for (i = 0; i < humiditySensorCount; i ++) {
+        if (humiditySensors[i].id == message->id){
+            sprintf(humiditySensors[i].humidityStr, "%d.%02d", message->data.humidity / 100, message->data.humidity % 100);
+            ESP_LOGI(TAG, "Humidity Updated: 0x%08x %s", message->id, humiditySensors[i].humidityStr);
+            value.s = humiditySensors[i].humidityStr;
+            iotElementPublish(humiditySensors[i].element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
             break;
         }
     }
+}
+
+static void pressureUpdated(void *user, NotificationsMessage_t *message) {
+    iotValue_t value;
+    struct BME280_t *dev = user;
+    sprintf(dev->pressureStr, "%d.%02d", message->data.pressure / 100, message->data.pressure % 100);
+    value.s = dev->pressureStr;
+    ESP_LOGI(TAG, "Pressure Updated: 0x%08x %s", message->id, dev->pressureStr);
+    iotElementPublish(dev->sensor->element, (dev->dev.id == BME280_CHIP_ID) ? HUMIDITY_PUB_INDEX_PRESSURE: TEMPERATURE_PUB_INDEX_PRESSURE, value);
+}
+
+static int addHumiditySensor(struct HumiditySensor **sensor, uint32_t *sensorId) {
+    struct HumiditySensor *newSensor;
+    if (humiditySensors == NULL) {
+        humiditySensors = calloc(sizeof(struct HumiditySensor), nrofHumiditySensors);
+        if (humiditySensors == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate memory for humidity sensors");
+            return -1;
+        }
+        notificationsRegister(Notifications_Class_Temperature, NOTIFICATIONS_ID_ALL, temperatureUpdated, NULL);
+        notificationsRegister(Notifications_Class_Humidity, NOTIFICATIONS_ID_ALL, humidityUpdated, NULL);
+    }
+    if (humiditySensorCount >= nrofHumiditySensors){
+        ESP_LOGE(TAG, "All humidity sensors already allocated!");
+        return -1;
+    }
+    newSensor = &humiditySensors[humiditySensorCount];
+    newSensor->id = NOTIFICATIONS_ID_ERROR;
+    strcpy(newSensor->temperatureStr, "0.00");
+    strcpy(newSensor->humidityStr, "0.00");
+    *sensor = newSensor;
+    *sensorId = humiditySensorCount;
+    humiditySensorCount ++;
+    return 0;
 }

@@ -21,6 +21,7 @@
 static const char TAG[] = "profile";
 
 typedef int (*initFunc_t)(int);
+typedef Notifications_ID_t (*addFunc_t)(CborValue *); 
 
 static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
     initSwitches,
@@ -28,7 +29,16 @@ static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
     initDHT22,
     NULL,
     NULL,
+    initBME280,
+};
+
+static const addFunc_t addFuncs[DeviceProfile_EntryType_Max] = {
+    addSwitch,
     NULL,
+    addDHT22,
+    NULL,
+    NULL,
+    addBME280
 };
 
 int processProfile(void)
@@ -63,7 +73,8 @@ int processProfile(void)
     }
 
     for (i=DeviceProfile_EntryType_GPIOSwitch; i <DeviceProfile_EntryType_Max; i++) {
-        if (initFuncs[i] != NULL){
+        if ((initFuncs[i] != NULL) && (nrofEntryTypes[i] != 0)){
+            ESP_LOGI(TAG, "EntryType %d Count %d", i, nrofEntryTypes[i]);
             if (initFuncs[i](nrofEntryTypes[i])) {
                 goto error;
             }
@@ -83,19 +94,9 @@ int processProfile(void)
     /* Process sensors and switches */
     deviceProfileParseProfile(profile, profileLen, &parser);
     while(!deviceProfileParserNextEntry(&parser, &entry, &entryType)) {
-        Notifications_ID_t id = NOTIFICATIONS_ID_ERROR;
-        switch(entryType){
-            case DeviceProfile_EntryType_GPIOSwitch:
-                id = addSwitch(&entry);
-                break;
-            case DeviceProfile_EntryType_DHT22:
-                id = addDHT22(&entry);
-                break;
-
-            default:
-                break;
+        if ((entryType < DeviceProfile_EntryType_Max) && (addFuncs[entryType] != NULL)) {
+            ids[entryIndex] = addFuncs[entryType](&entry);
         }
-        ids[entryIndex] = id;
         entryIndex ++;
         deviceProfileParserCloseEntry(&parser, &entry);
     }

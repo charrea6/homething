@@ -233,7 +233,7 @@ static void dhtThread(void* pvParameters)
             if ((sensor->lastTemperature != temp) || lastNotSet)
             {
                 // Update temp callbacks
-                data.temperature = temp;
+                data.temperature = temp * 10;
                 notificationsNotify(Notifications_Class_Temperature, NOTIFICATIONS_MAKE_ID( DHT22, sensor->pin), &data);
                 
                 sensor->lastTemperature = temp;
@@ -241,7 +241,7 @@ static void dhtThread(void* pvParameters)
             if ((sensor->lastHumidity != hum) || lastNotSet)
             {
                 // Update humidity callbacks
-                data.humidity = hum;
+                data.humidity = hum * 10;
                 notificationsNotify(Notifications_Class_Humidity, NOTIFICATIONS_MAKE_ID( DHT22, sensor->pin), &data);
                 sensor->lastHumidity = hum;
             }

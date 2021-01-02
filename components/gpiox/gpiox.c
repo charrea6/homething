@@ -9,19 +9,22 @@
 #include "pcf8574.h"
 #include "gpiox.h"
 
-#define MAX_EXPANDERS 4
 
 static const char *TAG="GPIOX";
+
+#if CONFIG_GPIOX_EXPANDERS == 1
+#define MAX_EXPANDERS 4
+#define BASE_ADDR 0x20
 
 static uint8_t nrofExpanders = 0;
 static uint8_t expander_pin_settings[MAX_EXPANDERS] = {0};
 static i2c_dev_t expander_devices[MAX_EXPANDERS];
-
-#define BASE_ADDR 0x20
+#endif
 
 int gpioxInit(void)
 {
     int result = 0;
+#if CONFIG_GPIOX_EXPANDERS == 1    
     nvs_handle handle;
     uint8_t scl, sda;
 
@@ -59,27 +62,19 @@ int gpioxInit(void)
     }
     if ((nrofExpanders > 0) && (result == 0))
     {
-        err = i2cdev_init();
-        if (err == ESP_OK)
+        for (int i=0; i < nrofExpanders; i++)
         {
-            for (int i=0; i < nrofExpanders; i++)
+            memset(&expander_devices[i], 0, sizeof(i2c_dev_t));
+            err = pcf8574_init_desc(&expander_devices[i], 0, BASE_ADDR + i, sda, scl);
+            if (err != ESP_OK)
             {
-                memset(&expander_devices[i], 0, sizeof(i2c_dev_t));
-                err = pcf8574_init_desc(&expander_devices[i], 0, BASE_ADDR + i, sda, scl);
-                if (err != ESP_OK)
-                {
-                    ESP_LOGE(TAG, "Failed to create PCF8574 device for expander %d: %d", i, err);
-                    result = 1;
-                    break;
-                }
+                ESP_LOGE(TAG, "Failed to create PCF8574 device for expander %d: %d", i, err);
+                result = 1;
+                break;
             }
         }
-        else
-        {
-            ESP_LOGE(TAG, "Failed to init i2cdev: %d", err);
-            result = 1;
-        }
     }
+#endif
     return result;
 }
 
@@ -127,6 +122,7 @@ int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
             }
         }
     }
+#if CONFIG_GPIOX_EXPANDERS == 1
     if (nrofExpanders > 0)
     {
         if (pins->pins[1] != 0)
@@ -154,6 +150,7 @@ int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
             }
         }
     }
+#endif
     return 0;   
 }
 
@@ -175,7 +172,7 @@ int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
             }
         }
     }
-
+#if CONFIG_GPIOX_EXPANDERS == 1
     if (nrofExpanders > 0)
     {
         if (pins->pins[1] != 0)
@@ -193,6 +190,7 @@ int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
             }
         }
     }
+#endif
     return 0;
 }
 
@@ -210,6 +208,7 @@ int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
             }
         }
     }
+#if CONFIG_GPIOX_EXPANDERS == 1
     if (nrofExpanders > 0)
     {
         if (pins->pins[1] != 0)
@@ -228,5 +227,6 @@ int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
             }
         }
     }
+#endif
     return 0;
 }

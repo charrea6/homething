@@ -104,11 +104,11 @@ static void humidityFanUpdateHumidity(HumidityFan_t *fan, NotificationsMessage_t
     iotValue_t value;
     int32_t humidityTenths = message->data.humidity;
 
-    ESP_LOGI(TAG, "%d: Humidity %d (Threshold %d) Manual Mode %d", fan->id, (humidityTenths / 10), fan->threshold, fan->manualMode);
+    ESP_LOGI(TAG, "%d: Humidity %d (Threshold %d) Manual Mode %d", fan->id, (humidityTenths / 100), fan->threshold, fan->manualMode);
     fan->lastHumidity = humidityTenths;
     if (fan->manualMode == false)
     {
-        if ((humidityTenths / 10) >= fan->threshold)
+        if ((humidityTenths / 100) >= fan->threshold)
         {
             if (!fan->override && !relayIsOn(fan->relay))
             {
@@ -140,7 +140,7 @@ static void humidityFanUpdateHumidity(HumidityFan_t *fan, NotificationsMessage_t
             }
         }
     }
-    sprintf(fan->humidity, "%d.%d", humidityTenths / 10, humidityTenths % 10);
+    sprintf(fan->humidity, "%d.%02d", humidityTenths / 100, humidityTenths % 100);
     value.s = fan->humidity;
     iotElementPublish(fan->element, PUB_ID_HUMIDITY, value);
 }
