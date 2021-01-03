@@ -49,9 +49,15 @@ static int addHumiditySensor(struct HumiditySensor **sensor, uint32_t *sensorId)
 
 static void temperatureUpdated(void *user,  NotificationsMessage_t *message);
 static void humidityUpdated(void *user,  NotificationsMessage_t *message);
+
+#ifdef CONFIG_BME280
 static void pressureUpdated(void *user, NotificationsMessage_t *message);
 static void bme280MeasureTimer(TimerHandle_t xTimer);
+#endif
+
+#ifdef CONFIG_SI7021
 static void si7021MeasureTimer(TimerHandle_t xTimer);
+#endif
 
 static char const TAG[]="sensors";
 
@@ -84,9 +90,16 @@ static uint32_t nrofHumiditySensors = 0;
 static uint32_t humiditySensorCount = 0;
 
 static struct HumiditySensor *humiditySensors = NULL;
-static struct BME280_t *bme280Devices;
-static struct SI7021_t *si7021Devices;
 
+#ifdef CONFIG_BME280
+static struct BME280_t *bme280Devices;
+#endif
+
+#ifdef CONFIG_SI7021
+static struct SI7021_t *si7021Devices;
+#endif
+
+#ifdef CONFIG_DHT22
 int initDHT22(int nrofSensors) {
     nrofHumiditySensors += nrofSensors;
     return 0;
@@ -114,7 +127,9 @@ Notifications_ID_t addDHT22(CborValue *entry) {
     iotElementPublish(dht->element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
     return dht->id;
 }
+#endif
 
+#ifdef CONFIG_BME280
 int initBME280(int nrofSensors) {
     bme280Devices = calloc(nrofSensors, sizeof(struct BME280_t));
     if (bme280Devices == NULL) {
@@ -219,7 +234,9 @@ static void bme280MeasureTimer(TimerHandle_t xTimer) {
         notificationsNotify(Notifications_Class_Pressure, id, &data);
     }
 }
+#endif
 
+#ifdef CONFIG_SI7021
 int initSI7021(int nrofSensors) {
     si7021Devices = calloc(nrofSensors, sizeof(struct SI7021_t));
     if (si7021Devices == NULL) {
@@ -297,7 +314,7 @@ static void si7021MeasureTimer(TimerHandle_t xTimer) {
         dev->lastHumidity = humidity;
     }
 }
-
+#endif
 static void temperatureUpdated(void *user,  NotificationsMessage_t *message) {
     uint32_t i;
     iotValue_t value;
@@ -335,6 +352,7 @@ static void humidityUpdated(void *user,  NotificationsMessage_t *message) {
     }
 }
 
+#ifdef CONFIG_BME280
 static void pressureUpdated(void *user, NotificationsMessage_t *message) {
     iotValue_t value;
     struct BME280_t *dev = user;
@@ -343,6 +361,7 @@ static void pressureUpdated(void *user, NotificationsMessage_t *message) {
     ESP_LOGI(TAG, "Pressure Updated: 0x%08x %s", message->id, dev->pressureStr);
     iotElementPublish(dev->sensor->element, (dev->dev.id == BME280_CHIP_ID) ? HUMIDITY_PUB_INDEX_PRESSURE: TEMPERATURE_PUB_INDEX_PRESSURE, value);
 }
+#endif
 
 static int addHumiditySensor(struct HumiditySensor **sensor, uint32_t *sensorId) {
     struct HumiditySensor *newSensor;

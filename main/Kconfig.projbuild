@@ -3,6 +3,12 @@ menu "Thing Configuration"
 config DHT22
     bool "Enable DHT22 support"
 
+config BME280
+    bool "Enable BME280 (or BMP280) support"
+
+config SI7021
+    bool "Enable SI7021 support"
+
 config HUMIDISTAT
     bool "Enable Humidistat Fan support"
     

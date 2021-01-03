@@ -26,19 +26,43 @@ typedef Notifications_ID_t (*addFunc_t)(CborValue *);
 static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
     initSwitches,
     initRelays,
+#ifdef CONFIG_DHT22
     initDHT22,
-    initSI7021,
+#else
     NULL,
+#endif
+#ifdef CONFIG_SI7021    
+    initSI7021,
+#else
+    NULL,
+#endif
+    NULL,
+#ifdef CONFIG_BME280
     initBME280,
+#else
+    NULL,
+#endif
 };
 
 static const addFunc_t addFuncs[DeviceProfile_EntryType_Max] = {
     addSwitch,
     NULL,
+#ifdef CONFIG_DHT22
     addDHT22,
-    addSI7021,
+#else
     NULL,
+#endif
+#ifdef CONFIG_SI7021
+    addSI7021,
+#else
+    NULL,
+#endif
+    NULL,
+#ifdef CONFIG_BME280
     addBME280
+#else
+    NULL,
+#endif
 };
 
 int processProfile(void)

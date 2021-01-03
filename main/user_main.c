@@ -35,8 +35,9 @@ void app_main(void)
     settimeofday(&tv, NULL);
 
     ESP_ERROR_CHECK( nvs_flash_init() );
+#if defined(CONFIG_BME280) || defined(CONFIG_SI7021) || defined(CONFIG_GPIOX_EXPANDERS)
     ESP_ERROR_CHECK( i2cdev_init() );
-
+#endif
     notificationsInit();
     iotInit();
     provisioningInit();
