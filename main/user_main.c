@@ -18,8 +18,6 @@
 #include "i2cdev.h"
 #include "switch.h"
 #include "iot.h"
-#include "dht.h"
-#include "humidityfan.h"
 #include "updater.h"
 #include "gpiox.h"
 #include "notifications.h"
@@ -47,9 +45,6 @@ void app_main(void)
     
     updaterInit();
 
-#if defined(CONFIG_DHT22)
-    dht22Start();
-#endif
     switchStart();
     iotStart();
     provisioningStart();

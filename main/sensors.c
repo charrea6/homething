@@ -29,7 +29,14 @@ struct HumiditySensor {
     char humidityStr[8];
 };
 
-struct BME280_t {
+
+struct DHT22 {
+    int8_t pin;
+    int16_t lastTemperature;
+    int16_t lastHumidity;
+};
+
+struct BME280 {
     bmp280_t dev;
     struct HumiditySensor *sensor;
     char pressureStr[8];
@@ -38,7 +45,7 @@ struct BME280_t {
     uint32_t lastHumidity;
 };
 
-struct SI7021_t {
+struct SI7021 {
     i2c_dev_t dev;
     struct HumiditySensor *sensor;
     float lastTemperature;
@@ -49,6 +56,10 @@ static int addHumiditySensor(struct HumiditySensor **sensor, uint32_t *sensorId)
 
 static void temperatureUpdated(void *user,  NotificationsMessage_t *message);
 static void humidityUpdated(void *user,  NotificationsMessage_t *message);
+
+#ifdef CONFIG_DHT22
+static void dht22MeasureTimer(TimerHandle_t xTimer);
+#endif
 
 #ifdef CONFIG_BME280
 static void pressureUpdated(void *user, NotificationsMessage_t *message);
@@ -91,22 +102,33 @@ static uint32_t humiditySensorCount = 0;
 
 static struct HumiditySensor *humiditySensors = NULL;
 
+#ifdef CONFIG_DHT22
+static struct DHT22 *dht22Devies;
+#endif
+
 #ifdef CONFIG_BME280
-static struct BME280_t *bme280Devices;
+static struct BME280 *bme280Devices;
 #endif
 
 #ifdef CONFIG_SI7021
-static struct SI7021_t *si7021Devices;
+static struct SI7021 *si7021Devices;
 #endif
 
 #ifdef CONFIG_DHT22
 int initDHT22(int nrofSensors) {
+    dht22Devies = calloc(nrofSensors, sizeof(struct DHT22));
+    if (dht22Devies == NULL) {
+        return -1;
+    }
+
     nrofHumiditySensors += nrofSensors;
     return 0;
 }
 
 Notifications_ID_t addDHT22(CborValue *entry) {
     struct HumiditySensor *dht;
+    struct DHT22 *dev;
+    gpio_config_t config;
     iotValue_t value;
     uint32_t pin;
     uint32_t sensorId;
@@ -118,20 +140,56 @@ Notifications_ID_t addDHT22(CborValue *entry) {
     if (addHumiditySensor(&dht, &sensorId)){
         return NOTIFICATIONS_ID_ERROR;
     }
-    dht->id = dht22Add(pin);
+    dev = dht22Devies;
+    dht22Devies ++;
+    dev->pin = pin;
+    
+    config.pin_bit_mask = 1<<pin;
+    config.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    config.intr_type = GPIO_INTR_DISABLE;
+    config.mode = GPIO_MODE_INPUT;    
+    config.pull_up_en = GPIO_PULLUP_ENABLE;
+    gpio_config(&config);
+    
+    dht->id = NOTIFICATIONS_MAKE_ID(DHT22, dev->pin);
     dht->element = iotNewElement(&humidityElementDescription, dht, "humidity%d", sensorId);
 
     value.s = dht->humidityStr;
     iotElementPublish(dht->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
     value.s = dht->temperatureStr;
     iotElementPublish(dht->element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
+
+    xTimerStart(xTimerCreate("dht22", SECS_TO_TICKS(5), pdTRUE, dev, dht22MeasureTimer), 0);
     return dht->id;
+}
+
+static void dht22MeasureTimer(TimerHandle_t xTimer) {
+    struct DHT22 *dev = pvTimerGetTimerID(xTimer);
+    int16_t temperature, humidity;
+    Notifications_ID_t id = NOTIFICATIONS_MAKE_ID(DHT22, dev->pin);
+    NotificationsData_t data;
+    
+    if (dht_read_data(DHT_TYPE_AM2301, dev->pin, &humidity, &temperature) != ESP_OK) {
+        ESP_LOGE(TAG, "dht22MeasureTimer: Failed reading sensor pin %d", dev->pin);
+        return;
+    }
+    if (temperature != dev->lastTemperature) {
+        data.temperature = temperature * 10;
+        dev->lastTemperature = temperature;
+        notificationsNotify(Notifications_Class_Temperature, id, &data);
+    }
+    if (humidity != dev->lastHumidity) {
+        data.humidity = humidity * 10;
+        dev->lastHumidity = humidity;
+        notificationsNotify(Notifications_Class_Humidity, id, &data);
+    }
+
 }
 #endif
 
 #ifdef CONFIG_BME280
 int initBME280(int nrofSensors) {
-    bme280Devices = calloc(nrofSensors, sizeof(struct BME280_t));
+    bme280Devices = calloc(nrofSensors, sizeof(struct BME280));
     if (bme280Devices == NULL) {
         return -1;
     }
@@ -147,7 +205,7 @@ Notifications_ID_t addBME280(CborValue *entry) {
     DeviceProfile_I2CDetails_t i2cDetails;
     bmp280_params_t params;
     bmp280_init_default_params(&params);
-    struct BME280_t *dev;
+    struct BME280 *dev;
     esp_err_t err;
     
     if (deviceProfileParserEntryGetI2CDetails(entry, &i2cDetails)){
@@ -160,7 +218,7 @@ Notifications_ID_t addBME280(CborValue *entry) {
     }
 
     dev = bme280Devices;
-    memset(dev, 0, sizeof(struct BME280_t));
+    memset(dev, 0, sizeof(struct BME280));
     dev->sensor = bme;
     err = bmp280_init_desc(&dev->dev, i2cDetails.addr, 0, i2cDetails.sda, i2cDetails.scl);
     if (err != ESP_OK) {
@@ -206,7 +264,7 @@ Notifications_ID_t addBME280(CborValue *entry) {
 }
 
 static void bme280MeasureTimer(TimerHandle_t xTimer) {
-    struct BME280_t *dev = pvTimerGetTimerID(xTimer);
+    struct BME280 *dev = pvTimerGetTimerID(xTimer);
     int32_t temperature;
     uint32_t humidity, pressure;
     esp_err_t err;
@@ -238,7 +296,7 @@ static void bme280MeasureTimer(TimerHandle_t xTimer) {
 
 #ifdef CONFIG_SI7021
 int initSI7021(int nrofSensors) {
-    si7021Devices = calloc(nrofSensors, sizeof(struct SI7021_t));
+    si7021Devices = calloc(nrofSensors, sizeof(struct SI7021));
     if (si7021Devices == NULL) {
         return -1;
     }
@@ -252,7 +310,7 @@ Notifications_ID_t addSI7021(CborValue *entry) {
     iotValue_t value;
     uint32_t sensorId;
     DeviceProfile_I2CDetails_t i2cDetails;
-    struct SI7021_t *dev;
+    struct SI7021 *dev;
     esp_err_t err;
     
     if (deviceProfileParserEntryGetI2CDetails(entry, &i2cDetails)){
@@ -265,7 +323,7 @@ Notifications_ID_t addSI7021(CborValue *entry) {
     }
 
     dev = si7021Devices;
-    memset(dev, 0, sizeof(struct SI7021_t));
+    memset(dev, 0, sizeof(struct SI7021));
     dev->sensor = sensor;
     err = si7021_init_desc(&dev->dev, 0, i2cDetails.sda, i2cDetails.scl);
     if (err != ESP_OK) {
@@ -285,7 +343,7 @@ Notifications_ID_t addSI7021(CborValue *entry) {
 }
 
 static void si7021MeasureTimer(TimerHandle_t xTimer) {
-    struct SI7021_t *dev = pvTimerGetTimerID(xTimer);
+    struct SI7021 *dev = pvTimerGetTimerID(xTimer);
     esp_err_t err;
     float temperature, humidity;
     NotificationsData_t data;
@@ -355,7 +413,7 @@ static void humidityUpdated(void *user,  NotificationsMessage_t *message) {
 #ifdef CONFIG_BME280
 static void pressureUpdated(void *user, NotificationsMessage_t *message) {
     iotValue_t value;
-    struct BME280_t *dev = user;
+    struct BME280 *dev = user;
     sprintf(dev->pressureStr, "%d.%02d", message->data.pressure / 100, message->data.pressure % 100);
     value.s = dev->pressureStr;
     ESP_LOGI(TAG, "Pressure Updated: 0x%08x %s", message->id, dev->pressureStr);
