@@ -20,6 +20,7 @@
 
 #include "wifi.h"
 #include "sdkconfig.h"
+#include "notifications.h"
 
 #define UNIQ_NAME_PREFIX  "homething-"
 #define MAC_STR "%02x%02x%02x%02x%02x%02x"
@@ -90,6 +91,7 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
 {
     struct timeval tv;
     char hostname[UNIQ_NAME_LEN];
+    NotificationsData_t notification;
     esp_err_t err;
 
     gettimeofday(&tv, NULL);
@@ -113,6 +115,8 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
         if (connectionCallback != NULL) {
             connectionCallback(true);
         }
+        notification.connectionState = true;
+        notificationsNotify(Notifications_Class_Wifi, NOTIFICATIONS_ID_WIFI_STATION, &notification);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
@@ -122,6 +126,10 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
                 connectionCallback(false);
             }
             connected = false;
+            
+            notification.connectionState = false;
+            notificationsNotify(Notifications_Class_Wifi, NOTIFICATIONS_ID_WIFI_STATION, &notification);
+
             disconnectedSeconds = tv.tv_sec;
         } else {
             if ((disconnectedSeconds + SECS_BEFORE_AP) <= tv.tv_sec) {
@@ -183,6 +191,11 @@ void wifiSetSSID(char *ssid, char *password)
 const char* wifiGetIPAddrStr(void)
 {
     return ipAddr;
+}
+
+bool wifiIsConnected(void)
+{
+    return connected;
 }
 
 static void wifiSetupStation(void)

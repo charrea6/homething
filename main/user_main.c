@@ -21,8 +21,8 @@
 #include "updater.h"
 #include "gpiox.h"
 #include "notifications.h"
-
 #include "provisioning.h"
+#include "logging.h"
 #include "profile.h"
 
 static const char TAG[] = "main";
@@ -37,6 +37,7 @@ void app_main(void)
     ESP_ERROR_CHECK( i2cdev_init() );
 #endif
     notificationsInit();
+    loggingInit();
     iotInit();
     provisioningInit();
     gpioxInit();

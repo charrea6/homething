@@ -6,7 +6,8 @@
 
 
 typedef enum{
-    Notifications_Class_Switch = 0,
+    Notifications_Class_Wifi = 0,
+    Notifications_Class_Switch,
     Notifications_Class_Temperature,
     Notifications_Class_Humidity,
     Notifications_Class_Pressure,
@@ -18,6 +19,7 @@ typedef union {
     uint32_t pressure;  // hPa * 100
     int32_t temperature; // degrees C * 100
     bool switchState;
+    bool connectionState;
 } NotificationsData_t; 
 
 typedef struct {
@@ -33,6 +35,10 @@ typedef void (*NotificationsCallback_t)(void *user,  NotificationsMessage_t *mes
 #define NOTIFICATIONS_ID_GPIOSWITCH_BASE  0x00000000
 #define NOTIFICATIONS_ID_DHT22_BASE       0x00000000
 #define NOTIFICATIONS_ID_I2C_BASE         0x01000000
+
+#define NOTIFICATIONS_ID_WIFI_STATION     0x00000000
+#define NOTIFICATIONS_ID_WIFI_AP          0x00000001
+
 #define NOTIFICATIONS_ID_ALL              0xffffffff
 #define NOTIFICATIONS_ID_ERROR            0xffffffff
 

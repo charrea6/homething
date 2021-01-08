@@ -25,4 +25,10 @@ void wifiStart(void);
  * Return a pointer to a static string.
  */
 const char *wifiGetIPAddrStr(void);
+
+/**
+ * Used to determine if Wifi Station is connected to an access point and has an IP.
+ * Return true if connected, false otherwise.
+ */
+bool wifiIsConnected(void);
 #endif
