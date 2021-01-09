@@ -186,7 +186,7 @@ def process_files(files):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('paths', type=str, nargs='+')
-    parser.add_argument("--output", "-o", type=argparse.FileType('w'))
+    parser.add_argument("--output", "-o", type=str)
     parser.add_argument("--cache-dir", "-c", type=str)
 
     args = parser.parse_args()
@@ -194,6 +194,12 @@ if __name__ == '__main__':
         cache_dir = args.cache_dir
         os.makedirs(cache_dir, exist_ok=True)
 
+    if os.path.exists(args.output):
+        output_mod_time = os.path.getmtime(args.output)
+    else:
+        output_mod_time = 0
+    
+    modified = False
     static_files = []
     for path in args.paths:
         if os.path.isdir(path):
@@ -202,27 +208,33 @@ if __name__ == '__main__':
                 for name in files:
                     filepath = os.path.join(root, name)
                     filename = filepath[len(base_dir):]
+                    if os.path.getmtime(filepath) > output_mod_time:
+                        modified = True
                     static_files.append(StaticFile(filepath, filename))
         else:
             static_files.append(StaticFile(path, '/' + os.path.basename(path)))
     
+    if not modified:
+        sys.exit(0)
+
     static_files = process_files(static_files)
+    with open(args.output, 'w') as output:
 
-    print(f'/* AUTO GENERATED FILE! {datetime.datetime.now()} */', file=args.output)
-    print('#include "provisioning_int.h"', file=args.output)
+        print(f'/* AUTO GENERATED FILE! {datetime.datetime.now()} */', file=output)
+        print('#include "provisioning_int.h"', file=output)
 
-    for sf in static_files:
-        print(sf.generate_data_section(), file=args.output)
+        for sf in static_files:
+            print(sf.generate_data_section(), file=output)
 
-    print('static const httpd_uri_t static_file_urls[] = {', file=args.output)
-    for i, sf in enumerate(static_files):
-        print(sf.generate_url_handler(), end='', file=args.output)
-        if i +1 < len(static_files):
-            print(',', file=args.output)
-        
-    print('\n};', file=args.output)
+        print('static const httpd_uri_t static_file_urls[] = {', file=output)
+        for i, sf in enumerate(static_files):
+            print(sf.generate_url_handler(), end='', file=output)
+            if i +1 < len(static_files):
+                print(',', file=output)
+            
+        print('\n};', file=output)
 
-    print(f"""
+        print(f"""
 void provisioningRegisterStaticFileHandlers(httpd_handle_t server)
 {{
     int i;
@@ -230,5 +242,5 @@ void provisioningRegisterStaticFileHandlers(httpd_handle_t server)
         httpd_register_uri_handler(server, &static_file_urls[i]);
     }}
 }}
-""", file=args.output)
+""", file=output)
 

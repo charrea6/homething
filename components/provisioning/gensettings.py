@@ -1,3 +1,4 @@
+import os
 import yaml
 try:
     from yaml import CLoader as Loader
@@ -54,6 +55,13 @@ if __name__ == '__main__':
     yaml_file = sys.argv[1]
     c_file = sys.argv[2]
     js_file = sys.argv[3]
+
+    yaml_file_last_mod = os.path.getmtime(yaml_file)
+    if os.path.exists(c_file) and os.path.exists(js_file):
+        c_file_last_mod = os.path.getmtime(c_file)
+        js_file_last_mod = os.path.getmtime(js_file)
+        if yaml_file_last_mod < c_file_last_mod and yaml_file_last_mod < js_file_last_mod:
+            sys.exit(0)
 
     data = load_settings(yaml_file)
 
