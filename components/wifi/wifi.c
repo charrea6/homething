@@ -21,6 +21,7 @@
 #include "wifi.h"
 #include "sdkconfig.h"
 #include "notifications.h"
+#include "utils.h"
 
 #define UNIQ_NAME_PREFIX  "homething-"
 #define MAC_STR "%02x%02x%02x%02x%02x%02x"
@@ -34,8 +35,8 @@
 
 static const char *TAG="WIFI";
 
-static char wifiSsid[MAX_LENGTH_WIFI_NAME];
-static char wifiPassword[MAX_LENGTH_WIFI_PASSWORD];
+static char *wifiSsid = NULL;
+static char *wifiPassword = NULL;
 static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 static bool connected = false;
 static time_t disconnectedSeconds = 0;
@@ -58,18 +59,15 @@ int wifiInit(WifiConnectionCallback_t callback)
     connectionCallback = callback;
 
     sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
-    wifiSsid[0] = 0;
-    wifiPassword[0] = 0;
     err = nvs_open("wifi", NVS_READONLY, &handle);
     if (err == ESP_OK)
     {
-        size_t len = sizeof(wifiSsid);
-        if (nvs_get_str(handle, "ssid", wifiSsid, &len) == ESP_OK)
+        if (nvs_get_str_alloc(handle, "ssid", &wifiSsid) == ESP_OK)
         {
-            len = sizeof(wifiPassword);
-            if (nvs_get_str(handle, "pass", wifiPassword, &len) != ESP_OK)
+            if (nvs_get_str_alloc(handle, "pass", &wifiPassword) != ESP_OK)
             {
-                wifiSsid[0] = 0;
+                free(wifiSsid);
+                wifiSsid = NULL;
             }
         }
         nvs_close(handle);
@@ -162,7 +160,7 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
 
 void wifiStart(void)
 {
-    if (wifiSsid[0])
+    if (wifiSsid != NULL)
     {
         wifiSetupStation();
     }
@@ -172,20 +170,6 @@ void wifiStart(void)
     }
 
     ESP_ERROR_CHECK( esp_wifi_start() );
-}
-
-void wifiSetSSID(char *ssid, char *password)
-{
-    wifi_mode_t mode;
-    strcpy(wifiSsid, ssid);
-    strcpy(wifiPassword, password);
-
-    ESP_ERROR_CHECK( esp_wifi_get_mode(&mode) );
-    wifiSetupStation();
-    if (mode == WIFI_MODE_STA)
-    {
-        ESP_ERROR_CHECK( esp_wifi_disconnect());
-    }
 }
 
 const char* wifiGetIPAddrStr(void)

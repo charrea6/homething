@@ -15,6 +15,7 @@
 #include "wifi.h"
 #include "logging.h"
 #include "notifications.h"
+#include "utils.h"
 
 #define ESP_RETURN_ON_ERR(expr) do { esp_err_t err = expr; if (err != ESP_OK) { ESP_LOGE(TAG, #expr " failed with error %d", err); return -1;}}while(0)
 
@@ -56,7 +57,6 @@ static SemaphoreHandle_t *loggingMutex;
 int loggingInit(){
     nvs_handle handle;
     esp_err_t err;
-    size_t len = 0;
     uint8_t enabled = 0;
     int i;
 
@@ -64,31 +64,17 @@ int loggingInit(){
 
     if ((nvs_get_u8(handle, "enable", &enabled) == ESP_OK) && enabled) {
         
-        if (nvs_get_str(handle, "host", NULL, &len) == ESP_OK) {
-            if (len > 256) {
-                ESP_LOGE(TAG, "Hostname too large");
-                goto error;
-            }
-            
-            loggingHost = malloc(len);
-            if (loggingHost == NULL) {
-                ESP_LOGE(TAG, "Failed to allocate memory for hostname");
-                goto error;
-            }
-            
-            if (nvs_get_str(handle, "host", loggingHost, &len) != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to read hostname");
-                goto error;
-            }
-
-            uint16_t p;
-            err = nvs_get_u16(handle, "port", &p);
-            if (err == ESP_OK) {   
-                loggingPort = (int) p;
-            } else {
-                loggingPort = 5555;
-            }
+        if (nvs_get_str_alloc(handle, "host", &loggingHost) != ESP_OK) {
+            goto error;
         }
+        uint16_t p;
+        err = nvs_get_u16(handle, "port", &p);
+        if (err == ESP_OK) {   
+            loggingPort = (int) p;
+        } else {
+            loggingPort = 5555;
+        }
+    
 
         buffers = calloc(NROF_BUFFERS, sizeof(struct Buffer));
         if (buffers == NULL) {

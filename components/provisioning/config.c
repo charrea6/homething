@@ -12,6 +12,7 @@
 
 #include "wifi.h"
 #include "iot.h"
+#include "utils.h"
 
 #include "cbor.h"
 
@@ -371,21 +372,10 @@ static bool getVariables(nvs_handle handle, struct setting *setting, CborEncoder
             case FT_USERNAME:
             case FT_HOSTNAME: {
                 char *value;
-                size_t length = 0;
-                err = nvs_get_str(handle, var->name, NULL, &length);
+                
+                err = nvs_get_str_alloc(handle, var->name, &value);
                 if (err == ESP_OK) {
-                    value = malloc(length);
-                    if (value == NULL) {
-                        err = ESP_ERR_NO_MEM;
-                        break;
-                    }
-                    err = nvs_get_str(handle, var->name, value, &length);
-                    if (err == ESP_OK) {
-                        /* nvs includes the \0 in the length which we don't want for cbor,
-                           use strlen to find the true lenght of the string.
-                        */
-                        cborErr = cbor_encode_text_string(encoder, value, strlen(value));
-                    }
+                    cborErr = cbor_encode_text_string(encoder, value, strlen(value));
                     free(value);
                 }
             }

@@ -6,10 +6,10 @@
 
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "utils.h"
 
 #include "deviceprofile.h"
 
-#define ESP_RETURN_ON_ERR(expr) do { esp_err_t err = expr; if (err != ESP_OK) { ESP_LOGE(TAG, #expr " failed with error %d", err); return -1;}}while(0)
 #define SUPPORTED_VERSION 1
 
 static const char TAG[] = "devprofile";
@@ -22,20 +22,23 @@ static int nextUint32(CborValue *it, uint32_t *result);
 
 int deviceProfileGetProfile(uint8_t **profile, size_t *profileLen) {
     nvs_handle handle;
+    esp_err_t err;
     if (deviceProfile == NULL) {
-        ESP_RETURN_ON_ERR(nvs_open(THING, NVS_READONLY, &handle));
-
-        ESP_RETURN_ON_ERR( nvs_get_blob(handle, PROFILE, NULL, &deviceProfileLen) );
-        deviceProfile = malloc(deviceProfileLen);
-        if (deviceProfile == NULL)
-        {  
-            printf("Failed to allocate memory for profile string (%d bytes required)\n", *profileLen);
+        err = nvs_open(THING, NVS_READONLY, &handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to open thing section, err %d", err);
             return -1;
         }
 
-        ESP_RETURN_ON_ERR( nvs_get_blob(handle, PROFILE, deviceProfile, &deviceProfileLen) );
+        err = nvs_get_blob_alloc(handle, PROFILE, (void**)&deviceProfile, &deviceProfileLen);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to read device profile, err %d", err);
+        }
 
         nvs_close(handle);
+        if (err!= ESP_OK){
+            return -1;
+        }
     }
     *profile = deviceProfile;
     *profileLen = deviceProfileLen;
@@ -44,11 +47,20 @@ int deviceProfileGetProfile(uint8_t **profile, size_t *profileLen) {
 
 int deviceProfileSetProfile(const uint8_t *profile, size_t profileLen) {
     nvs_handle handle;
-    
-    ESP_RETURN_ON_ERR(nvs_open(THING, NVS_READWRITE, &handle));
-    ESP_RETURN_ON_ERR(nvs_set_blob(handle, PROFILE, profile, profileLen));
+    esp_err_t err;
+    int ret = 0;
+    err = nvs_open(THING, NVS_READWRITE, &handle);
+    if (err == ESP_OK){
+        ESP_LOGE(TAG, "Failed to open thing section, err %d", err);
+        return -1;
+    }
+    err = nvs_set_blob(handle, PROFILE, profile, profileLen);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set profile blob, err %d", err);
+        ret = -1;
+    }
     nvs_close(handle);
-    return 0;
+    return ret;
 }
 
 int deviceProfileValidateProfile(const uint8_t *profile, size_t profileLen) {
