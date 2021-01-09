@@ -86,7 +86,7 @@ Notifications_ID_t addSwitch(CborValue *entry) {
     id = switchAdd(pin);
     switches[switchCount].id = id;
     switches[switchCount].type = type;
-    switches[switchCount].element = iotNewElement(&elementDescription, NULL, switchTypes[type], switchTypeCounts[type]);
+    switches[switchCount].element = iotNewElement(&elementDescription, 0, NULL, switchTypes[type], switchTypeCounts[type]);
     switchTypeCounts[type]++;
     switchCount++;
     return id;

@@ -152,7 +152,7 @@ Notifications_ID_t addDHT22(CborValue *entry) {
     gpio_config(&config);
     
     dht->id = NOTIFICATIONS_MAKE_ID(DHT22, dev->pin);
-    dht->element = iotNewElement(&humidityElementDescription, dht, "humidity%d", sensorId);
+    dht->element = iotNewElement(&humidityElementDescription, 0, dht, "humidity%d", sensorId);
 
     value.s = dht->humidityStr;
     iotElementPublish(dht->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
@@ -236,7 +236,7 @@ Notifications_ID_t addBME280(CborValue *entry) {
     ESP_LOGI(TAG, "addBME280: found %s\n", bme280p ? "BME280" : "BMP280");
 
     if (bme280p) {
-        bme->element = iotNewElement(&htpElementDescription, bme, "humidity%d", sensorId);
+        bme->element = iotNewElement(&htpElementDescription, 0, bme, "humidity%d", sensorId);
 
         value.s = bme->humidityStr;
         iotElementPublish(bme->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
@@ -246,7 +246,7 @@ Notifications_ID_t addBME280(CborValue *entry) {
         value.s = dev->pressureStr;
         iotElementPublish(bme->element, HUMIDITY_PUB_INDEX_PRESSURE, value);
     } else {
-        bme->element = iotNewElement(&tpElementDescription, bme, "temperature%d", sensorId);
+        bme->element = iotNewElement(&tpElementDescription, 0, bme, "temperature%d", sensorId);
 
         value.s = bme->temperatureStr;
         iotElementPublish(bme->element, TEMPERATURE_PUB_INDEX_TEMPERATURE, value);
@@ -332,7 +332,7 @@ Notifications_ID_t addSI7021(CborValue *entry) {
     }
     si7021Devices++;
 
-    sensor->element = iotNewElement(&humidityElementDescription, sensor, "humidity%d", sensorId);
+    sensor->element = iotNewElement(&humidityElementDescription, 0, sensor, "humidity%d", sensorId);
     value.s = sensor->humidityStr;
     iotElementPublish(sensor->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
     value.s = sensor->temperatureStr;

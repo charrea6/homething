@@ -76,6 +76,8 @@ typedef struct iotElementDescription {
         .nrofSubs= 0\
         }
 
+#define IOT_ELEMENT_FLAGS_DONT_ANNOUNCE 1
+
 /** Initialse the IOT subsystem.
  * This needs to be done before you can add Elements and Pub/Sub items.
  */
@@ -90,7 +92,7 @@ int iotInit(void);
  */
 void iotStart();
 
-iotElement_t iotNewElement(const iotElementDescription_t *desc, void *userContext, const char const *nameFormat, ...);
+iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, void *userContext, const char const *nameFormat, ...);
 
 void iotElementPublish(iotElement_t element, int pubId, iotValue_t value);
 

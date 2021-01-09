@@ -30,7 +30,7 @@ void relayInit(uint8_t id, uint8_t pin, uint8_t onLevel, Relay_t *relay) {
     relay->u.fields.onLevel = onLevel & 1;
     relaySetState(relay, false);
 
-    relay->element = iotNewElement(&elementDescription, relay, "relay%d", id);
+    relay->element = iotNewElement(&elementDescription, 0, relay, "relay%d", id);
 }
 
 void relaySetState(Relay_t *relay, bool on) {

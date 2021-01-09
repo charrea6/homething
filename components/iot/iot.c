@@ -19,6 +19,7 @@
 #include "tcpip_adapter.h"
 
 #include "mqtt_client.h"
+#include "cbor.h"
 
 #include "iot.h"
 #include "wifi.h"
@@ -74,6 +75,7 @@ static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 #define VT_IS_RETAINED(type) ((type & 0x80) == 0x80) ? 1:0
 struct iotElement {
     const iotElementDescription_t *desc;
+    uint32_t flags;
     char *name;
     void *userContext;
     struct iotElement *next;
@@ -87,7 +89,8 @@ static iotElement_t elementsHead = NULL;
 #define DEVICE_PUB_INDEX_MEM_FREE   2
 #define DEVICE_PUB_INDEX_MEM_LOW    3
 #define DEVICE_PUB_INDEX_PROFILE    4
-#define DEVICE_PUB_INDEX_TASK_STATS 5
+#define DEVICE_PUB_INDEX_TOPICS     5
+#define DEVICE_PUB_INDEX_TASK_STATS 6
 
 static iotElement_t deviceElement;
 
@@ -109,6 +112,7 @@ static char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
 static char mqttCommonCtrlSub[MQTT_COMMON_CTRL_SUB_LEN];
 
 static iotBinaryValue_t deviceProfileBinaryValue;
+static iotBinaryValue_t announcedTopicsBinaryValue;
 
 static void mqttMessageArrived(char *mqttTopic, int mqttTopicLen, char *data, int dataLen);
 static void mqttStart(void);
@@ -124,6 +128,7 @@ static void iotUpdateTaskStats(TimerHandle_t xTimer);
 #endif
 static void iotWifiConnectionStatus(bool connected);
 static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value);
+static void iotUpdateAnnouncedTopics(void);
 
 #ifdef CONFIG_CONNECTION_LED
 
@@ -150,7 +155,8 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "ip"),
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memFree"),
         IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memLow"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "profile")
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "profile"),
+        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "topics")
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
         , IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "taskStats")
 #endif
@@ -189,13 +195,16 @@ int iotInit(void)
     sprintf(mqttCommonCtrlSub, "%s/+/%s", mqttPathPrefix, IOT_DEFAULT_CONTROL_STR);
 
     ESP_LOGI(TAG, "Initialised IOT - device path: %s", mqttPathPrefix);
-    deviceElement = iotNewElement(&deviceElementDescription, NULL, "device");
+    deviceElement = iotNewElement(&deviceElementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE, NULL, "device");
     iotUpdateMemoryStats();
     if (deviceProfileGetProfile(&deviceProfileBinaryValue.data, (size_t*)&deviceProfileBinaryValue.len) == 0){
         iotValue_t value;
         value.bin = &deviceProfileBinaryValue;
         iotElementPublish(deviceElement, DEVICE_PUB_INDEX_PROFILE, value);
     }
+    announcedTopicsBinaryValue.data = NULL;
+    announcedTopicsBinaryValue.len = 0;
+
     err = nvs_open("mqtt", NVS_READONLY, &handle);
     if (err == ESP_OK)
     {
@@ -246,7 +255,7 @@ void iotStart()
 #endif
 }
 
-iotElement_t iotNewElement(const iotElementDescription_t *desc, void *userContext, const char const *nameFormat, ...)
+iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, void *userContext, const char const *nameFormat, ...)
 {
     va_list args;
     struct iotElement *newElement = malloc(sizeof(struct iotElement) + (sizeof(iotValue_t) * desc->nrofPubs));
@@ -264,6 +273,7 @@ iotElement_t iotNewElement(const iotElementDescription_t *desc, void *userContex
     va_end(args);
     memset(&newElement->values, 0, sizeof(iotValue_t) * desc->nrofPubs);
     newElement->desc = desc;
+    newElement->flags = flags;
     newElement->userContext = userContext;
     newElement->next = elementsHead;
     elementsHead = newElement;
@@ -640,12 +650,165 @@ static void iotWifiConnectionStatus(bool connected)
     {
         if (connected)
         {
+            if (announcedTopicsBinaryValue.data == NULL){
+                iotUpdateAnnouncedTopics();
+            }
             esp_mqtt_client_start(mqttClient);
         }
         else
         {
             esp_mqtt_client_stop(mqttClient);
         }
+    }
+}
+
+static void iotUpdateAnnouncedTopics(void)
+{
+    int i, nrofElements = 0;
+    iotElement_t element = elementsHead;
+    iotElementDescription_t const **descriptions;
+    size_t descriptionsEstimate = 0, elementsEstimate = 0, totalEstimate;
+    int nrofDescriptions = 0;
+    uint8_t *buffer = NULL;
+    CborEncoder encoder, deArrayEncoder, deMapEncoder;
+
+    for (element = elementsHead; element; element = element->next) {
+        if ((element->flags & IOT_ELEMENT_FLAGS_DONT_ANNOUNCE) != 0){
+            continue;
+        }
+        nrofElements++;
+        // String length + 2 bytes for CBOR encoding of string + 5 bytes for description id
+        elementsEstimate += strlen(element->name) + 2 + 5;
+    } 
+
+    descriptions = calloc(nrofElements, sizeof(iotElementDescription_t *));
+    if (descriptions == NULL) {
+        ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for descriptions");
+        return;
+    }
+
+    for (element = elementsHead; element; element = element->next){
+        if ((element->flags & IOT_ELEMENT_FLAGS_DONT_ANNOUNCE) != 0){
+            continue;
+        }
+
+        bool found = false;
+        size_t estimate = 1 + 2; // 1 byte for array of pubs and subs + 2 for pubs map
+        for (i = 0; i < nrofDescriptions; i++) {
+            if (descriptions[i] == element->desc) {
+                found = true;
+                break;
+            }
+        }
+        if (found) {
+            continue;
+        }
+        descriptions[nrofDescriptions] = element->desc;
+        nrofDescriptions ++;
+
+        if (element->desc->nrofPubs > 255) {
+            ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many pubs for %s", element->name);
+            goto error;
+        }
+        for (i = 0; i < element->desc->nrofPubs; i++) {
+            // String length + 2 bytes for CBOR encoding of string + 1 byte for type 
+            estimate += strlen(PUB_GET_NAME(element, i)) + 2 + 1;
+        }
+
+        estimate += 2; // for subs map
+        if (element->desc->nrofSubs) {
+            if (element->desc->nrofSubs > 256) {
+                ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many subs for %s", element->name);
+                goto error;
+            }
+            for (i = 0; i < element->desc->nrofSubs; i++) {
+                const char *name;
+                if (element->desc->subs[i].type_name[SUB_INDEX_NAME] == 0) {
+                    name = IOT_DEFAULT_CONTROL_STR;
+                } else {
+                    name = SUB_GET_NAME(element, i);
+                } 
+                // String length + 2 bytes for CBOR encoding of string + 1 byte for type 
+                estimate += strlen(name) + 2 + 1;
+            }
+        }
+
+        // Description array + 5 bytes for CBOR encoding of description id (the ptr value of element->desc)
+        descriptionsEstimate += estimate + 5;
+    }
+    totalEstimate = descriptionsEstimate + elementsEstimate + 1;
+    buffer = malloc(totalEstimate);
+    if (!buffer) {
+        ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Failed to allocate buffer");
+        goto error;
+    }
+    cbor_encoder_init(&encoder, buffer, totalEstimate, 0);
+    
+    #define CHECK_CBOR_ERROR(call, message) do{ CborError err = call; if (err != CborNoError){ ESP_LOGE(TAG, message ", error %d", err); goto error;} }while(0) 
+
+    CHECK_CBOR_ERROR(cbor_encoder_create_array(&encoder, &deArrayEncoder, 2), "Failed to create descriptions/elements array");
+
+    // Encode descriptions: { description ptr: { topic name: type... } ..}
+    CHECK_CBOR_ERROR(cbor_encoder_create_map(&deArrayEncoder, &deMapEncoder, nrofDescriptions), "Failed to create descriptions map");
+    for (i = 0; i < nrofDescriptions; i++){
+        CborEncoder descriptionArrayEncoder, psMapEncoder;
+        int psIndex;
+        CHECK_CBOR_ERROR(cbor_encode_uint(&deMapEncoder, (uint32_t)descriptions[i]), "encode failed for description key");
+        CHECK_CBOR_ERROR(cbor_encoder_create_array(&deMapEncoder, &descriptionArrayEncoder, 2), "Failed to create description array");
+        
+        CHECK_CBOR_ERROR(cbor_encoder_create_map(&descriptionArrayEncoder, &psMapEncoder, descriptions[i]->nrofPubs), "Failed to create pubs map");
+        for (psIndex = 0; psIndex < descriptions[i]->nrofPubs; psIndex++){
+            CHECK_CBOR_ERROR(cbor_encode_text_stringz(&psMapEncoder, &descriptions[i]->pubs[psIndex][PUB_INDEX_NAME]), "encode failed for element name");
+            CHECK_CBOR_ERROR(cbor_encode_uint(&psMapEncoder, (uint32_t)VT_BARE_TYPE(descriptions[i]->pubs[psIndex][PUB_INDEX_TYPE])), "encode failed for element type");
+
+        }
+        CHECK_CBOR_ERROR(cbor_encoder_close_container(&descriptionArrayEncoder, &psMapEncoder), "Failed to close pubs map");
+        
+        CHECK_CBOR_ERROR(cbor_encoder_create_map(&descriptionArrayEncoder, &psMapEncoder, descriptions[i]->nrofSubs), "Failed to create subs map");
+        for (psIndex = 0; psIndex < descriptions[i]->nrofSubs; psIndex++){
+            const char *name;
+            if (descriptions[i]->subs[psIndex].type_name[SUB_INDEX_NAME] == 0) {
+                name = IOT_DEFAULT_CONTROL_STR;
+            } else {
+                name = &descriptions[i]->subs[psIndex].type_name[SUB_INDEX_NAME];
+            } 
+            CHECK_CBOR_ERROR(cbor_encode_text_stringz(&psMapEncoder, name), "encode failed for element name");
+            CHECK_CBOR_ERROR(cbor_encode_uint(&psMapEncoder, (uint32_t)VT_BARE_TYPE(descriptions[i]->subs[psIndex].type_name[SUB_INDEX_TYPE])), "encode failed for element description");    
+        }
+        CHECK_CBOR_ERROR(cbor_encoder_close_container(&descriptionArrayEncoder, &psMapEncoder), "Failed to close subs map");
+
+        CHECK_CBOR_ERROR(cbor_encoder_close_container(&deMapEncoder, &descriptionArrayEncoder), "Failed to close description array");
+
+    }
+    CHECK_CBOR_ERROR(cbor_encoder_close_container(&deArrayEncoder, &deMapEncoder), "Failed to close descriptions map");
+
+    // Encode elements: { element name: description ptr ...}
+    CHECK_CBOR_ERROR(cbor_encoder_create_map(&deArrayEncoder, &deMapEncoder, nrofElements), "Failed to create elements map");
+    for (element = elementsHead; element; element = element->next){
+        if ((element->flags & IOT_ELEMENT_FLAGS_DONT_ANNOUNCE) != 0){
+            continue;
+        }
+
+        CHECK_CBOR_ERROR(cbor_encode_text_stringz(&deMapEncoder, element->name), "encode failed for element name");
+        CHECK_CBOR_ERROR(cbor_encode_uint(&deMapEncoder, (uint32_t)element->desc), "encode failed for element description");
+    }
+    CHECK_CBOR_ERROR(cbor_encoder_close_container(&deArrayEncoder, &deMapEncoder), "Failed to close elements map");
+ 
+    CHECK_CBOR_ERROR(cbor_encoder_close_container(&encoder, &deArrayEncoder), "Failed to close descriptions/elements array");
+    announcedTopicsBinaryValue.data = buffer;
+    announcedTopicsBinaryValue.len = cbor_encoder_get_buffer_size(&encoder, buffer);
+    
+    iotValue_t value;
+    value.bin = &announcedTopicsBinaryValue;
+    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_TOPICS, value);
+    buffer = NULL;
+
+error:
+    if (descriptions) {
+        free(descriptions);
+    }
+    if (buffer) {
+        free(buffer);
     }
 }
 

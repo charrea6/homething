@@ -133,7 +133,7 @@ void updaterInit()
 {
     iotValue_t value;
     ESP_LOGI(TAG, "Updater initialised, Version: %s Capabilities: %s", appVersion, capabilities);
-    updaterElement = iotNewElement(&elementDescription, NULL, "sw");
+    updaterElement = iotNewElement(&elementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE, NULL, "sw");
     value.s = appVersion;
     iotElementPublish(updaterElement, PUB_INDEX_VERSION, value);
 

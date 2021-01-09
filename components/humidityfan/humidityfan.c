@@ -61,7 +61,7 @@ void humidityFanInit(HumidityFan_t *fan, Relay_t *relay, Notifications_ID_t humi
     sprintf(fan->humidity, "0.0");
     fan->relay = relay;
 
-    fan->element = iotNewElement(&elementDescription, fan, "fan%d", fanCount);
+    fan->element = iotNewElement(&elementDescription, 0, fan, "fan%d", fanCount);
     fanCount ++;
 
     value.i = relayId(relay);
