@@ -203,7 +203,9 @@ if __name__ == '__main__':
     static_files = []
     for path in args.paths:
         if os.path.isdir(path):
-            base_dir = os.path.abspath(path)        
+            base_dir = os.path.abspath(path)
+            if os.path.getmtime(base_dir) > output_mod_time:
+                modified = True
             for root, dirs, files in os.walk(base_dir):
                 for name in files:
                     filepath = os.path.join(root, name)
@@ -212,6 +214,8 @@ if __name__ == '__main__':
                         modified = True
                     static_files.append(StaticFile(filepath, filename))
         else:
+            if os.path.getmtime(path) > output_mod_time:
+                modified = True
             static_files.append(StaticFile(path, '/' + os.path.basename(path)))
     
     if not modified:
