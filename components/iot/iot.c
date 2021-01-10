@@ -662,12 +662,28 @@ static void iotWifiConnectionStatus(bool connected)
     }
 }
 
+static size_t get_cbor_str_requirement(const char *str) {
+    size_t len = strlen(str);
+    size_t req = len + 1;
+    if (len > 23) {
+        req++;
+        if (len > 255) {
+            req++;
+            if (len > 0xffff) {
+                ESP_LOGE(TAG, "get_cbor_str_requirement: Very large string! len %u", len);
+                req += 2;
+            }
+        }
+    }
+    return req;
+}
+
 static void iotUpdateAnnouncedTopics(void)
 {
     int i, nrofElements = 0;
     iotElement_t element = elementsHead;
     iotElementDescription_t const **descriptions;
-    size_t descriptionsEstimate = 0, elementsEstimate = 0, totalEstimate;
+    size_t descriptionsEstimate = 1, elementsEstimate = 1, totalEstimate;
     int nrofDescriptions = 0;
     uint8_t *buffer = NULL;
     CborEncoder encoder, deArrayEncoder, deMapEncoder;
@@ -678,7 +694,7 @@ static void iotUpdateAnnouncedTopics(void)
         }
         nrofElements++;
         // String length + 2 bytes for CBOR encoding of string + 5 bytes for description id
-        elementsEstimate += strlen(element->name) + 2 + 5;
+        elementsEstimate += get_cbor_str_requirement(element->name) + 5;
     } 
 
     descriptions = calloc(nrofElements, sizeof(iotElementDescription_t *));
@@ -693,7 +709,7 @@ static void iotUpdateAnnouncedTopics(void)
         }
 
         bool found = false;
-        size_t estimate = 1 + 2; // 1 byte for array of pubs and subs + 2 for pubs map
+        size_t estimate = 1 + 1; // 1 byte for array of pubs and subs + 2 for pubs map
         for (i = 0; i < nrofDescriptions; i++) {
             if (descriptions[i] == element->desc) {
                 found = true;
@@ -706,20 +722,27 @@ static void iotUpdateAnnouncedTopics(void)
         descriptions[nrofDescriptions] = element->desc;
         nrofDescriptions ++;
 
-        if (element->desc->nrofPubs > 255) {
-            ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many pubs for %s", element->name);
-            goto error;
+        if (element->desc->nrofPubs > 23){
+            estimate++;
+            if (element->desc->nrofPubs > 255) {
+                ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many pubs for %s", element->name);
+                goto error;
+            }
         }
+        
         for (i = 0; i < element->desc->nrofPubs; i++) {
             // String length + 2 bytes for CBOR encoding of string + 1 byte for type 
-            estimate += strlen(PUB_GET_NAME(element, i)) + 2 + 1;
+            estimate += get_cbor_str_requirement(PUB_GET_NAME(element, i)) + 1;
         }
 
-        estimate += 2; // for subs map
+        estimate += 1; // for subs map
         if (element->desc->nrofSubs) {
-            if (element->desc->nrofSubs > 256) {
-                ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many subs for %s", element->name);
-                goto error;
+            if (element->desc->nrofSubs > 23) {
+                estimate += 1;
+                if (element->desc->nrofSubs > 256) {
+                    ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many subs for %s", element->name);
+                    goto error;
+                }
             }
             for (i = 0; i < element->desc->nrofSubs; i++) {
                 const char *name;
@@ -729,7 +752,7 @@ static void iotUpdateAnnouncedTopics(void)
                     name = SUB_GET_NAME(element, i);
                 } 
                 // String length + 2 bytes for CBOR encoding of string + 1 byte for type 
-                estimate += strlen(name) + 2 + 1;
+                estimate += get_cbor_str_requirement(name) + 1;
             }
         }
 
@@ -797,7 +820,7 @@ static void iotUpdateAnnouncedTopics(void)
     CHECK_CBOR_ERROR(cbor_encoder_close_container(&encoder, &deArrayEncoder), "Failed to close descriptions/elements array");
     announcedTopicsBinaryValue.data = buffer;
     announcedTopicsBinaryValue.len = cbor_encoder_get_buffer_size(&encoder, buffer);
-    
+    ESP_LOGI(TAG, "iotUpdateAnnouncedTopics: Estimate %d Used %d", totalEstimate, announcedTopicsBinaryValue.len);
     iotValue_t value;
     value.bin = &announcedTopicsBinaryValue;
     iotElementPublish(deviceElement, DEVICE_PUB_INDEX_TOPICS, value);
