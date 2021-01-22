@@ -50,7 +50,7 @@ int deviceProfileSetProfile(const uint8_t *profile, size_t profileLen) {
     esp_err_t err;
     int ret = 0;
     err = nvs_open(THING, NVS_READWRITE, &handle);
-    if (err == ESP_OK){
+    if (err != ESP_OK){
         ESP_LOGE(TAG, "Failed to open thing section, err %d", err);
         return -1;
     }
