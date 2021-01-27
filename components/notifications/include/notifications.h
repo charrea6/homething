@@ -35,6 +35,7 @@ typedef void (*NotificationsCallback_t)(void *user,  NotificationsMessage_t *mes
 #define NOTIFICATIONS_ID_GPIOSWITCH_BASE  0x00000000
 #define NOTIFICATIONS_ID_DHT22_BASE       0x00000000
 #define NOTIFICATIONS_ID_I2C_BASE         0x01000000
+#define NOTIFICATIONS_ID_DS18x20_BASE     0x02000000
 
 #define NOTIFICATIONS_ID_WIFI_STATION     0x00000000
 #define NOTIFICATIONS_ID_WIFI_AP          0x00000001

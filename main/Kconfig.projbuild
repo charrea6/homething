@@ -9,6 +9,9 @@ config BME280
 config SI7021
     bool "Enable SI7021 support"
 
+config DS18x20
+    bool "Enabled DS18x20 support"
+    
 config HUMIDISTAT
     bool "Enable Humidistat Fan support"
     

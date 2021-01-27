@@ -42,6 +42,11 @@ static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
 #else
     NULL,
 #endif
+#ifdef CONFIG_DS18x20
+    initDS18x20
+#else
+    NULL
+#endif
 };
 
 static const addFunc_t addFuncs[DeviceProfile_EntryType_Max] = {
@@ -59,9 +64,14 @@ static const addFunc_t addFuncs[DeviceProfile_EntryType_Max] = {
 #endif
     NULL,
 #ifdef CONFIG_BME280
-    addBME280
+    addBME280,
 #else
     NULL,
+#endif
+#ifdef CONFIG_DS18x20
+    addDS18x20
+#else
+    NULL
 #endif
 };
 

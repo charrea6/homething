@@ -12,10 +12,10 @@ static const char TAG[] = "relay";
 IOT_DESCRIBE_ELEMENT(
     elementDescription,
     IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BOOL, "state")
+        IOT_DESCRIBE_PUB(RETAINED, BOOL, "state")
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_BOOL, IOT_SUB_DEFAULT_NAME, (iotElementSubUpdateCallback_t)relayControl)
+        IOT_DESCRIBE_SUB(BOOL, IOT_SUB_DEFAULT_NAME, (iotElementSubUpdateCallback_t)relayControl)
     )
 );
 

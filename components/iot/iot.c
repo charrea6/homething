@@ -59,17 +59,15 @@ static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 #define _HEX_TYPE(v) 0x0 ## v
 #define HEX_TYPE(type) _HEX_TYPE(type)
 
-#define VT_BOOL   HEX_TYPE(IOT_VALUE_TYPE_BOOL)
-#define VT_INT    HEX_TYPE(IOT_VALUE_TYPE_INT)
-#define VT_FLOAT  HEX_TYPE(IOT_VALUE_TYPE_FLOAT)
-#define VT_STRING HEX_TYPE(IOT_VALUE_TYPE_STRING)
-#define VT_BINARY HEX_TYPE(IOT_VALUE_TYPE_BINARY)
-
-#define VT_RETAINED_BOOL   HEX_TYPE(IOT_VALUE_TYPE_RETAINED_BOOL)
-#define VT_RETAINED_INT    HEX_TYPE(IOT_VALUE_TYPE_RETAINED_INT)
-#define VT_RETAINED_FLOAT  HEX_TYPE(IOT_VALUE_TYPE_RETAINED_FLOAT)
-#define VT_RETAINED_STRING HEX_TYPE(IOT_VALUE_TYPE_RETAINED_STRING)
-#define VT_RETAINED_BINARY HEX_TYPE(IOT_VALUE_TYPE_RETAINED_BINARY)
+#define VT_BOOL       HEX_TYPE(IOT_VALUE_TYPE_BOOL)
+#define VT_INT        HEX_TYPE(IOT_VALUE_TYPE_INT)
+#define VT_FLOAT      HEX_TYPE(IOT_VALUE_TYPE_FLOAT)
+#define VT_STRING     HEX_TYPE(IOT_VALUE_TYPE_STRING)
+#define VT_BINARY     HEX_TYPE(IOT_VALUE_TYPE_BINARY)
+#define VT_HUNDREDTHS HEX_TYPE(IOT_VALUE_TYPE_HUNDREDTHS)
+#define VT_CELCIUS    HEX_TYPE(IOT_VALUE_TYPE_CELCIUS)
+#define VT_PERCENT_RH HEX_TYPE(IOT_VALUE_TYPE_PERCENT_RH)
+#define VT_KPA        HEX_TYPE(IOT_VALUE_TYPE_KPA)
 
 #define VT_BARE_TYPE(type) (type & 0x7f)
 #define VT_IS_RETAINED(type) ((type & 0x80) == 0x80) ? 1:0
@@ -151,18 +149,18 @@ static void setLedState(int subsystem, bool state);
 IOT_DESCRIBE_ELEMENT(
     deviceElementDescription,
     IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "uptime"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "ip"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memFree"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "memLow"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "profile"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "topics")
+        IOT_DESCRIBE_PUB(RETAINED, INT, "uptime"),
+        IOT_DESCRIBE_PUB(RETAINED, STRING, "ip"),
+        IOT_DESCRIBE_PUB(RETAINED, INT, "memFree"),
+        IOT_DESCRIBE_PUB(RETAINED, INT, "memLow"),
+        IOT_DESCRIBE_PUB(RETAINED, BINARY, "profile"),
+        IOT_DESCRIBE_PUB(RETAINED, BINARY, "topics")
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
-        , IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BINARY, "taskStats")
+        , IOT_DESCRIBE_PUB(RETAINED, BINARY, "taskStats")
 #endif
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_BINARY, IOT_SUB_DEFAULT_NAME, iotDeviceControl)
+        IOT_DESCRIBE_SUB(BINARY, IOT_SUB_DEFAULT_NAME, iotDeviceControl)
     )
 );
 
@@ -296,6 +294,10 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value)
             updateRequired = value.b != element->values[pubId].b;
             break;
         case VT_INT:
+        case VT_HUNDREDTHS:
+        case VT_PERCENT_RH:
+        case VT_CELCIUS:
+        case VT_KPA:
             updateRequired = value.i != element->values[pubId].i;
             break;
         case VT_FLOAT:
@@ -360,6 +362,21 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
 
         case VT_FLOAT:
             sprintf(payload, "%f", value.f);
+            break;
+        
+        case VT_HUNDREDTHS:
+        case VT_PERCENT_RH:
+        case VT_CELCIUS:
+        case VT_KPA: {
+                char *str = payload;
+                int hundredths = value.i;
+                if (hundredths < 0) {
+                    hundredths *= -1;
+                    str[0] = '-';
+                    str++;
+                }
+                sprintf(str, "%d.%02d", hundredths / 100, hundredths % 100);
+            }
             break;
 
         case VT_STRING:        
@@ -438,6 +455,7 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
 {
     iotValue_t value;
     iotBinaryValue_t binValue;
+    bool allowNegative = false;
     const char *name;
     if (element->desc->subs[subId].type_name[SUB_INDEX_NAME] == 0)
     {
@@ -463,6 +481,41 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
         {
             ESP_LOGW(TAG, "Invalid value for int type (%s)", payload);
             return;
+        }
+        break;
+
+        case VT_CELCIUS:
+        case VT_HUNDREDTHS:
+        allowNegative = true;
+        case VT_PERCENT_RH:
+        case VT_KPA: {
+            char *decimalPoint = NULL;
+            if ((payload[0] == '-')  && (!allowNegative)){
+                ESP_LOGW(TAG, "Negative values not allowed for topic (%s)", payload);
+                return;
+            }
+            decimalPoint = strchr(payload, '.');
+            if (decimalPoint != NULL) {
+                *decimalPoint = 0;
+            }
+
+            if (sscanf(payload, "%d", &value.i) ==  0) {
+                ESP_LOGW(TAG, "Invalid value for topic type (%s)", payload);
+                return;
+            }
+
+            value.i *= 100;
+            if (decimalPoint != NULL) {
+                unsigned int hundredths = 0;
+                if (strlen(decimalPoint +1) > 2) {
+                    decimalPoint[3] = 0;
+                }
+                if (sscanf(payload, "%u", &hundredths) ==  0) {
+                    ESP_LOGW(TAG, "Invalid value for topic type (%s)", payload);
+                    return;
+                }
+                value.i += hundredths;
+            }
         }
         break;
         

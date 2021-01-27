@@ -37,12 +37,12 @@ static iotElement_t updaterElement;
 IOT_DESCRIBE_ELEMENT(
     elementDescription,
     IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "version"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "status"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_STRING, "capabilities")
+        IOT_DESCRIBE_PUB(RETAINED, STRING, "version"),
+        IOT_DESCRIBE_PUB(RETAINED, STRING, "status"),
+        IOT_DESCRIBE_PUB(RETAINED, STRING, "capabilities")
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_STRING, "update", updateVersion)
+        IOT_DESCRIBE_SUB(STRING, "update", updateVersion)
     )
 );
 

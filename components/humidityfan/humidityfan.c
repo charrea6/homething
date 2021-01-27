@@ -34,15 +34,15 @@ static int fanCount=0;
 IOT_DESCRIBE_ELEMENT(
     elementDescription,
     IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BOOL, "state"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_STRING, "humidity"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "threshold"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_BOOL, "manual"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "manualSecs"),
-        IOT_DESCRIBE_PUB(IOT_VALUE_TYPE_RETAINED_INT, "relay")
+        IOT_DESCRIBE_PUB(RETAINED, BOOL, "state"),
+        IOT_DESCRIBE_PUB(RETAINED, PERCENT_RH, "humidity"),
+        IOT_DESCRIBE_PUB(RETAINED, INT, "threshold"),
+        IOT_DESCRIBE_PUB(RETAINED, BOOL, "manual"),
+        IOT_DESCRIBE_PUB(RETAINED, INT, "manualSecs"),
+        IOT_DESCRIBE_PUB(RETAINED, INT, "relay")
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(IOT_VALUE_TYPE_STRING, IOT_SUB_DEFAULT_NAME, (iotElementSubUpdateCallback_t)humidityFanCtrl)
+        IOT_DESCRIBE_SUB(STRING, IOT_SUB_DEFAULT_NAME, (iotElementSubUpdateCallback_t)humidityFanCtrl)
     )
 );
 
@@ -57,8 +57,6 @@ void humidityFanInit(HumidityFan_t *fan, Relay_t *relay, Notifications_ID_t humi
     fan->overThresholdSeconds =  10;
     fan->manualMode = false;
     fan->manualModeSecsLeft = 0u;
-
-    sprintf(fan->humidity, "0.0");
     fan->relay = relay;
 
     fan->element = iotNewElement(&elementDescription, 0, fan, "fan%d", fanCount);
@@ -68,7 +66,7 @@ void humidityFanInit(HumidityFan_t *fan, Relay_t *relay, Notifications_ID_t humi
     iotElementPublish(fan->element, PUB_ID_RELAY, value);
     value.i = fan->threshold;
     iotElementPublish(fan->element, PUB_ID_THRESHOLD, value);
-    value.s = fan->humidity;
+    value.i = 0;
     iotElementPublish(fan->element, PUB_ID_HUMIDITY, value);
     
     fan->runOnTimer = xTimerCreate("fRO", SECS_TO_TICKS(fan->runOnSeconds), pdFALSE, fan, humidityFanRunOnTimeout);
@@ -140,8 +138,7 @@ static void humidityFanUpdateHumidity(HumidityFan_t *fan, NotificationsMessage_t
             }
         }
     }
-    sprintf(fan->humidity, "%d.%02d", humidityTenths / 100, humidityTenths % 100);
-    value.s = fan->humidity;
+    value.i = humidityTenths;
     iotElementPublish(fan->element, PUB_ID_HUMIDITY, value);
 }
 
