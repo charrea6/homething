@@ -65,6 +65,9 @@ static char capabilities[] = ""
 #ifdef CONFIG_BME280
     "bme280,"
 #endif
+#ifdef CONFIG_DS18x20
+    "ds18x20,"
+#endif
 #ifdef CONFIG_HUMIDISTAT
     "humidistat,"
 #endif
