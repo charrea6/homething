@@ -29,7 +29,7 @@
 
 #define NROF_BUFFERS 3
 
-struct Buffer{
+struct Buffer {
     char data[HEADER_SIZE + BUFFER_SIZE];
 
 #define BUFFER_READY_TO_SEND 0x80000000
@@ -54,7 +54,8 @@ static putchar_like_t originalPutChar;
 static SemaphoreHandle_t *loggingMutex;
 
 
-int loggingInit(){
+int loggingInit()
+{
     nvs_handle handle;
     esp_err_t err;
     uint8_t enabled = 0;
@@ -63,25 +64,25 @@ int loggingInit(){
     ESP_RETURN_ON_ERR(nvs_open("log", NVS_READONLY, &handle));
 
     if ((nvs_get_u8(handle, "enable", &enabled) == ESP_OK) && enabled) {
-        
+
         if (nvs_get_str_alloc(handle, "host", &loggingHost) != ESP_OK) {
             goto error;
         }
         uint16_t p;
         err = nvs_get_u16(handle, "port", &p);
-        if (err == ESP_OK) {   
+        if (err == ESP_OK) {
             loggingPort = (int) p;
         } else {
             loggingPort = 5555;
         }
-    
+
 
         buffers = calloc(NROF_BUFFERS, sizeof(struct Buffer));
         if (buffers == NULL) {
             ESP_LOGE(TAG, "Failed to allocate memory for buffers");
             goto error;
         }
-        
+
         for (i=0; i < NROF_BUFFERS; i ++) {
             strcpy(buffers[i].data, "LOG");
             esp_read_mac((uint8_t*)&buffers[i].data[MAC_OFFSET], ESP_MAC_WIFI_STA);
@@ -89,7 +90,7 @@ int loggingInit(){
         nrofBuffers = NROF_BUFFERS;
         currentBuffer = 0;
         loggingMutex = xSemaphoreCreateMutex();
-        if (loggingMutex == NULL){
+        if (loggingMutex == NULL) {
             ESP_LOGE(TAG, "Failed to create mutex");
             goto error;
         }
@@ -111,7 +112,8 @@ error:
     return -1;
 }
 
-static int loggingPutChar(int ch) {
+static int loggingPutChar(int ch)
+{
     if (originalPutChar != NULL) {
         originalPutChar(ch);
     }
@@ -131,15 +133,16 @@ static int loggingPutChar(int ch) {
             buffers[currentBuffer].len = 0;
         }
         xSemaphoreGive(loggingMutex);
-    } 
+    }
     return ch;
 }
 
-static void loggingWifiNotification(void *user,  NotificationsMessage_t *message){
+static void loggingWifiNotification(void *user,  NotificationsMessage_t *message)
+{
     if (message->data.connectionState) {
         // Get Logging Host address
         loggingSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-        if (loggingSocket == -1){
+        if (loggingSocket == -1) {
             printf("Failed to create logging socket!\n");
             return;
         }
@@ -153,7 +156,7 @@ static void loggingWifiNotification(void *user,  NotificationsMessage_t *message
                 }
             }
             xSemaphoreGive(loggingMutex);
-        } 
+        }
 
         // Start timer
     } else {
@@ -162,8 +165,9 @@ static void loggingWifiNotification(void *user,  NotificationsMessage_t *message
     }
 }
 
-static void loggingSendBuffer(struct Buffer *buffer) {
-    if (loggingSocket != -1){
+static void loggingSendBuffer(struct Buffer *buffer)
+{
+    if (loggingSocket != -1) {
         struct sockaddr_in destAddr;
         destAddr.sin_addr.s_addr = inet_addr(loggingHost);
         destAddr.sin_family = AF_INET;

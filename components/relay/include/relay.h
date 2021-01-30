@@ -3,8 +3,7 @@
 #include "iot.h"
 
 typedef struct Relay {
-    union 
-    {
+    union {
         uint32_t data;
         struct {
             uint8_t pin;
@@ -12,7 +11,7 @@ typedef struct Relay {
             bool on;
             uint8_t id;
         } fields;
-    }u;
+    } u;
     iotElement_t element;
 } Relay_t;
 

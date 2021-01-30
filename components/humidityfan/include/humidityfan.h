@@ -7,7 +7,7 @@
 #include "relay.h"
 #include "notifications.h"
 
-typedef struct HumidityFan{
+typedef struct HumidityFan {
     int id;
     char humidity[6];
     bool override;
@@ -22,7 +22,7 @@ typedef struct HumidityFan{
     TimerHandle_t runOnTimer;
     TimerHandle_t overThresholdTimer;
     TimerHandle_t manualModeTimer;
-}HumidityFan_t;
+} HumidityFan_t;
 
 void humidityFanInit(HumidityFan_t *fan, Relay_t *relay, Notifications_ID_t humiditySensor, int threshold);
 

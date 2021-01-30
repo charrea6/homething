@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 /**
- * Station connection status callback, bool will be true when a connection has been successfully 
+ * Station connection status callback, bool will be true when a connection has been successfully
  * established and false when disconnected.
  */
 typedef void (*WifiConnectionCallback_t)(bool);

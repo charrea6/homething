@@ -14,7 +14,7 @@ typedef enum {
     DeviceProfile_EntryType_BME280,
     DeviceProfile_EntryType_DS18B20,
     DeviceProfile_EntryType_Max
-}DeviceProfile_EntryType_e;
+} DeviceProfile_EntryType_e;
 
 typedef enum {
     DeviceProfile_SwitchType_Toggle = 0,
@@ -37,7 +37,7 @@ typedef struct {
     uint8_t sda;
     uint8_t scl;
     uint8_t addr;
-}DeviceProfile_I2CDetails_t;
+} DeviceProfile_I2CDetails_t;
 
 typedef struct {
     CborParser parser;

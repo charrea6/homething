@@ -20,7 +20,8 @@ static uint32_t deviceProfileLen = 0u;
 
 static int nextUint32(CborValue *it, uint32_t *result);
 
-int deviceProfileGetProfile(uint8_t **profile, size_t *profileLen) {
+int deviceProfileGetProfile(uint8_t **profile, size_t *profileLen)
+{
     nvs_handle handle;
     esp_err_t err;
     if (deviceProfile == NULL) {
@@ -36,7 +37,7 @@ int deviceProfileGetProfile(uint8_t **profile, size_t *profileLen) {
         }
 
         nvs_close(handle);
-        if (err!= ESP_OK){
+        if (err!= ESP_OK) {
             return -1;
         }
     }
@@ -45,12 +46,13 @@ int deviceProfileGetProfile(uint8_t **profile, size_t *profileLen) {
     return 0;
 }
 
-int deviceProfileSetProfile(const uint8_t *profile, size_t profileLen) {
+int deviceProfileSetProfile(const uint8_t *profile, size_t profileLen)
+{
     nvs_handle handle;
     esp_err_t err;
     int ret = 0;
     err = nvs_open(THING, NVS_READWRITE, &handle);
-    if (err != ESP_OK){
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open thing section, err %d", err);
         return -1;
     }
@@ -63,9 +65,10 @@ int deviceProfileSetProfile(const uint8_t *profile, size_t profileLen) {
     return ret;
 }
 
-int deviceProfileValidateProfile(const uint8_t *profile, size_t profileLen) {
+int deviceProfileValidateProfile(const uint8_t *profile, size_t profileLen)
+{
     DeviceProfile_Parser_t parser;
-    if (deviceProfileParseProfile(profile, profileLen, &parser)){
+    if (deviceProfileParseProfile(profile, profileLen, &parser)) {
         return -1;
     }
 
@@ -75,10 +78,11 @@ int deviceProfileValidateProfile(const uint8_t *profile, size_t profileLen) {
     return 0;
 }
 
-int deviceProfileParseProfile(const uint8_t *profile, size_t profileLen, DeviceProfile_Parser_t *parser) {
+int deviceProfileParseProfile(const uint8_t *profile, size_t profileLen, DeviceProfile_Parser_t *parser)
+{
     uint32_t version;
 
-    if (cbor_parser_init(profile, profileLen, 0, &parser->parser, &parser->it) != CborNoError){
+    if (cbor_parser_init(profile, profileLen, 0, &parser->parser, &parser->it) != CborNoError) {
         return -1;
     }
     if (cbor_value_get_type(&parser->it) != CborArrayType) {
@@ -99,7 +103,8 @@ int deviceProfileParseProfile(const uint8_t *profile, size_t profileLen, DeviceP
     return 0;
 }
 
-int deviceProfileParserNextEntry(DeviceProfile_Parser_t *parser, CborValue *entry, DeviceProfile_EntryType_e *entryType) {
+int deviceProfileParserNextEntry(DeviceProfile_Parser_t *parser, CborValue *entry, DeviceProfile_EntryType_e *entryType)
+{
     if (cbor_value_at_end(&parser->arrayIt)) {
         return -1;
     }
@@ -116,11 +121,13 @@ int deviceProfileParserNextEntry(DeviceProfile_Parser_t *parser, CborValue *entr
     return 0;
 }
 
-int deviceProfileParserEntryGetUint32(CborValue *parserEntry, uint32_t *result) {
+int deviceProfileParserEntryGetUint32(CborValue *parserEntry, uint32_t *result)
+{
     return nextUint32(parserEntry, result);
 }
 
-int deviceProfileParserEntryGetI2CDetails(CborValue *parserEntry, DeviceProfile_I2CDetails_t *details) {
+int deviceProfileParserEntryGetI2CDetails(CborValue *parserEntry, DeviceProfile_I2CDetails_t *details)
+{
     uint32_t uint;
     if (nextUint32(parserEntry, &uint) == -1) {
         return -1;
@@ -137,25 +144,27 @@ int deviceProfileParserEntryGetI2CDetails(CborValue *parserEntry, DeviceProfile_
     return 0;
 }
 
-static int nextUint32(CborValue *it, uint32_t *result) {
+static int nextUint32(CborValue *it, uint32_t *result)
+{
     uint64_t uintValue;
     if (cbor_value_at_end(it)) {
         return  -1;
     }
     if (cbor_value_is_unsigned_integer(it)) {
-        if (cbor_value_get_uint64(it, &uintValue) != CborNoError){ 
+        if (cbor_value_get_uint64(it, &uintValue) != CborNoError) {
             return -1;
         }
         *result = (uint32_t)uintValue;
         cbor_value_advance(it);
-    } else { 
-         return -1; 
+    } else {
+        return -1;
     }
     return 0;
 }
 
-int deviceProfileParserCloseEntry(DeviceProfile_Parser_t *parser, CborValue *entry) {
-    while (!cbor_value_at_end(entry)){
+int deviceProfileParserCloseEntry(DeviceProfile_Parser_t *parser, CborValue *entry)
+{
+    while (!cbor_value_at_end(entry)) {
         cbor_value_advance(entry);
     }
     cbor_value_leave_container(&parser->arrayIt, entry);

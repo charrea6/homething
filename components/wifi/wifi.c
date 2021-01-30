@@ -60,12 +60,9 @@ int wifiInit(WifiConnectionCallback_t callback)
 
     sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
     err = nvs_open("wifi", NVS_READONLY, &handle);
-    if (err == ESP_OK)
-    {
-        if (nvs_get_str_alloc(handle, "ssid", &wifiSsid) == ESP_OK)
-        {
-            if (nvs_get_str_alloc(handle, "pass", &wifiPassword) != ESP_OK)
-            {
+    if (err == ESP_OK) {
+        if (nvs_get_str_alloc(handle, "ssid", &wifiSsid) == ESP_OK) {
+            if (nvs_get_str_alloc(handle, "pass", &wifiPassword) != ESP_OK) {
                 free(wifiSsid);
                 wifiSsid = NULL;
             }
@@ -105,7 +102,7 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
         }
         wifiStartStation();
         break;
-    case SYSTEM_EVENT_STA_GOT_IP: 
+    case SYSTEM_EVENT_STA_GOT_IP:
         sprintf(ipAddr, IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
         ESP_LOGI(TAG, "Connected to SSID, IP=%s", ipAddr);
         connected = true;
@@ -119,12 +116,12 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
     case SYSTEM_EVENT_STA_DISCONNECTED:
         sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
         wifiStartStation();
-        if (connected){
+        if (connected) {
             if (connectionCallback != NULL) {
                 connectionCallback(false);
             }
             connected = false;
-            
+
             notification.connectionState = false;
             notificationsNotify(Notifications_Class_Wifi, NOTIFICATIONS_ID_WIFI_STATION, &notification);
 
@@ -160,12 +157,9 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
 
 void wifiStart(void)
 {
-    if (wifiSsid != NULL)
-    {
+    if (wifiSsid != NULL) {
         wifiSetupStation();
-    }
-    else
-    {
+    } else {
         wifiSetupAP(false);
     }
 

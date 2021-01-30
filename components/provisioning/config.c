@@ -27,7 +27,7 @@ typedef enum FieldType {
     FT_DEVICE_ID,
     FT_STRING,
     FT_MAX
-}FieldType;
+} FieldType;
 
 struct variable {
     const char *name;
@@ -69,7 +69,7 @@ esp_err_t provisioningConfigPostHandler(httpd_req_t *req)
         errorMsg = "config content length too big";
         goto error;
     }
-    
+
     nvs_handle handle;
     size_t off = 0;
     int    ret;
@@ -129,7 +129,7 @@ esp_err_t provisioningConfigPostHandler(httpd_req_t *req)
                 break;
             }
         }
-        
+
         if (foundSetting == NULL) {
             ESP_LOGE(TAG, "Unexpected key \"%s\"", key);
             free(key);
@@ -257,7 +257,8 @@ error:
     return ESP_FAIL;
 }
 
-static void reboot(TimerHandle_t xTimer) {
+static void reboot(TimerHandle_t xTimer)
+{
     esp_restart();
 }
 
@@ -266,7 +267,7 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
     esp_err_t err = ESP_OK;
     char *errorMsg = NULL;
 
-    while (!cbor_value_at_end(it)) { 
+    while (!cbor_value_at_end(it)) {
         CborError cborErr;
         char *key;
         size_t keyLen;
@@ -283,7 +284,7 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
             goto error;
         }
         struct variable *foundVariable = NULL;
-        for (i=0; i < setting->nrofVariables; i ++){
+        for (i=0; i < setting->nrofVariables; i ++) {
             if (strcmp(key, setting->variables[i].name) == 0) {
                 foundVariable = &setting->variables[i];
                 break;
@@ -300,53 +301,53 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
             goto error;
         }
         switch(foundVariable->type) {
-            case FT_STRING:
-            case FT_USERNAME:
-            case FT_PASSWORD:
-            case FT_HOSTNAME: {       
-                char *value;
-                size_t valueLen;
-                cborErr = cbor_value_dup_text_string(it, &value, &valueLen, it);
-                if (cborErr) {
-                    errorMsg = "Failed to extract string variable value";
-                    goto error;
-                }
-                ESP_LOGI(TAG,"Setting %s to \"%s\" (len %u)", foundVariable->name, value, valueLen);
-                err = nvs_set_str(handle, foundVariable->name, value);
-                free(value);
+        case FT_STRING:
+        case FT_USERNAME:
+        case FT_PASSWORD:
+        case FT_HOSTNAME: {
+            char *value;
+            size_t valueLen;
+            cborErr = cbor_value_dup_text_string(it, &value, &valueLen, it);
+            if (cborErr) {
+                errorMsg = "Failed to extract string variable value";
+                goto error;
             }
-            break;
-            case FT_PORT: {
-                uint64_t value;
-                cborErr = cbor_value_get_uint64(it, &value);
-                if (cborErr) {
-                    errorMsg = "Failed to extract int variable value";
-                    goto error;
-                }
-                cbor_value_advance(it);
-                ESP_LOGI(TAG,"Setting %s to %u", foundVariable->name, (uint16_t)value);
-                err = nvs_set_u16(handle, foundVariable->name, (uint16_t)value);
+            ESP_LOGI(TAG,"Setting %s to \"%s\" (len %u)", foundVariable->name, value, valueLen);
+            err = nvs_set_str(handle, foundVariable->name, value);
+            free(value);
+        }
+        break;
+        case FT_PORT: {
+            uint64_t value;
+            cborErr = cbor_value_get_uint64(it, &value);
+            if (cborErr) {
+                errorMsg = "Failed to extract int variable value";
+                goto error;
             }
-            break;
-            case FT_CHECKBOX: {
-                bool value;
-                cborErr = cbor_value_get_boolean(it, &value);
-                if (cborErr) {
-                    errorMsg = "Failed to extract bool variable value";
-                    goto error;
-                }
-                cbor_value_advance(it);
-                ESP_LOGI(TAG,"Setting %s to %s", foundVariable->name, value ? "true":"false");
-                err = nvs_set_u8(handle, foundVariable->name, value);
+            cbor_value_advance(it);
+            ESP_LOGI(TAG,"Setting %s to %u", foundVariable->name, (uint16_t)value);
+            err = nvs_set_u16(handle, foundVariable->name, (uint16_t)value);
+        }
+        break;
+        case FT_CHECKBOX: {
+            bool value;
+            cborErr = cbor_value_get_boolean(it, &value);
+            if (cborErr) {
+                errorMsg = "Failed to extract bool variable value";
+                goto error;
             }
+            cbor_value_advance(it);
+            ESP_LOGI(TAG,"Setting %s to %s", foundVariable->name, value ? "true":"false");
+            err = nvs_set_u8(handle, foundVariable->name, value);
+        }
+        break;
+        case FT_DEVICE_ID:
             break;
-            case FT_DEVICE_ID:
-            break;
-            default:
+        default:
             err = ESP_FAIL;
             break;
         }
-        if (err != ESP_OK){
+        if (err != ESP_OK) {
             ESP_LOGW(TAG, "setVariable failed for variable %s type %d err %d", foundVariable->name, foundVariable->type, err);
         }
     }
@@ -357,8 +358,8 @@ error:
 static bool getVariables(nvs_handle handle, struct setting *setting, CborEncoder *encoder)
 {
     int n;
-    
-    for (n = 0; n < setting->nrofVariables; n++){
+
+    for (n = 0; n < setting->nrofVariables; n++) {
         esp_err_t err = ESP_OK;
         CborError cborErr = CborNoError;
         struct variable *var = &setting->variables[n];
@@ -368,48 +369,48 @@ static bool getVariables(nvs_handle handle, struct setting *setting, CborEncoder
             goto error;
         }
         switch(var->type) {
-            case FT_STRING:
-            case FT_USERNAME:
-            case FT_HOSTNAME: {
-                char *value;
-                
-                err = nvs_get_str_alloc(handle, var->name, &value);
-                if (err == ESP_OK) {
-                    cborErr = cbor_encode_text_string(encoder, value, strlen(value));
-                    free(value);
-                }
+        case FT_STRING:
+        case FT_USERNAME:
+        case FT_HOSTNAME: {
+            char *value;
+
+            err = nvs_get_str_alloc(handle, var->name, &value);
+            if (err == ESP_OK) {
+                cborErr = cbor_encode_text_string(encoder, value, strlen(value));
+                free(value);
             }
-            break;
-            case FT_PASSWORD:
+        }
+        break;
+        case FT_PASSWORD:
             cborErr = cbor_encode_text_string(encoder, "", 0);
             break;
-            case FT_PORT: {
-                uint16_t value;
-                err = nvs_get_u16(handle, var->name, &value);
-                if (err == ESP_OK) {
-                    cborErr = cbor_encode_uint(encoder, (uint64_t)value);
-                }
+        case FT_PORT: {
+            uint16_t value;
+            err = nvs_get_u16(handle, var->name, &value);
+            if (err == ESP_OK) {
+                cborErr = cbor_encode_uint(encoder, (uint64_t)value);
             }
-            break;
-            case FT_CHECKBOX: {
-                uint8_t value;
-                err = nvs_get_u8(handle, var->name, &value);
-                if (err == ESP_OK) {
-                    cborErr = cbor_encode_boolean(encoder, value?true:false);
-                }
+        }
+        break;
+        case FT_CHECKBOX: {
+            uint8_t value;
+            err = nvs_get_u8(handle, var->name, &value);
+            if (err == ESP_OK) {
+                cborErr = cbor_encode_boolean(encoder, value?true:false);
             }
-            break;
-            case FT_DEVICE_ID:{
-                uint8_t mac[6];
-                esp_read_mac(mac, ESP_MAC_WIFI_STA);
-                cborErr = cbor_encode_byte_string(encoder, mac, sizeof(mac));
-            }
-            break;
-            default:
+        }
+        break;
+        case FT_DEVICE_ID: {
+            uint8_t mac[6];
+            esp_read_mac(mac, ESP_MAC_WIFI_STA);
+            cborErr = cbor_encode_byte_string(encoder, mac, sizeof(mac));
+        }
+        break;
+        default:
             err = ESP_FAIL;
             break;
         }
-        if (err != ESP_OK){
+        if (err != ESP_OK) {
             ESP_LOGW(TAG, "addVariable failed for variable %s type %d err %d", var->name, var->type, err);
             *encoder = beforeVariable;
         }

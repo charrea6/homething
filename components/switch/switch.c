@@ -17,12 +17,14 @@ static const char *TAG="switch";
 
 static GPIOX_Pins_t switchPins, switchValues;
 
-int switchInit() {
+int switchInit()
+{
     GPIOX_PINS_CLEAR_ALL(switchPins);
     return 0;
 }
 
-Notifications_ID_t switchAdd(int pin) {
+Notifications_ID_t switchAdd(int pin)
+{
     if (pin > GPIOX_PINS_MAX) {
         ESP_LOGE(TAG, "switchAdd: Invalid Pin number %d", pin);
         return -1;
@@ -31,13 +33,14 @@ Notifications_ID_t switchAdd(int pin) {
     return NOTIFICATIONS_MAKE_ID(GPIOSWITCH, pin);
 }
 
-static void switchThread(void* pvParameters) {
+static void switchThread(void* pvParameters)
+{
     int i;
     GPIOX_Pins_t newValues, diff;
     NotificationsData_t data;
-    
+
     ESP_LOGI(TAG, "Switch thread starting");
-    
+
     gpioxSetup(&switchPins, GPIOX_MODE_IN_PULLUP);
     gpioxGetPins(&switchPins, &switchValues);
 
@@ -56,7 +59,8 @@ static void switchThread(void* pvParameters) {
     }
 }
 
-void switchStart() {
+void switchStart()
+{
     int i;
     for (i=0; i < GPIOX_PINS_MAX; i++) {
         if (GPIOX_PINS_IS_SET(switchPins, i)) {

@@ -6,6 +6,8 @@ import hashlib
 import struct
 import click
 import subprocess
+import configparser
+import fnmatch
 
 build_action = None
 
@@ -178,6 +180,44 @@ def build_config(action, ctx, args, configfile=None):
     esptool_args += [offset, bin_filename]
     subprocess.check_call(['python', esptool_path] + esptool_args)
 
+
+
+def format_code(action, ctx, args):
+    options = ['--suffix=none', '--style=1tbs']
+    submodules = configparser.ConfigParser()
+    submodules.read('.gitmodules')
+    ignore_paths = []
+    for submodule in submodules.sections():
+        path = submodules[submodule]['path']
+        ignore_paths.append(path)
+        if path.startswith("components/"):
+            ignore_paths.append(os.path.join(os.path.dirname(path), "include"))
+
+    print(f'Will ignore: {ignore_paths}')
+
+    def should_ignore(path):
+        for d in ignore_paths:
+            if path.startswith(d):
+                return True
+        return False
+
+    for root, dirs, files in os.walk('components'):
+        if should_ignore(root):
+            continue
+        run_astyle = False
+        for f in files:
+            if fnmatch.fnmatch(f, '*.[ch]'):
+                run_astyle = True
+
+        for d in dirs:
+            full_path = os.path.join(root, d)
+            if full_path in ignore_paths:
+                dirs.remove(d)
+        
+        if run_astyle:
+            subprocess.check_call(['astyle'] + options + [f'{root}/*.c,*.h'])
+    subprocess.check_call(['astyle'] + options + ['main/*.c,*.h'])
+
 def action_extensions(base_actions, project_dir):
     global build_action
     build_action = base_actions['actions']['app']['callback']
@@ -189,6 +229,9 @@ def action_extensions(base_actions, project_dir):
                 'flashconfig': {
                     'callback': build_config, 
                     "arguments":[{'names':['configfile'], 'type':click.Path(exists=True)}]
+                },
+                'ensureformat': {
+                    'callback': format_code
                 }
             }
 

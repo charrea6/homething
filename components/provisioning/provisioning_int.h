@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <esp_http_server.h>
 
-enum ContentType{
+enum ContentType {
     CT_HTML = 0,
     CT_CSS,
     CT_JS,

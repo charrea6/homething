@@ -5,14 +5,14 @@
 #include <stdint.h>
 
 
-typedef enum{
+typedef enum {
     Notifications_Class_Wifi = 0,
     Notifications_Class_Switch,
     Notifications_Class_Temperature,
     Notifications_Class_Humidity,
     Notifications_Class_Pressure,
     Notifications_Class_Max
-}Notifications_Class_e;
+} Notifications_Class_e;
 
 typedef union {
     uint32_t humidity;  // %RH * 100
@@ -20,13 +20,13 @@ typedef union {
     int32_t temperature; // degrees C * 100
     bool switchState;
     bool connectionState;
-} NotificationsData_t; 
+} NotificationsData_t;
 
 typedef struct {
     Notifications_Class_e clazz;
     uint32_t id;
     NotificationsData_t data;
-}NotificationsMessage_t;
+} NotificationsMessage_t;
 
 typedef uint32_t Notifications_ID_t;
 

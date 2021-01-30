@@ -16,7 +16,8 @@ static const char TAG[] = "relays";
 static int relayCount = 0;
 static Relay_t *relays;
 
-int initRelays(int norfSwitches) {
+int initRelays(int norfSwitches)
+{
     relays = calloc(norfSwitches, sizeof(Relay_t));
     if (relays == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for relays");
@@ -25,7 +26,8 @@ int initRelays(int norfSwitches) {
     return 0;
 }
 
-int addRelay(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount) {
+int addRelay(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount)
+{
     Relay_t *relay;
     uint32_t pin;
     uint32_t onLevel;
@@ -47,7 +49,7 @@ int addRelay(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount) {
 
     if (deviceProfileParserEntryGetUint32(entry, &controller) == 0) {
         controlled = true;
-        if (controller >= DeviceProfile_RelayController_Max){
+        if (controller >= DeviceProfile_RelayController_Max) {
             ESP_LOGE(TAG, "setupRelay: Controller type %u invalid!", controller);
             return  -1;
         }
@@ -67,25 +69,25 @@ int addRelay(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount) {
     relayCount++;
     if (controlled) {
         switch(controller) {
-            case DeviceProfile_RelayController_Switch:
+        case DeviceProfile_RelayController_Switch:
             notificationsRegister(Notifications_Class_Switch, ids[id], switchRelayController, relay);
             break;
-            case DeviceProfile_RelayController_Temperature:
+        case DeviceProfile_RelayController_Temperature:
             break;
-            case DeviceProfile_RelayController_Humidity:{
+        case DeviceProfile_RelayController_Humidity: {
 #ifdef CONFIG_HUMIDISTAT
-                HumidityFan_t *fanController = malloc(sizeof(HumidityFan_t));
-                if (fanController) {
-                    humidityFanInit(fanController, relay, ids[id], CONFIG_HUMIDISTAT_THRESHOLD);
-                } else {
-                    ESP_LOGE(TAG, "setupRelay: Failed to allocate memory for humidistat");
-                }
-#else 
+            HumidityFan_t *fanController = malloc(sizeof(HumidityFan_t));
+            if (fanController) {
+                humidityFanInit(fanController, relay, ids[id], CONFIG_HUMIDISTAT_THRESHOLD);
+            } else {
+                ESP_LOGE(TAG, "setupRelay: Failed to allocate memory for humidistat");
+            }
+#else
             ESP_LOGW(TAG, "setupRelay: Unsupported humidistat controller!");
 #endif
-            }
-            break;
-            default:
+        }
+        break;
+        default:
             ESP_LOGW(TAG, "setupRelay: Unknown controller type %u", controller);
             break;
         }

@@ -21,7 +21,7 @@
 static const char TAG[] = "profile";
 
 typedef int (*initFunc_t)(int);
-typedef Notifications_ID_t (*addFunc_t)(CborValue *); 
+typedef Notifications_ID_t (*addFunc_t)(CborValue *);
 
 static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
     initSwitches,
@@ -31,7 +31,7 @@ static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
 #else
     NULL,
 #endif
-#ifdef CONFIG_SI7021    
+#ifdef CONFIG_SI7021
     initSI7021,
 #else
     NULL,
@@ -97,7 +97,7 @@ int processProfile(void)
     if (deviceProfileParseProfile(profile, profileLen, &parser)) {
         goto error;
     }
-    
+
     while(!deviceProfileParserNextEntry(&parser, &entry, &entryType)) {
         if (entryType < DeviceProfile_EntryType_Max) {
             nrofEntryTypes[entryType]++;
@@ -107,7 +107,7 @@ int processProfile(void)
     }
 
     for (i=DeviceProfile_EntryType_GPIOSwitch; i <DeviceProfile_EntryType_Max; i++) {
-        if ((initFuncs[i] != NULL) && (nrofEntryTypes[i] != 0)){
+        if ((initFuncs[i] != NULL) && (nrofEntryTypes[i] != 0)) {
             ESP_LOGI(TAG, "EntryType %d Count %d", i, nrofEntryTypes[i]);
             if (initFuncs[i](nrofEntryTypes[i])) {
                 goto error;
@@ -116,12 +116,12 @@ int processProfile(void)
     }
 
     ids = calloc(entryCount, sizeof(Notifications_ID_t));
-    if (ids == NULL){
+    if (ids == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for ids");
         goto error;
     }
 
-    for (i = 0; i < entryCount; i ++){
+    for (i = 0; i < entryCount; i ++) {
         ids[i] = NOTIFICATIONS_ID_ERROR;
     }
 
@@ -134,11 +134,11 @@ int processProfile(void)
         entryIndex ++;
         deviceProfileParserCloseEntry(&parser, &entry);
     }
-    
+
     /* Process relays last so we can find sensor/switch ids */
     deviceProfileParseProfile(profile, profileLen, &parser);
     while(!deviceProfileParserNextEntry(&parser, &entry, &entryType)) {
-        if (entryType == DeviceProfile_EntryType_Relay){
+        if (entryType == DeviceProfile_EntryType_Relay) {
             if (addRelay(&entry, ids, entryCount)) {
                 goto error;
             }

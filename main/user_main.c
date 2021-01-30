@@ -43,7 +43,7 @@ void app_main(void)
     gpioxInit();
     switchInit();
     processProfile();
-    
+
     updaterInit();
 
     switchStart();

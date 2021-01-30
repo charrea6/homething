@@ -25,14 +25,14 @@ typedef void (*iotElementSubUpdateCallback_t)(void *userData, iotElement_t eleme
 typedef struct iotElementSubDescription {
     const char *type_name;
     iotElementSubUpdateCallback_t callback;
-}iotElementSubDescription_t;
+} iotElementSubDescription_t;
 
 typedef struct iotElementDescription {
     const char * const *pubs;
     const int nrofPubs;
     const iotElementSubDescription_t const *subs;
     const int nrofSubs;
-}iotElementDescription_t;
+} iotElementDescription_t;
 
 #define IOT_VALUE_TYPE_BOOL            0
 #define IOT_VALUE_TYPE_INT             1
@@ -53,8 +53,8 @@ typedef struct iotElementDescription {
 
 // Define both retained and not retained types at this point to allow for compile time errors,
 // combining the retained setting and type when used doesn't allow use to catch misspelling etc.
-#define IOT_VALUE_TYPE_BOOL_NOT_RETAINED        _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_BOOL )    
-#define IOT_VALUE_TYPE_BOOL_RETAINED            _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_BOOL )    
+#define IOT_VALUE_TYPE_BOOL_NOT_RETAINED        _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_BOOL )
+#define IOT_VALUE_TYPE_BOOL_RETAINED            _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_BOOL )
 
 #define IOT_VALUE_TYPE_INT_NOT_RETAINED         _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_INT )
 #define IOT_VALUE_TYPE_INT_RETAINED             _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_INT )
@@ -62,23 +62,23 @@ typedef struct iotElementDescription {
 #define IOT_VALUE_TYPE_FLOAT_NOT_RETAINED       _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_FLOAT)
 #define IOT_VALUE_TYPE_FLOAT_RETAINED           _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_FLOAT)
 
-#define IOT_VALUE_TYPE_STRING_NOT_RETAINED      _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_STRING ) 
-#define IOT_VALUE_TYPE_STRING_RETAINED          _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_STRING ) 
+#define IOT_VALUE_TYPE_STRING_NOT_RETAINED      _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_STRING )
+#define IOT_VALUE_TYPE_STRING_RETAINED          _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_STRING )
 
-#define IOT_VALUE_TYPE_BINARY_NOT_RETAINED      _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_BINARY ) 
-#define IOT_VALUE_TYPE_BINARY_RETAINED          _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_BINARY ) 
+#define IOT_VALUE_TYPE_BINARY_NOT_RETAINED      _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_BINARY )
+#define IOT_VALUE_TYPE_BINARY_RETAINED          _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_BINARY )
 
-#define IOT_VALUE_TYPE_HUNDREDTHS_NOT_RETAINED  _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_HUNDREDTHS ) 
-#define IOT_VALUE_TYPE_HUNDREDTHS_RETAINED      _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_HUNDREDTHS ) 
+#define IOT_VALUE_TYPE_HUNDREDTHS_NOT_RETAINED  _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_HUNDREDTHS )
+#define IOT_VALUE_TYPE_HUNDREDTHS_RETAINED      _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_HUNDREDTHS )
 
-#define IOT_VALUE_TYPE_CELCIUS_NOT_RETAINED     _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_CELCIUS ) 
-#define IOT_VALUE_TYPE_CELCIUS_RETAINED         _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_CELCIUS ) 
+#define IOT_VALUE_TYPE_CELCIUS_NOT_RETAINED     _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_CELCIUS )
+#define IOT_VALUE_TYPE_CELCIUS_RETAINED         _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_CELCIUS )
 
-#define IOT_VALUE_TYPE_PERCENT_RH_NOT_RETAINED  _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_PERCENT_RH ) 
-#define IOT_VALUE_TYPE_PERCENT_RH_RETAINED      _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_PERCENT_RH ) 
+#define IOT_VALUE_TYPE_PERCENT_RH_NOT_RETAINED  _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_PERCENT_RH )
+#define IOT_VALUE_TYPE_PERCENT_RH_RETAINED      _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_PERCENT_RH )
 
-#define IOT_VALUE_TYPE_KPA_NOT_RETAINED         _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_KPA ) 
-#define IOT_VALUE_TYPE_KPA_RETAINED             _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_KPA ) 
+#define IOT_VALUE_TYPE_KPA_NOT_RETAINED         _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_KPA )
+#define IOT_VALUE_TYPE_KPA_RETAINED             _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_KPA )
 
 #define _IOT_DEFINE_TYPE(r, t) IOT_VALUE_TYPE_ ## t ## _ ## r
 
@@ -120,7 +120,7 @@ int iotInit(void);
  * Connects to the configured Wifi network and then to the configured MQTT server.
  * Once connected any updates to Pub items will be reflected to the MQTT server if
  * connected or stored for transmission when a connection is established.
- * Any message sent to subscribe topics will be reflected to the specified 
+ * Any message sent to subscribe topics will be reflected to the specified
  * callback as soon as they are recieved.
  */
 void iotStart();

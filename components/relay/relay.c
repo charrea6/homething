@@ -19,7 +19,8 @@ IOT_DESCRIBE_ELEMENT(
     )
 );
 
-void relayInit(uint8_t id, uint8_t pin, uint8_t onLevel, Relay_t *relay) { 
+void relayInit(uint8_t id, uint8_t pin, uint8_t onLevel, Relay_t *relay)
+{
     GPIOX_Pins_t pins;
     GPIOX_PINS_CLEAR_ALL(pins);
     GPIOX_PINS_SET(pins, pin);
@@ -33,7 +34,8 @@ void relayInit(uint8_t id, uint8_t pin, uint8_t onLevel, Relay_t *relay) {
     relay->element = iotNewElement(&elementDescription, 0, relay, "relay%d", id);
 }
 
-void relaySetState(Relay_t *relay, bool on) {
+void relaySetState(Relay_t *relay, bool on)
+{
     if (on == relayIsOn(relay)) {
         return;
     }
@@ -49,7 +51,7 @@ void relaySetState(Relay_t *relay, bool on) {
     } else {
         l = relay->u.fields.onLevel ^ 1;
     }
-    
+
     if (l) {
         GPIOX_PINS_SET(values, relay->u.fields.pin);
     }
@@ -62,6 +64,7 @@ void relaySetState(Relay_t *relay, bool on) {
     iotElementPublish(relay->element, 0, value);
 }
 
-static void relayControl(Relay_t *relay, iotElement_t *element, iotValue_t value) {
+static void relayControl(Relay_t *relay, iotElement_t *element, iotValue_t value)
+{
     relaySetState(relay, value.b);
 }

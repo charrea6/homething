@@ -28,16 +28,16 @@ static const char *content_types[CT_MAX] = {
 };
 
 static const httpd_uri_t handlers[] = {{
-    .method = HTTP_GET,
-    .uri = "/config",
-    .handler = provisioningConfigGetHandler,
-    .user_ctx = NULL
-}, {
-    .method = HTTP_POST,
-    .uri = "/config",
-    .handler = provisioningConfigPostHandler,
-    .user_ctx = NULL
-}
+        .method = HTTP_GET,
+        .uri = "/config",
+        .handler = provisioningConfigGetHandler,
+        .user_ctx = NULL
+    }, {
+        .method = HTTP_POST,
+        .uri = "/config",
+        .handler = provisioningConfigPostHandler,
+        .user_ctx = NULL
+    }
 };
 
 static bool isCompressionAcceptable(httpd_req_t *req);
@@ -55,7 +55,7 @@ int provisioningStart(void)
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.stack_size = HTTPD_TASK_STACK_SIZE;
-    
+
     ESP_LOGI(TAG, "Starting server on port: %d", config.server_port);
     if (httpd_start(&server, &config) != ESP_OK) {
         return 1;
@@ -63,11 +63,11 @@ int provisioningStart(void)
     // Set URI handlers
     ESP_LOGI(TAG, "Registering URI handlers");
     provisioningRegisterStaticFileHandlers(server);
-    
+
     for (i = 0; i < sizeof(handlers)/sizeof(httpd_uri_t); i++) {
         httpd_register_uri_handler(server, &handlers[i]);
     }
-    
+
     // Disable Captive Portal DNS
     // TODO: Reduce task memory requirements
     ///    : wasn't responding to `dig @<ESP IP> www.google.com` as arcount wasn't 0
@@ -98,7 +98,7 @@ esp_err_t provisioningStaticFileHandler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static bool isCompressionAcceptable(httpd_req_t *req) 
+static bool isCompressionAcceptable(httpd_req_t *req)
 {
     size_t len = httpd_req_get_hdr_value_len(req, ACCEPT_ENCODING);
     if (len == 0) {

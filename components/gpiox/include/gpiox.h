@@ -2,8 +2,8 @@
 #define _GPIOX_H_
 #include <stdint.h>
 #include "sdkconfig.h"
- 
-/* 
+
+/*
   Nodemcu Pin Names
 
   |    Pins       |
@@ -105,7 +105,7 @@ typedef enum {
     GPIOX_MODE_IN_FLOAT,
     GPIOX_MODE_IN_PULLUP,
     GPIOX_MODE_IN_PULLDOWN,
-}GPIOX_Mode_t;
+} GPIOX_Mode_t;
 
 #define GPIOX_PINS_MAX (GPIOX_PINS_SIZE * 32)
 
