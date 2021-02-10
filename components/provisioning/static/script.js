@@ -130,13 +130,13 @@ function saveConfig() {
             if (Array.isArray(variable)) {
                 for (var subVar of variable) {    
                     var value = variableGetValue(setting, subVar);
-                    if (value != "") {
+                    if (value !== "") {
                         config_setting[subVar.name] = value;
                     }
                 }
             } else {       
                 var value = variableGetValue(setting, variable);
-                if (value != ""){
+                if (value !== ""){
                     config_setting[variable.name] = value;
                 }
             }
