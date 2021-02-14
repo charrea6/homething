@@ -46,7 +46,7 @@ void app_main(void)
     notificationLedInit();
 #endif
 
-    CHECK_ERROR(loggingInit());
+    loggingInit();
 
     CHECK_ERROR(wifiInit());
     CHECK_ERROR(iotInit());

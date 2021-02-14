@@ -17,8 +17,6 @@
 #include "notifications.h"
 #include "utils.h"
 
-#define ESP_RETURN_ON_ERR(expr) do { esp_err_t err = expr; if (err != ESP_OK) { ESP_LOGE(TAG, #expr " failed with error %d", err); return -1;}}while(0)
-
 #define MAGIC_SIZE 4
 #define SEQUENCE_OFFSET MAGIC_SIZE
 #define SEQUENCE_SIZE sizeof(uint32_t)
@@ -54,14 +52,17 @@ static putchar_like_t originalPutChar;
 static SemaphoreHandle_t *loggingMutex;
 
 
-int loggingInit()
+void loggingInit()
 {
     nvs_handle handle;
     esp_err_t err;
     uint8_t enabled = 0;
     int i;
 
-    ESP_RETURN_ON_ERR(nvs_open("log", NVS_READONLY, &handle));
+    err = nvs_open("log", NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return;
+    }
 
     if ((nvs_get_u8(handle, "enable", &enabled) == ESP_OK) && enabled) {
 
@@ -75,7 +76,6 @@ int loggingInit()
         } else {
             loggingPort = 5555;
         }
-
 
         buffers = calloc(NROF_BUFFERS, sizeof(struct Buffer));
         if (buffers == NULL) {
@@ -97,7 +97,8 @@ int loggingInit()
         originalPutChar = esp_log_set_putchar(loggingPutChar);
         notificationsRegister(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, loggingWifiNotification, NULL);
     }
-    return 0;
+    nvs_close(handle);
+    return;
 error:
     if (loggingMutex != NULL) {
         vSemaphoreDelete(loggingMutex);
@@ -109,7 +110,7 @@ error:
         free(loggingHost);
     }
     nvs_close(handle);
-    return -1;
+    return;
 }
 
 static int loggingPutChar(int ch)
