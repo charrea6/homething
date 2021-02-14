@@ -20,12 +20,16 @@
 #include "iot.h"
 #include "updater.h"
 #include "gpiox.h"
+#include "notificationled.h"
 #include "notifications.h"
 #include "provisioning.h"
+#include "wifi.h"
 #include "logging.h"
 #include "profile.h"
 
 static const char TAG[] = "main";
+
+#define CHECK_ERROR( __func ) do {if (__func) { ESP_LOGE(TAG, "%s failed!", #__func); return;} } while(0)
 
 void app_main(void)
 {
@@ -37,16 +41,25 @@ void app_main(void)
     ESP_ERROR_CHECK( i2cdev_init() );
 #endif
     notificationsInit();
-    loggingInit();
-    iotInit();
-    provisioningInit();
-    gpioxInit();
-    switchInit();
-    processProfile();
+
+#ifdef CONFIG_NOTIFICATION_LED
+    notificationLedInit();
+#endif
+
+    CHECK_ERROR(loggingInit());
+
+    CHECK_ERROR(wifiInit());
+    CHECK_ERROR(iotInit());
+    CHECK_ERROR(provisioningInit());
+    CHECK_ERROR(gpioxInit());
+    CHECK_ERROR(switchInit());
+    CHECK_ERROR(processProfile());
 
     updaterInit();
 
     switchStart();
     iotStart();
-    provisioningStart();
+    wifiStart();
+
+    CHECK_ERROR(provisioningStart());
 }

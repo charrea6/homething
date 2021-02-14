@@ -31,6 +31,43 @@
     - title: Passphrase (optional)
       name: pass
       type: password
+- title: Notification LED
+  name: notificationled
+  depends on: NOTIFICATION_LED
+  variables:
+  - title: WiFi Connecting
+    name: wifi
+    type: choice
+    choices:
+    - [0, "Off" ]
+    - [1, "On for 0.5s, Off for 0.5s"]
+    - [2, "On for 0.5s, Off for 1s"]
+    - [3, "On for 1s, Off for 1s"]
+    - [4, "On for 0.5s, Off for 5s"]
+    - [5, "On for 1s, Off for 5s"]
+    - [6, "On"]
+  - title: MQTT Connecting
+    name: mqtt
+    type: choice
+    choices:
+    - [0, "Off" ]
+    - [1, "On for 0.5s, Off for 0.5s"]
+    - [2, "On for 0.5s, Off for 1s"]
+    - [3, "On for 1s, Off for 1s"]
+    - [4, "On for 0.5s, Off for 5s"]
+    - [5, "On for 1s, Off for 5s"]
+    - [6, "On"]
+  - title: Connected
+    name: connected
+    type: choice
+    choices:
+    - [0, "Off" ]
+    - [1, "On for 0.5s, Off for 0.5s"]
+    - [2, "On for 0.5s, Off for 1s"]
+    - [3, "On for 1s, Off for 1s"]
+    - [4, "On for 0.5s, Off for 5s"]
+    - [5, "On for 1s, Off for 5s"]
+    - [6, "On"]
 - title: Logging
   name: log
   variables:

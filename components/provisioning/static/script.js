@@ -21,6 +21,12 @@ function variableToStr(setting, variable){
         break;
     case 'string':html=`<div><label for="${varId}">${variable.title}</label><input class="u-full-width" type="text" placeholder="${variable.title}" id="${varId}"></div>`;
         break;
+    case 'choice':html=`<div><label for="${varId}">${variable.title}</label><select class="u-full-width" id="${varId}">`
+        for (var option of variable.choices) {
+            html += `<option value="${option[0]}">${option[1]}</option>`
+        }
+        html += '</select></div>'
+        break;
     }
     return html;
 }
@@ -34,6 +40,9 @@ function variableGetValue(setting, variable) {
         return el.checked;
     }
     if ((variable.type == "port") && (el.value != "")) {
+        return parseInt(el.value);
+    }
+    if (variable.type == "choice") {
         return parseInt(el.value);
     }
     return el.value;

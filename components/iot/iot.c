@@ -7,22 +7,20 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "freertos/timers.h"
+#include "freertos/semphr.h"
 
 #include "esp_log.h"
 #include "esp_system.h"
-#include "esp_wifi.h"
-#include "esp_event_loop.h"
 #include "nvs_flash.h"
 
 #include "driver/gpio.h"
-
-#include "tcpip_adapter.h"
 
 #include "mqtt_client.h"
 #include "cbor.h"
 
 #include "iot.h"
 #include "wifi.h"
+#include "notifications.h"
 #include "sdkconfig.h"
 #include "deviceprofile.h"
 
@@ -124,27 +122,10 @@ static uint8_t taskStatsBuffer[1024];
 static iotBinaryValue_t taskStatsBinaryValue;
 static void iotUpdateTaskStats(TimerHandle_t xTimer);
 #endif
-static void iotWifiConnectionStatus(bool connected);
+static void iotWifiConnectionStatus(void *user,  NotificationsMessage_t *message);
 static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value);
 static void iotUpdateAnnouncedTopics(void);
 
-#ifdef CONFIG_CONNECTION_LED
-
-#define LED_SUBSYS_WIFI 0
-#define LED_SUBSYS_MQTT 1
-#define LED_STATE_ALL_CONNECTED ((1 << LED_SUBSYS_WIFI) | (1 << LED_SUBSYS_MQTT))
-
-#define LED_ON 0
-#define LED_OFF 1
-
-static TimerHandle_t ledTimer;
-static uint8_t connState = 0;
-static void setupLed();
-static void setLedState(int subsystem, bool state);
-#define SET_LED_STATE(subsystem, state) setLedState(subsystem, state)
-#else
-#define SET_LED_STATE(subsystem, state)
-#endif
 
 IOT_DESCRIBE_ELEMENT(
     deviceElementDescription,
@@ -173,18 +154,12 @@ int iotInit(void)
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
 
-#ifdef CONFIG_CONNECTION_LED
-    setupLed();
-#endif
-    result = wifiInit(iotWifiConnectionStatus);
-    if (result) {
-        ESP_LOGE(TAG, "Wifi init failed");
-        return result;
-    }
+    notificationsRegister(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, iotWifiConnectionStatus, NULL);
 
     mqttMutex = xSemaphoreCreateMutex();
     if (mqttMutex == NULL) {
         ESP_LOGE(TAG, "Failed to create mqttMutex!");
+        return -1;
     }
 
     sprintf(mqttPathPrefix, "homething/%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -233,7 +208,6 @@ int iotInit(void)
 void iotStart()
 {
     mqttStart();
-    wifiStart();
 
     xTimerStart(xTimerCreate("updUptime", UPTIME_UPDATE_MS / portTICK_RATE_MS, pdTRUE, NULL, iotUpdateUptime), 0);
 
@@ -647,10 +621,11 @@ static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t va
     }
 }
 
-static void iotWifiConnectionStatus(bool connected)
+static void iotWifiConnectionStatus(void *user,  NotificationsMessage_t *message)
 {
     iotValue_t value;
-    SET_LED_STATE(LED_SUBSYS_WIFI, connected);
+    bool connected = message->data.connectionState == Notifications_ConnectionState_Connected;
+
     if (connected) {
         value.s = wifiGetIPAddrStr();
         iotElementPublish(deviceElement, DEVICE_PUB_INDEX_IP, value);
@@ -911,22 +886,26 @@ static void mqttConnected(void)
 
 static esp_err_t mqttEventHandler(esp_mqtt_event_handle_t event)
 {
+    NotificationsData_t notification;
+
     switch (event->event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT Connected");
-        SET_LED_STATE(LED_SUBSYS_MQTT, true);
         mqttConnected();
         MUTEX_LOCK();
         mqttIsConnected = true;
         MUTEX_UNLOCK();
+        notification.connectionState = Notifications_ConnectionState_Connected;
+        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_MQTT, &notification);
         break;
 
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "MQTT Disconnected");
-        SET_LED_STATE(LED_SUBSYS_MQTT, false);
         MUTEX_LOCK();
         mqttIsConnected = false;
         MUTEX_UNLOCK();
+        notification.connectionState = Notifications_ConnectionState_Disconnected;
+        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_MQTT, &notification);
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
@@ -972,46 +951,3 @@ static void mqttStart(void)
 }
 
 
-#ifdef CONFIG_CONNECTION_LED
-static void onLedTimer(TimerHandle_t xTimer)
-{
-    gpio_set_level(CONFIG_CONNECTION_LED_PIN, !gpio_get_level(CONFIG_CONNECTION_LED_PIN));
-}
-
-static void setupLed()
-{
-    gpio_config_t config;
-
-    config.pin_bit_mask = 1 << CONFIG_CONNECTION_LED_PIN;
-    config.mode = GPIO_MODE_DEF_OUTPUT;
-    config.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    config.pull_up_en = GPIO_PULLUP_DISABLE;
-    config.intr_type = GPIO_INTR_DISABLE;
-    gpio_config(&config);
-    gpio_set_level(CONFIG_CONNECTION_LED_PIN, LED_OFF);
-    ledTimer = xTimerCreate("CONNLED", 500 / portTICK_RATE_MS, pdTRUE, NULL, onLedTimer);
-    xTimerStart(ledTimer, 0);
-}
-
-static void setLedState(int subsystem, bool state)
-{
-    uint8_t oldState = connState;
-    if (state) {
-        connState |= 1<< subsystem;
-    } else {
-        connState &= ~(1<< subsystem);
-    }
-    if (oldState != connState) {
-        if (connState == LED_STATE_ALL_CONNECTED) {
-            if (xTimerIsTimerActive(ledTimer) == pdTRUE) {
-                xTimerStop(ledTimer, 0);
-            }
-            gpio_set_level(CONFIG_CONNECTION_LED_PIN, LED_ON);
-        } else {
-            if (xTimerIsTimerActive(ledTimer) == pdFALSE) {
-                xTimerStart(ledTimer, 0);
-            }
-        }
-    }
-}
-#endif

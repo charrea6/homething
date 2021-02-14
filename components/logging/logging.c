@@ -95,7 +95,7 @@ int loggingInit()
             goto error;
         }
         originalPutChar = esp_log_set_putchar(loggingPutChar);
-        notificationsRegister(Notifications_Class_Wifi, NOTIFICATIONS_ID_WIFI_STATION, loggingWifiNotification, NULL);
+        notificationsRegister(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, loggingWifiNotification, NULL);
     }
     return 0;
 error:
@@ -139,7 +139,8 @@ static int loggingPutChar(int ch)
 
 static void loggingWifiNotification(void *user,  NotificationsMessage_t *message)
 {
-    if (message->data.connectionState) {
+    switch(message->data.connectionState) {
+    case Notifications_ConnectionState_Connected: {
         // Get Logging Host address
         loggingSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
         if (loggingSocket == -1) {
@@ -159,9 +160,14 @@ static void loggingWifiNotification(void *user,  NotificationsMessage_t *message
         }
 
         // Start timer
-    } else {
+    }
+    break;
+    case Notifications_ConnectionState_Disconnected:
         closesocket(loggingSocket);
         loggingSocket = -1;
+        break;
+    default:
+        break;
     }
 }
 

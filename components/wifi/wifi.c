@@ -40,7 +40,6 @@ static char *wifiPassword = NULL;
 static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 static bool connected = false;
 static time_t disconnectedSeconds = 0;
-static WifiConnectionCallback_t connectionCallback;
 
 static esp_err_t wifiEventHandler(void *ctx, system_event_t *event);
 static void wifiStartStation(void);
@@ -49,14 +48,12 @@ static void wifiSetupAP(bool andStation);
 
 static void getUniqName(char *name);
 
-int wifiInit(WifiConnectionCallback_t callback)
+int wifiInit(void)
 {
     int result = 0;
     esp_err_t err;
     nvs_handle handle;
     char hostname[UNIQ_NAME_LEN];
-
-    connectionCallback = callback;
 
     sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
     err = nvs_open("wifi", NVS_READONLY, &handle);
@@ -88,6 +85,7 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
     char hostname[UNIQ_NAME_LEN];
     NotificationsData_t notification;
     esp_err_t err;
+    wifi_sta_list_t staList;
 
     gettimeofday(&tv, NULL);
     ESP_LOGI(TAG, "System Event: %d (secs %ld disconnectedSeconds %ld)", event->event_id, tv.tv_sec, disconnectedSeconds);
@@ -100,6 +98,9 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, \"%s\") == %d", hostname, err);
         }
+        notification.connectionState = Notifications_ConnectionState_Connecting;
+        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
+
         wifiStartStation();
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
@@ -107,23 +108,16 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
         ESP_LOGI(TAG, "Connected to SSID, IP=%s", ipAddr);
         connected = true;
         disconnectedSeconds = 0;
-        if (connectionCallback != NULL) {
-            connectionCallback(true);
-        }
-        notification.connectionState = true;
-        notificationsNotify(Notifications_Class_Wifi, NOTIFICATIONS_ID_WIFI_STATION, &notification);
+        notification.connectionState = Notifications_ConnectionState_Connected;
+        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
         wifiStartStation();
         if (connected) {
-            if (connectionCallback != NULL) {
-                connectionCallback(false);
-            }
             connected = false;
-
-            notification.connectionState = false;
-            notificationsNotify(Notifications_Class_Wifi, NOTIFICATIONS_ID_WIFI_STATION, &notification);
+            notification.connectionState = Notifications_ConnectionState_Disconnected;
+            notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
 
             disconnectedSeconds = tv.tv_sec;
         } else {
@@ -146,6 +140,25 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
         err = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, \"%s\") == %d", hostname, err);
+        }
+        notification.connectionState = Notifications_ConnectionState_Connecting;
+        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
+        break;
+    case SYSTEM_EVENT_AP_STAIPASSIGNED:
+        staList.num = 0;
+        if ((esp_wifi_ap_get_sta_list(&staList) == ESP_OK) && (staList.num == 1)) {
+            notification.connectionState = Notifications_ConnectionState_Connected;
+            notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
+        }
+        break;
+    case SYSTEM_EVENT_AP_STADISCONNECTED:
+        staList.num = 0;
+        if ((esp_wifi_ap_get_sta_list(&staList) == ESP_OK) && (staList.num == 0)) {
+            notification.connectionState = Notifications_ConnectionState_Disconnected;
+            notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
+
+            notification.connectionState = Notifications_ConnectionState_Connecting;
+            notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
         }
         break;
 

@@ -6,7 +6,7 @@
 
 
 typedef enum {
-    Notifications_Class_Wifi = 0,
+    Notifications_Class_Network = 0,
     Notifications_Class_Switch,
     Notifications_Class_Temperature,
     Notifications_Class_Humidity,
@@ -14,12 +14,18 @@ typedef enum {
     Notifications_Class_Max
 } Notifications_Class_e;
 
+typedef enum {
+    Notifications_ConnectionState_Disconnected = 0,
+    Notifications_ConnectionState_Connecting,
+    Notifications_ConnectionState_Connected
+} Notifications_ConnectionState_e;
+
 typedef union {
     uint32_t humidity;  // %RH * 100
     uint32_t pressure;  // hPa * 100
     int32_t temperature; // degrees C * 100
     bool switchState;
-    bool connectionState;
+    Notifications_ConnectionState_e connectionState;
 } NotificationsData_t;
 
 typedef struct {
@@ -39,6 +45,7 @@ typedef void (*NotificationsCallback_t)(void *user,  NotificationsMessage_t *mes
 
 #define NOTIFICATIONS_ID_WIFI_STATION     0x00000000
 #define NOTIFICATIONS_ID_WIFI_AP          0x00000001
+#define NOTIFICATIONS_ID_MQTT             0x00000002
 
 #define NOTIFICATIONS_ID_ALL              0xffffffff
 #define NOTIFICATIONS_ID_ERROR            0xffffffff

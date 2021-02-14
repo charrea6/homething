@@ -21,12 +21,12 @@ config HUMIDISTAT_THRESHOLD
     range 0 100
     depends on HUMIDISTAT
 
-config CONNECTION_LED
-    bool "Enable Wifi/MQTT connection LED"
+config NOTIFICATION_LED
+    bool "Enable notification LED"
 
-config CONNECTION_LED_PIN
+config NOTIFICATION_LED_PIN
     int "GPIO pin for LED"
-    depends on CONNECTION_LED
+    depends on NOTIFICATION_LED
     range 0 16
     default 2
     

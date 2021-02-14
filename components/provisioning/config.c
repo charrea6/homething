@@ -26,6 +26,7 @@ typedef enum FieldType {
     FT_CHECKBOX,
     FT_DEVICE_ID,
     FT_STRING,
+    FT_CHOICE,
     FT_MAX
 } FieldType;
 
@@ -58,6 +59,7 @@ static const cborTypeTest fieldTypeToCborType[FT_MAX] = {
     cbor_value_is_boolean,
     cbor_value_is_text_string,
     cbor_value_is_text_string,
+    cbor_value_is_integer
 };
 
 esp_err_t provisioningConfigPostHandler(httpd_req_t *req)
@@ -343,6 +345,18 @@ static char *setVariables(nvs_handle handle, struct setting *setting, CborValue 
         break;
         case FT_DEVICE_ID:
             break;
+        case FT_CHOICE: {
+            int64_t value;
+            cborErr = cbor_value_get_int64(it, &value);
+            if (cborErr) {
+                errorMsg = "Failed to extract int variable value";
+                goto error;
+            }
+            cbor_value_advance(it);
+            ESP_LOGI(TAG,"Setting %s to %d", foundVariable->name, (uint32_t)value);
+            err = nvs_set_i32(handle, foundVariable->name, (int32_t)value);
+        }
+        break;
         default:
             err = ESP_FAIL;
             break;
@@ -404,6 +418,14 @@ static bool getVariables(nvs_handle handle, struct setting *setting, CborEncoder
             uint8_t mac[6];
             esp_read_mac(mac, ESP_MAC_WIFI_STA);
             cborErr = cbor_encode_byte_string(encoder, mac, sizeof(mac));
+        }
+        break;
+        case FT_CHOICE: {
+            int32_t value;
+            err = nvs_get_i32(handle, var->name, &value);
+            if (err == ESP_OK) {
+                cborErr = cbor_encode_int(encoder, (int64_t)value);
+            }
         }
         break;
         default:

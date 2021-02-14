@@ -10,5 +10,5 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/static_files.c
 )
 
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/settings.h ${CMAKE_BINARY_DIR}/settings.js
-    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/gensettings.py ${CMAKE_CURRENT_SOURCE_DIR}/settings.yml ${CMAKE_BINARY_DIR}/provisioningSettings.h ${CMAKE_BINARY_DIR}/settings.js
-    DEPENDS gensettings.py settings.yml)
+    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/gensettings.py ${CMAKE_BINARY_DIR}/config/sdkconfig.json ${CMAKE_CURRENT_SOURCE_DIR}/settings.yml ${CMAKE_BINARY_DIR}/provisioningSettings.h ${CMAKE_BINARY_DIR}/settings.js
+    DEPENDS gensettings.py settings.yml ${CMAKE_BINARY_DIR}/config/sdkconfig.json)
