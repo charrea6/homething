@@ -53,7 +53,8 @@ void app_main(void)
     CHECK_ERROR(provisioningInit());
     CHECK_ERROR(gpioxInit());
     CHECK_ERROR(switchInit());
-    CHECK_ERROR(processProfile());
+    
+    processProfile();
 
     updaterInit();
 
