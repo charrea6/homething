@@ -29,9 +29,9 @@ void relayInit(uint8_t id, uint8_t pin, uint8_t onLevel, Relay_t *relay)
     relay->u.fields.id = id;
     relay->u.fields.pin = pin;
     relay->u.fields.onLevel = onLevel & 1;
-    relaySetState(relay, false);
-
     relay->element = iotNewElement(&elementDescription, 0, relay, "relay%d", id);
+    relay->u.fields.on = true; // So that we can set it to false in relaySetState!
+    relaySetState(relay, false);
 }
 
 void relaySetState(Relay_t *relay, bool on)
