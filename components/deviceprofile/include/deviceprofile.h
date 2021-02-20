@@ -13,6 +13,7 @@ typedef enum {
     DeviceProfile_EntryType_TSL2561,
     DeviceProfile_EntryType_BME280,
     DeviceProfile_EntryType_DS18B20,
+    DeviceProfile_EntryType_LED,
     DeviceProfile_EntryType_Max
 } DeviceProfile_EntryType_e;
 

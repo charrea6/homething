@@ -17,62 +17,25 @@
 #include "sensors.h"
 #include "dht.h"
 #include "humidityfan.h"
+#include "led.h"
 
 static const char TAG[] = "profile";
 
 typedef int (*initFunc_t)(int);
 typedef Notifications_ID_t (*addFunc_t)(CborValue *);
 
-static const initFunc_t initFuncs[DeviceProfile_EntryType_Max] = {
-    initSwitches,
-    initRelays,
-#ifdef CONFIG_DHT22
-    initDHT22,
-#else
-    NULL,
-#endif
-#ifdef CONFIG_SI7021
-    initSI7021,
-#else
-    NULL,
-#endif
-    NULL,
-#ifdef CONFIG_BME280
-    initBME280,
-#else
-    NULL,
-#endif
-#ifdef CONFIG_DS18x20
-    initDS18x20
-#else
-    NULL
-#endif
-};
-
-static const addFunc_t addFuncs[DeviceProfile_EntryType_Max] = {
-    addSwitch,
-    NULL,
-#ifdef CONFIG_DHT22
-    addDHT22,
-#else
-    NULL,
-#endif
-#ifdef CONFIG_SI7021
-    addSI7021,
-#else
-    NULL,
-#endif
-    NULL,
-#ifdef CONFIG_BME280
-    addBME280,
-#else
-    NULL,
-#endif
-#ifdef CONFIG_DS18x20
-    addDS18x20
-#else
-    NULL
-#endif
+struct Component {
+    initFunc_t init;
+    addFunc_t add;
+} components[DeviceProfile_EntryType_Max] = {
+    SWITCHES_COMPONENT,
+    {initRelays, NULL},
+    DHT22_COMPONENT,
+    SI7021_COMPONENT,
+    {NULL, NULL},
+    BME280_COMPONENT,
+    DS18x20_COMPONENT,
+    LED_COMPONENT
 };
 
 void processProfile(void)
@@ -106,9 +69,9 @@ void processProfile(void)
     }
 
     for (i=DeviceProfile_EntryType_GPIOSwitch; i <DeviceProfile_EntryType_Max; i++) {
-        if ((initFuncs[i] != NULL) && (nrofEntryTypes[i] != 0)) {
+        if ((components[i].init != NULL) && (nrofEntryTypes[i] != 0)) {
             ESP_LOGI(TAG, "EntryType %d Count %d", i, nrofEntryTypes[i]);
-            if (initFuncs[i](nrofEntryTypes[i])) {
+            if (components[i].init(nrofEntryTypes[i])) {
                 goto error;
             }
         }
@@ -127,8 +90,8 @@ void processProfile(void)
     /* Process sensors and switches */
     deviceProfileParseProfile(profile, profileLen, &parser);
     while(!deviceProfileParserNextEntry(&parser, &entry, &entryType)) {
-        if ((entryType < DeviceProfile_EntryType_Max) && (addFuncs[entryType] != NULL)) {
-            ids[entryIndex] = addFuncs[entryType](&entry);
+        if ((entryType < DeviceProfile_EntryType_Max) && (components[entryType].add != NULL)) {
+            ids[entryIndex] = components[entryType].add(&entry);
         }
         entryIndex ++;
         deviceProfileParserCloseEntry(&parser, &entry);
