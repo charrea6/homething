@@ -63,7 +63,7 @@ static const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 #define VT_STRING     HEX_TYPE(IOT_VALUE_TYPE_STRING)
 #define VT_BINARY     HEX_TYPE(IOT_VALUE_TYPE_BINARY)
 #define VT_HUNDREDTHS HEX_TYPE(IOT_VALUE_TYPE_HUNDREDTHS)
-#define VT_CELCIUS    HEX_TYPE(IOT_VALUE_TYPE_CELCIUS)
+#define VT_CELSIUS    HEX_TYPE(IOT_VALUE_TYPE_CELSIUS)
 #define VT_PERCENT_RH HEX_TYPE(IOT_VALUE_TYPE_PERCENT_RH)
 #define VT_KPA        HEX_TYPE(IOT_VALUE_TYPE_KPA)
 
@@ -258,7 +258,7 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value)
     case VT_INT:
     case VT_HUNDREDTHS:
     case VT_PERCENT_RH:
-    case VT_CELCIUS:
+    case VT_CELSIUS:
     case VT_KPA:
         updateRequired = value.i != element->values[pubId].i;
         break;
@@ -321,7 +321,7 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
 
     case VT_HUNDREDTHS:
     case VT_PERCENT_RH:
-    case VT_CELCIUS:
+    case VT_CELSIUS:
     case VT_KPA: {
         char *str = payload;
         int hundredths = value.i;
@@ -424,7 +424,7 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
         }
         break;
 
-    case VT_CELCIUS:
+    case VT_CELSIUS:
     case VT_HUNDREDTHS:
         allowNegative = true;
     case VT_PERCENT_RH:
