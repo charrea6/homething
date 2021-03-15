@@ -5,22 +5,29 @@
 
 #define IOT_DEFAULT_CONTROL NULL
 
+typedef char iotValueType_t;
+
+typedef union iotValue iotValue_t;
+
+typedef struct iotElement *iotElement_t;
+
+typedef void (*iotElementSubUpdateCallback_t)(void *userData, iotElement_t element, iotValue_t value);
+
+typedef void (*iotValueOnConnectCallback_t)(void *userData, iotElement_t element, int pubId, bool release, iotValueType_t *valueType, iotValue_t *value);
+
 typedef struct {
     uint8_t *data;
     int32_t len;
 } iotBinaryValue_t;
 
-typedef union {
+union iotValue {
     int i;
     float f;
     bool b;
     const char *s;
     const iotBinaryValue_t *bin;
-} iotValue_t;
-
-typedef struct iotElement *iotElement_t;
-
-typedef void (*iotElementSubUpdateCallback_t)(void *userData, iotElement_t element, iotValue_t value);
+    iotValueOnConnectCallback_t callback;
+};
 
 typedef struct iotElementSubDescription {
     const char *type_name;
@@ -30,7 +37,7 @@ typedef struct iotElementSubDescription {
 typedef struct iotElementDescription {
     const char * const *pubs;
     const int nrofPubs;
-    const iotElementSubDescription_t const *subs;
+    const iotElementSubDescription_t *subs;
     const int nrofSubs;
 } iotElementDescription_t;
 
@@ -43,6 +50,7 @@ typedef struct iotElementDescription {
 #define IOT_VALUE_TYPE_CELSIUS         6
 #define IOT_VALUE_TYPE_PERCENT_RH      7
 #define IOT_VALUE_TYPE_KPA             8
+#define IOT_VALUE_TYPE_ON_CONNECT      9
 
 #define IOT_VALUE_NOT_RETAINED 0
 #define IOT_VALUE_RETAINED     8
@@ -79,6 +87,9 @@ typedef struct iotElementDescription {
 
 #define IOT_VALUE_TYPE_KPA_NOT_RETAINED         _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_KPA )
 #define IOT_VALUE_TYPE_KPA_RETAINED             _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_KPA )
+
+#define IOT_VALUE_TYPE_ON_CONNECT_NOT_RETAINED  _IOT_DEFINE_TYPE_1( IOT_VALUE_NOT_RETAINED, IOT_VALUE_TYPE_ON_CONNECT )
+#define IOT_VALUE_TYPE_ON_CONNECT_RETAINED      _IOT_DEFINE_TYPE_1( IOT_VALUE_RETAINED,     IOT_VALUE_TYPE_ON_CONNECT )
 
 #define _IOT_DEFINE_TYPE(r, t) IOT_VALUE_TYPE_ ## t ## _ ## r
 
@@ -125,8 +136,12 @@ int iotInit(void);
  */
 void iotStart();
 
-iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, void *userContext, const char const *nameFormat, ...);
+/** Creates a new IOT Element using the specified pub/sub description and printf formatting for the name.
+ */
+iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, void *userContext, const char *nameFormat, ...);
 
+/** Publish a value to the specified element and pubId.
+ */
 void iotElementPublish(iotElement_t element, int pubId, iotValue_t value);
 
 /** Convert a string value to a boolean
@@ -134,5 +149,14 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value);
  * Invalid values return 1
  */
 int iotStrToBool(const char *str, bool *out);
+
+/** Publish a message to the MQTT server.
+ * Returns a negative number on error.
+ */
+int iotMqttPublish(const char *topic, const char *data, int len, int qos, int retain);
+
+/** Returns true if the device is currently connected to an MQTT server.
+ */
+bool iotMqttIsConnected(void);
 
 #endif
