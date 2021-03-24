@@ -22,16 +22,19 @@
 #include "notifications.h"
 #include "sdkconfig.h"
 #include "deviceprofile.h"
+#include "utils.h"
 
 static const char *TAG="IOT-DEV";
+static const char *DESC="desc";
 
-#define DEVICE_PUB_INDEX_UPTIME     0
-#define DEVICE_PUB_INDEX_IP         1
-#define DEVICE_PUB_INDEX_MEM_FREE   2
-#define DEVICE_PUB_INDEX_MEM_LOW    3
-#define DEVICE_PUB_INDEX_PROFILE    4
-#define DEVICE_PUB_INDEX_TOPICS     5
-#define DEVICE_PUB_INDEX_TASK_STATS 6
+#define DEVICE_PUB_INDEX_UPTIME      0
+#define DEVICE_PUB_INDEX_IP          1
+#define DEVICE_PUB_INDEX_MEM_FREE    2
+#define DEVICE_PUB_INDEX_MEM_LOW     3
+#define DEVICE_PUB_INDEX_PROFILE     4
+#define DEVICE_PUB_INDEX_TOPICS      5
+#define DEVICE_PUB_INDEX_DESCRIPTION 6
+#define DEVICE_PUB_INDEX_TASK_STATS  7
 
 static iotElement_t deviceElement;
 
@@ -47,7 +50,7 @@ static void iotDeviceUpdateTaskStats(TimerHandle_t xTimer);
 static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value);
 static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue);
 static void iotDeviceOnConnect(void *userData, iotElement_t element, int pubId, bool release, iotValueType_t *valueType, iotValue_t *value);
-
+static char* iotDeviceGetDescription(void);
 
 IOT_DESCRIBE_ELEMENT(
     deviceElementDescription,
@@ -57,7 +60,8 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(RETAINED, INT, "memFree"),
         IOT_DESCRIBE_PUB(RETAINED, INT, "memLow"),
         IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "profile"),
-        IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "topics")
+        IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "topics"),
+        IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "description")
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
         , IOT_DESCRIBE_PUB(RETAINED, BINARY, "taskStats")
 #endif
@@ -78,7 +82,7 @@ int iotDeviceInit(void)
     iotElementPublish(deviceElement, DEVICE_PUB_INDEX_IP, value);
     iotElementPublish(deviceElement, DEVICE_PUB_INDEX_PROFILE, value);
     iotElementPublish(deviceElement, DEVICE_PUB_INDEX_TOPICS, value);
-
+    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_DESCRIPTION, value);
     return 0;
 }
 
@@ -246,7 +250,18 @@ static void iotDeviceOnConnect(void *userData, iotElement_t element, int pubId, 
             value->bin = bin;
         }
         break;
+    case DEVICE_PUB_INDEX_DESCRIPTION:
+        if (release) {
+            if (value->s) {
+                free((char *)value->s);
+            }
+        } else {
+            *valueType = IOT_VALUE_TYPE_STRING;
+            value->s = iotDeviceGetDescription();
+        }
+        break;
     default:
+        ESP_LOGE(TAG, "Unexpected pub id (%d) in onConnect!", pubId);
         break;
     }
 }
@@ -421,4 +436,23 @@ error:
         free(buffer);
     }
     return -1;
+}
+
+static char* iotDeviceGetDescription(void)
+{
+    esp_err_t err;
+    nvs_handle handle;
+    char *desc = NULL;
+
+    err = nvs_open("thing", NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open thing section (%d)", err);
+        return NULL;
+    }
+    err = nvs_get_str_alloc(handle, DESC, &desc);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get description (%d)", err);
+        return NULL;
+    }
+    return desc;
 }
