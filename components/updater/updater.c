@@ -55,21 +55,21 @@ static char updatePath[256];
 
 /* Device profile string creation - start */
 static char capabilities[] = ""
-                             "flash" CONFIG_ESPTOOLPY_FLASHSIZE ","
+                             "flash" CONFIG_ESPTOOLPY_FLASHSIZE
 #ifdef CONFIG_DHT22
-                             "dht22,"
+                             ",dht22"
 #endif
 #ifdef CONFIG_BME280
-                             "si7201,"
+                             ",si7201"
 #endif
 #ifdef CONFIG_BME280
-                             "bme280,"
+                             ",bme280"
 #endif
 #ifdef CONFIG_DS18x20
-                             "ds18x20,"
+                             ",ds18x20"
 #endif
 #ifdef CONFIG_HUMIDISTAT
-                             "humidistat,"
+                             ",humidistat"
 #endif
                              ;
 /* Device profile string creation - finish */
