@@ -270,7 +270,7 @@ static void bme280MeasureTimer(TimerHandle_t xTimer)
         ESP_LOGE(TAG, "bme280MeasureTimer: Failed reading sensor %d", err);
         return;
     }
-    updateForHundredth(temperature, Notifications_Class_Temperature, sensor, 
+    updateForHundredth(temperature, Notifications_Class_Temperature, sensor,
                        bme280p ? HUMIDITY_PUB_INDEX_TEMPERTURE: TEMPERATURE_PUB_INDEX_TEMPERATURE);
 
     if (bme280p) {
