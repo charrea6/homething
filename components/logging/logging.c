@@ -34,8 +34,8 @@ struct Buffer {
     uint32_t len;
 };
 
+static void loggingDriverInit(void);
 static void loggingSendBuffer(struct Buffer *buffer);
-static int loggingPutChar(int ch);
 static void loggingWifiNotification(void *user,  NotificationsMessage_t *message);
 
 static const char TAG[]="logging";
@@ -47,8 +47,6 @@ static uint32_t sequence = 0;
 static char *loggingHost;
 static uint16_t loggingPort;
 static int loggingSocket = -1;
-
-static putchar_like_t originalPutChar;
 static SemaphoreHandle_t *loggingMutex;
 
 
@@ -94,7 +92,7 @@ void loggingInit()
             ESP_LOGE(TAG, "Failed to create mutex");
             goto error;
         }
-        originalPutChar = esp_log_set_putchar(loggingPutChar);
+        loggingDriverInit();
         notificationsRegister(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, loggingWifiNotification, NULL);
     }
     nvs_close(handle);
@@ -112,6 +110,9 @@ error:
     nvs_close(handle);
     return;
 }
+
+#ifdef CONFIG_IDF_TARGET_ESP8266
+static putchar_like_t originalPutChar;
 
 static int loggingPutChar(int ch)
 {
@@ -137,6 +138,53 @@ static int loggingPutChar(int ch)
     }
     return ch;
 }
+static void loggingDriverInit(void)
+{
+    originalPutChar = esp_log_set_putchar(loggingPutChar);
+}
+#endif
+
+#if CONFIG_IDF_TARGET_ESP32
+static vprintf_like_t originalVprintf;
+
+static int loggingVprintf(const char *fmt, va_list args)
+{
+    char *output = NULL;
+    int r = vasprintf(&output, fmt, args);
+    if (output != NULL) {
+        if (r) {
+            if (xSemaphoreTake(loggingMutex, 10) == pdTRUE) {
+                int i;
+                for (i=0; i < r; i++) {
+                    buffers[currentBuffer].data[HEADER_SIZE + buffers[currentBuffer].len] = output[i];
+                    buffers[currentBuffer].len ++;
+                    if (buffers[currentBuffer].len >= BUFFER_SIZE) {
+                        uint32_t networkSequence;
+                        loggingSendBuffer(&buffers[currentBuffer]);
+                        currentBuffer++;
+                        if (currentBuffer >= NROF_BUFFERS) {
+                            currentBuffer = 0;
+                        }
+                        sequence++;
+                        networkSequence = htonl(sequence);
+                        memcpy(&buffers[currentBuffer].data[SEQUENCE_OFFSET], &networkSequence, sizeof(sequence));
+                        buffers[currentBuffer].len = 0;
+                    }
+                }
+                xSemaphoreGive(loggingMutex);
+            }
+        }
+        free(output);
+    }
+    return r;
+}
+
+static void loggingDriverInit(void)
+{
+    originalVprintf = esp_log_set_vprintf(loggingVprintf);
+}
+
+#endif
 
 static void loggingWifiNotification(void *user,  NotificationsMessage_t *message)
 {

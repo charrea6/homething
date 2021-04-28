@@ -176,7 +176,6 @@ error:
     ESP_LOGE(TAG, "ERROR: %s", errorMsg);
     httpd_resp_set_status(req, HTTPD_400);
     httpd_resp_send(req, errorMsg, -1);
-    ESP_LOGE(TAG, errorMsg);
 
     if (buf) {
         free(buf);
@@ -251,7 +250,6 @@ error:
     ESP_LOGE(TAG, "ERROR: %s", errorMsg);
     httpd_resp_set_status(req, HTTPD_400);
     httpd_resp_send(req, errorMsg, -1);
-    ESP_LOGE(TAG, errorMsg);
 
     if (buf) {
         free(buf);

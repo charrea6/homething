@@ -3,7 +3,11 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+
+#ifdef CONFIG_IDF_TARGET_ESP8266
 #include "esp8266/gpio_struct.h"
+#endif
+
 #include "driver/gpio.h"
 #include "i2cdev.h"
 #include "pcf8574.h"

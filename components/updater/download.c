@@ -70,7 +70,7 @@ static int sendGet(int sock, char *host, int port, char *path)
     const char *GET_FORMAT =
         "GET %s HTTP/1.0\r\n"
         "Host: %s:%d\r\n"
-        "User-Agent: hiot/1.0 esp8266\r\n\r\n";
+        "User-Agent: hiot/1.0 " CONFIG_IDF_TARGET "\r\n\r\n";
 
     l = asprintf(&req,  GET_FORMAT, path, host, port);
     if (l == -1) {

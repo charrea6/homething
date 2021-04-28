@@ -11,12 +11,15 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
-#include "esp_event_loop.h"
 #include "nvs_flash.h"
 
-#include "driver/gpio.h"
-
+#ifdef CONFIG_IDF_TARGET_ESP8266
+#include "esp_event_loop.h"
 #include "tcpip_adapter.h"
+#elif CONFIG_IDF_TARGET_ESP32
+#include "esp_event.h"
+#include "esp_netif.h"
+#endif
 
 #include "wifi.h"
 #include "sdkconfig.h"
@@ -41,7 +44,7 @@ static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 static bool connected = false;
 static time_t disconnectedSeconds = 0;
 
-static esp_err_t wifiEventHandler(void *ctx, system_event_t *event);
+static void wifiDriverInit(void);
 static void wifiStartStation(void);
 static void wifiSetupStation(void);
 static void wifiSetupAP(bool andStation);
@@ -69,9 +72,8 @@ int wifiInit(void)
 
     getUniqName(hostname);
 
-    tcpip_adapter_init();
+    wifiDriverInit();
 
-    ESP_ERROR_CHECK( esp_event_loop_init(wifiEventHandler, NULL) );
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
@@ -79,6 +81,7 @@ int wifiInit(void)
     return result;
 }
 
+#ifdef CONFIG_IDF_TARGET_ESP8266
 static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
 {
     struct timeval tv;
@@ -167,6 +170,169 @@ static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
     }
     return ESP_OK;
 }
+
+static void wifiDriverInit(void)
+{
+    tcpip_adapter_init();
+    ESP_ERROR_CHECK(esp_event_loop_init(wifiEventHandler, NULL));
+}
+#elif CONFIG_IDF_TARGET_ESP32
+
+static esp_netif_t *stationNetif = NULL, *apNetif = NULL;
+
+static void wifiEventStationStart(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+    struct timeval tv;
+    char hostname[UNIQ_NAME_LEN];
+    NotificationsData_t notification;
+    esp_err_t err;
+
+    gettimeofday(&tv, NULL);
+    connected = false;
+    disconnectedSeconds = tv.tv_sec;
+    getUniqName(hostname);
+    err = esp_netif_set_hostname(stationNetif, hostname);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_netif_set_hostname(stationNetif, \"%s\") == %d", hostname, err);
+    }
+    notification.connectionState = Notifications_ConnectionState_Connecting;
+    notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
+
+    wifiStartStation();
+}
+
+static void wifiEventStationGotIP(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+    NotificationsData_t notification;
+    ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+
+    sprintf(ipAddr, IPSTR, IP2STR(&event->ip_info.ip));
+    ESP_LOGI(TAG, "Connected to SSID, IP=%s", ipAddr);
+    connected = true;
+    disconnectedSeconds = 0;
+    notification.connectionState = Notifications_ConnectionState_Connected;
+    notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
+}
+
+static void wifiEventStationDisconnected(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+    struct timeval tv;
+    NotificationsData_t notification;
+
+    gettimeofday(&tv, NULL);
+    sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
+    wifiStartStation();
+    if (connected) {
+        connected = false;
+        notification.connectionState = Notifications_ConnectionState_Disconnected;
+        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
+
+        disconnectedSeconds = tv.tv_sec;
+    } else {
+        if ((disconnectedSeconds + SECS_BEFORE_AP) <= tv.tv_sec) {
+            wifi_mode_t mode = WIFI_MODE_NULL;
+            esp_wifi_get_mode(&mode);
+            if (mode != WIFI_MODE_APSTA) {
+                ESP_LOGI(TAG, "Timeout connecting to SSID, enabling AP...");
+                wifiSetupAP(true);
+            }
+            if ((disconnectedSeconds + SECS_BEFORE_REBOOT) <tv.tv_sec) {
+                ESP_LOGI(TAG, "Timeout connecting to SSID, rebooting...");
+                esp_restart();
+            }
+        }
+    }
+}
+
+static void wifiEventAPStart(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+    struct timeval tv;
+    char hostname[UNIQ_NAME_LEN];
+    NotificationsData_t notification;
+    esp_err_t err;
+
+    gettimeofday(&tv, NULL);
+
+    getUniqName(hostname);
+    err = esp_netif_set_hostname(apNetif, hostname);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_netif_set_hostname(apNetif, \"%s\") == %d", hostname, err);
+    }
+    notification.connectionState = Notifications_ConnectionState_Connecting;
+    notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
+}
+
+static void wifiEventAPStationIPAssigned(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+    NotificationsData_t notification;
+    wifi_sta_list_t staList;
+
+    staList.num = 0;
+    if ((esp_wifi_ap_get_sta_list(&staList) == ESP_OK) && (staList.num == 1)) {
+        notification.connectionState = Notifications_ConnectionState_Connected;
+        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
+    }
+}
+
+static void wifiEventAPStationDisconnected(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+    NotificationsData_t notification;
+    wifi_sta_list_t staList;
+
+    staList.num = 0;
+    if ((esp_wifi_ap_get_sta_list(&staList) == ESP_OK) && (staList.num == 0)) {
+        notification.connectionState = Notifications_ConnectionState_Disconnected;
+        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
+
+        notification.connectionState = Notifications_ConnectionState_Connecting;
+        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
+    }
+}
+
+static void wifiDriverInit(void)
+{
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    stationNetif = esp_netif_create_wifi(WIFI_IF_STA, (esp_netif_inherent_config_t *)ESP_NETIF_BASE_DEFAULT_WIFI_STA);
+    apNetif = esp_netif_create_wifi(WIFI_IF_AP, (esp_netif_inherent_config_t *)ESP_NETIF_BASE_DEFAULT_WIFI_AP);
+    esp_wifi_set_default_wifi_sta_handlers();
+    esp_wifi_set_default_wifi_ap_handlers();
+
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                    WIFI_EVENT_STA_START,
+                    wifiEventStationStart,
+                    NULL,
+                    NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                    WIFI_EVENT_STA_DISCONNECTED,
+                    wifiEventStationDisconnected,
+                    NULL,
+                    NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                    IP_EVENT_STA_GOT_IP,
+                    wifiEventStationGotIP,
+                    NULL,
+                    NULL));
+
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                    WIFI_EVENT_AP_START,
+                    wifiEventAPStart,
+                    NULL,
+                    NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                    WIFI_EVENT_AP_STADISCONNECTED,
+                    wifiEventAPStationDisconnected,
+                    NULL,
+                    NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                    IP_EVENT_AP_STAIPASSIGNED,
+                    wifiEventAPStationIPAssigned,
+                    NULL,
+                    NULL));
+}
+#else
+#error "Unknown target!"
+#endif
 
 void wifiStart(void)
 {
