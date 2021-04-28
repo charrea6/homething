@@ -18,14 +18,15 @@ static uint32_t switchTypeCounts[DeviceProfile_SwitchType_Max] = {0};
 
 static uint32_t switchCount = 0;
 
-static const char * const switchTypes[] = {
+static const char * const switchTypes[DeviceProfile_SwitchType_Max] = {
     "toggle%d",
     "onOff%d",
     "momentary%d",
     "contact%d",
+    "motion%d"
 };
 
-static const char * const switchStateOn[] = {
+static const char * const switchStateOn[DeviceProfile_SwitchType_Max] = {
     "toggled",
     "off",
     "released",
@@ -33,7 +34,7 @@ static const char * const switchStateOn[] = {
     "motion detected"
 };
 
-static const char * const switchStateOff[] = {
+static const char * const switchStateOff[DeviceProfile_SwitchType_Max] = {
     "toggled",
     "on",
     "pressed",
