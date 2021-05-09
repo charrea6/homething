@@ -1,0 +1,9 @@
+menu "IOT"
+
+    config ENABLE_HOMEASSISTANT_DISCOVERY
+        bool "Enable Home Assistant Discovery"
+        default y
+        help
+            This enables sending of configuration information to the home assistant MQTT Discovery topic.
+endmenu
+    

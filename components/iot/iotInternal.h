@@ -46,8 +46,12 @@ struct iotElement {
 iotElement_t iotElementsHead;
 const char *IOT_DEFAULT_CONTROL_STR;
 
+char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
+
 bool mqttIsSetup;
 bool mqttIsConnected;
+
+char *iotElementPubTopic(iotElement_t element, int pubId);
 
 int mqttInit(void);
 void mqttNetworkConnected(bool connected);
@@ -58,4 +62,8 @@ void iotMqttConnected(void);
 
 int iotDeviceInit(void);
 void iotDeviceStart(void);
+
+#ifdef CONFIG_ENABLE_HOMEASSISTANT_DISCOVERY
+void iotHomeAssistantInit(void);
+#endif
 #endif

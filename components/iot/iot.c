@@ -25,7 +25,7 @@ const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 
 iotElement_t iotElementsHead = NULL;
 
-static char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
+char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
 static char mqttCommonCtrlSub[MQTT_COMMON_CTRL_SUB_LEN];
 
 static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t value);
@@ -50,6 +50,10 @@ int iotInit(void)
     if (result != 0) {
         return result;
     }
+
+#ifdef CONFIG_ENABLE_HOMEASSISTANT_DISCOVERY
+    iotHomeAssistantInit();
+#endif
 
     return iotDeviceInit();
 }
@@ -126,22 +130,29 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value)
     }
 }
 
+char *iotElementPubTopic(iotElement_t element, int pubId)
+{
+    char *path;
+
+    if (element->desc->pubs[pubId][PUB_INDEX_NAME] == 0) {
+        asprintf(&path, "%s/%s", mqttPathPrefix, element->name);
+    } else {
+        asprintf(&path, "%s/%s/%s", mqttPathPrefix, element->name, PUB_GET_NAME(element, pubId));
+    }
+
+    return path;
+}
+
 static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t value)
 {
     char *path;
     char payload[30] = "";
     char *message = payload;
     int messageLen = -1;
-    const char *prefix = mqttPathPrefix;
     int rc;
     iotValueOnConnectCallback_t callback = NULL;
 
-    if (element->desc->pubs[pubId][PUB_INDEX_NAME] == 0) {
-        asprintf(&path, "%s/%s", prefix, element->name);
-    } else {
-        asprintf(&path, "%s/%s/%s", prefix, element->name, PUB_GET_NAME(element, pubId));
-    }
-
+    path = iotElementPubTopic(element, pubId);
     if (path == NULL) {
         ESP_LOGE(TAG, "Failed to allocate path when publishing message");
         return false;
@@ -191,7 +202,7 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
 
     case VT_BINARY:
         if (value.bin == NULL) {
-            return false;
+            return true;
         }
         message = (char*)value.bin->data;
         messageLen = (int)value.bin->len;
@@ -199,7 +210,7 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
 
     default:
         free(path);
-        return false;
+        return true;
     }
     if (messageLen == -1) {
         messageLen = strlen((char*)message);
