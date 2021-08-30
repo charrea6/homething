@@ -374,8 +374,9 @@ Notifications_ID_t addDS18x20(CborValue *entry)
     uint32_t pin;
     ds18x20_addr_t deviceAddrs[DS18x20_MAX_DEVICES];
     struct DS18x20Pin *pinStruct;
-    int nrofDevices, i;
+    size_t nrofDevices = 0, i;
     gpio_config_t config;
+    esp_err_t err;
 
     if (deviceProfileParserEntryGetUint32(entry, &pin)) {
         ESP_LOGE(TAG, "addDS18x20: Failed to get pin!");
@@ -390,8 +391,9 @@ Notifications_ID_t addDS18x20(CborValue *entry)
     gpio_config(&config);
 
     ESP_LOGI(TAG, "addDS18x20: Searching pin %u", pin);
-    nrofDevices = ds18x20_scan_devices(pin, deviceAddrs, DS18x20_MAX_DEVICES);
-    if (nrofDevices == 0) {
+    err = ds18x20_scan_devices(pin, deviceAddrs, DS18x20_MAX_DEVICES, &nrofDevices);
+    
+    if ((err != ESP_OK) || (nrofDevices == 0)) {
         ESP_LOGE(TAG, "addDS18x20: Failed find any sensor!");
         return NOTIFICATIONS_ID_ERROR;
     }
@@ -424,7 +426,7 @@ Notifications_ID_t addDS18x20(CborValue *entry)
 static void ds18x20MeasureTimer(TimerHandle_t xTimer)
 {
     struct DS18x20Pin *pinStruct = pvTimerGetTimerID(xTimer);
-    if (ds18x20_measure(pinStruct->pin, ds18x20_ANY, true) != ESP_OK) {
+    if (ds18x20_measure(pinStruct->pin, DS18X20_ANY, true) != ESP_OK) {
         ESP_LOGE(TAG, "ds18x20MeasureTimer: Failed to send measure");
         xTimerStart(pinStruct->measureTimer, 0);
         return;

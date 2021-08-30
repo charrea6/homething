@@ -183,7 +183,7 @@ static int _safestrcmp(const char *constant, int conLen, const char *variable, i
     }
     return strncmp(constant, variable, len);
 }
-#define safestrcmp(constant, variable, len) _safestrcmp(constant, sizeof(constant), variable, len)
+#define safestrcmp(constant, variable, len) _safestrcmp(constant, sizeof("" constant), variable, len)
 #define SETPROFILE "setprofile"
 static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value)
 {
