@@ -23,6 +23,7 @@
 #include "sdkconfig.h"
 #include "deviceprofile.h"
 #include "utils.h"
+#include "safestring.h"
 
 static const char *TAG="IOT-DEV";
 static const char *DESC="desc";
@@ -175,15 +176,6 @@ error:
 }
 #endif
 
-
-static int _safestrcmp(const char *constant, int conLen, const char *variable, int len)
-{
-    if (conLen > len) {
-        return -1;
-    }
-    return strncmp(constant, variable, len);
-}
-#define safestrcmp(constant, variable, len) _safestrcmp(constant, sizeof("" constant), variable, len)
 #define SETPROFILE "setprofile"
 static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value)
 {
