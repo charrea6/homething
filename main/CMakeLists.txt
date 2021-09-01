@@ -1,3 +1,3 @@
-idf_component_register(SRCS "led.c" "switches.c" "profile.c" "user_main.c" "relays.c" "sensors.c"
+idf_component_register(SRCS "led_strips.c" "led.c" "switches.c" "profile.c" "user_main.c" "relays.c" "sensors.c"
                     INCLUDE_DIRS ""
-                    REQUIRES "gpiox" "iot" "switch" "humidityfan" "updater" "provisioning" "notifications" "deviceprofile" "logging" "i2cdev" "bmp280" "si7021" "dht" "ds18x20" "notificationled")
+                    REQUIRES "gpiox" "iot" "switch" "humidityfan" "updater" "provisioning" "notifications" "deviceprofile" "logging" "i2cdev" "bmp280" "si7021" "dht" "ds18x20" "notificationled" "led_strip_spi")

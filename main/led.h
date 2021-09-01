@@ -3,7 +3,7 @@
 #include "cbor.h"
 #include "notifications.h"
 
-int initLeds(int nrofRelays);
+int initLeds(int nrofLeds);
 Notifications_ID_t addLed(CborValue *entry);
 #define LED_COMPONENT {initLeds, addLed}
 #endif

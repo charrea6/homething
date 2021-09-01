@@ -14,6 +14,7 @@ typedef enum {
     DeviceProfile_EntryType_BME280,
     DeviceProfile_EntryType_DS18B20,
     DeviceProfile_EntryType_LED,
+    DeviceProfile_EntryType_LEDStripSPI,
     DeviceProfile_EntryType_Max
 } DeviceProfile_EntryType_e;
 

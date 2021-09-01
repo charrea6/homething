@@ -18,6 +18,7 @@
 #include "dht.h"
 #include "humidityfan.h"
 #include "led.h"
+#include "led_strips.h"
 
 static const char TAG[] = "profile";
 
@@ -35,7 +36,8 @@ struct Component {
     {NULL, NULL},
     BME280_COMPONENT,
     DS18x20_COMPONENT,
-    LED_COMPONENT
+    LED_COMPONENT,
+    LED_STRIP_SPI_COMPONENT
 };
 
 void processProfile(void)
