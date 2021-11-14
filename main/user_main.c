@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
+#include "cJSON.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -26,6 +27,7 @@
 #include "wifi.h"
 #include "logging.h"
 #include "profile.h"
+#include "homeassistant.h"
 
 static const char TAG[] = "main";
 
@@ -40,6 +42,8 @@ void app_main(void)
 #if defined(CONFIG_BME280) || defined(CONFIG_SI7021) || defined(CONFIG_GPIOX_EXPANDERS)
     ESP_ERROR_CHECK( i2cdev_init() );
 #endif
+    cJSON_InitHooks(NULL);
+
     notificationsInit();
 
 #ifdef CONFIG_NOTIFICATION_LED
@@ -57,6 +61,8 @@ void app_main(void)
     processProfile();
 
     updaterInit();
+
+    homeAssistantDiscoveryInit();
 
     switchStart();
     iotStart();

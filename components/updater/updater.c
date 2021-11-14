@@ -36,6 +36,7 @@ static iotElement_t updaterElement;
 
 IOT_DESCRIBE_ELEMENT(
     elementDescription,
+    IOT_ELEMENT_TYPE_OTHER,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, STRING, "version"),
         IOT_DESCRIBE_PUB(RETAINED, STRING, "status"),
@@ -152,4 +153,9 @@ void updaterUpdateStatus(char *status)
     iotValue_t value;
     value.s = status;
     iotElementPublish(updaterElement, PUB_INDEX_STATUS, value);
+}
+
+char *updaterGetVersion(void)
+{
+    return appVersion;
 }

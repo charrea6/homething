@@ -32,6 +32,7 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
 static bool iotElementSendUpdate(iotElement_t element);
 static bool iotElementSubscribe(iotElement_t element);
 static void iotWifiConnectionStatus(void *user,  NotificationsMessage_t *message);
+static char *checkedPathBuffer(const char *elementName, const char *subTopic, char *buffer, size_t *bufferLen);
 
 int iotInit(void)
 {
@@ -406,4 +407,113 @@ static void iotWifiConnectionStatus(void *user,  NotificationsMessage_t *message
     if (mqttIsSetup) {
         mqttNetworkConnected(connected);
     }
+}
+
+bool iotElementIterate(iotElementIterator_t *iterator, bool onlyAnnounced, iotElement_t *nextElement)
+{
+    iotElement_t element = (iotElement_t)*iterator;
+    if (element == NULL) {
+        element = iotElementsHead;
+    }
+    for (; (element != NULL); element = element->next) {
+        if (onlyAnnounced && ((element->flags & IOT_ELEMENT_FLAGS_DONT_ANNOUNCE) != 0)) {
+            continue;
+        }
+        *nextElement = element;
+        *iterator = element->next;
+        return true;
+    }
+    return false;
+}
+
+char *iotElementGetName(iotElement_t element)
+{
+    return element->name;
+}
+
+const iotElementDescription_t *iotElementGetDescription(iotElement_t element)
+{
+    return element->desc;
+}
+
+static char *checkedPathBuffer(const char *elementName, const char *subTopic, char *buffer, size_t *bufferLen)
+{
+    char *result = NULL;
+    size_t required = strlen(mqttPathPrefix) + 1  /* / */ +
+                      strlen(elementName) + 1 /* / */ +
+                      (subTopic != NULL ? strlen(subTopic) + 1 /* \0 */ :  0);
+    if (required <= *bufferLen) {
+        if (subTopic == NULL) {
+            sprintf(buffer, "%s/%s", mqttPathPrefix, elementName);
+        } else {
+            sprintf(buffer, "%s/%s/%s", mqttPathPrefix, elementName, subTopic);
+        }
+        result = buffer;
+    }
+
+    *bufferLen = required;
+    return result;
+}
+
+char *iotElementGetBasePath(iotElement_t element, char *buffer, size_t *bufferLen)
+{
+    return checkedPathBuffer(element->name, NULL, buffer, bufferLen);
+}
+
+char *iotElementGetPubPath(iotElement_t element, int pubId, char *buffer, size_t *bufferLen)
+{
+    const char *pubName;
+    if (pubId >= element->desc->nrofPubs) {
+        bufferLen = 0;
+        return NULL;
+    }
+
+    if (element->desc->pubs[pubId][PUB_INDEX_NAME] == 0) {
+        pubName = NULL;
+    } else {
+        pubName = &element->desc->pubs[pubId][PUB_INDEX_NAME];
+    }
+
+    return checkedPathBuffer(element->name, pubName, buffer, bufferLen);
+}
+
+char *iotElementGetSubPath(iotElement_t element, int subId, char *buffer, size_t *bufferLen)
+{
+    const char *subName;
+    if (subId >= element->desc->nrofSubs) {
+        bufferLen = 0;
+        return NULL;
+    }
+
+    if (element->desc->subs[subId].type_name[SUB_INDEX_NAME] == 0) {
+        subName = IOT_DEFAULT_CONTROL_STR;
+    } else {
+        subName = &element->desc->subs[subId].type_name[SUB_INDEX_NAME];
+    }
+
+    return checkedPathBuffer(element->name, subName, buffer, bufferLen);
+}
+
+const char *iotElementGetPubName(iotElement_t element, int pubId)
+{
+    if (pubId >= element->desc->nrofPubs) {
+        return NULL;
+    }
+
+    return &element->desc->pubs[pubId][PUB_INDEX_NAME];
+}
+
+const char *iotElementGetSubName(iotElement_t element, int subId)
+{
+    const char *subName;
+    if (subId >= element->desc->nrofSubs) {
+        return NULL;
+    }
+
+    if (element->desc->subs[subId].type_name[SUB_INDEX_NAME] == 0) {
+        subName = IOT_DEFAULT_CONTROL_STR;
+    } else {
+        subName = &element->desc->subs[subId].type_name[SUB_INDEX_NAME];
+    }
+    return subName;
 }

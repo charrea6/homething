@@ -83,6 +83,7 @@ static char const TAG[]="sensors";
 
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
     humidityElementDescription,
+    IOT_ELEMENT_TYPE_SENSOR_HUMIDITY,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, PERCENT_RH, IOT_PUB_USE_ELEMENT),
         IOT_DESCRIBE_PUB(RETAINED, CELSIUS, "temperature")
@@ -91,6 +92,7 @@ IOT_DESCRIBE_ELEMENT_NO_SUBS(
 
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
     htpElementDescription, // Humidity / Temperature / Pressure
+    IOT_ELEMENT_TYPE_SENSOR_HUMIDITY,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, PERCENT_RH, IOT_PUB_USE_ELEMENT),
         IOT_DESCRIBE_PUB(RETAINED, CELSIUS, "temperature"),
@@ -100,6 +102,7 @@ IOT_DESCRIBE_ELEMENT_NO_SUBS(
 
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
     temperatureElementDescription, // Temperature
+    IOT_ELEMENT_TYPE_SENSOR_TEMPERATURE,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, CELSIUS, IOT_PUB_USE_ELEMENT)
     )
@@ -107,6 +110,7 @@ IOT_DESCRIBE_ELEMENT_NO_SUBS(
 
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
     tpElementDescription, // Temperature / Pressure
+    IOT_ELEMENT_TYPE_SENSOR_TEMPERATURE,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, CELSIUS, IOT_PUB_USE_ELEMENT),
         IOT_DESCRIBE_PUB(RETAINED, KPA, "pressure")
@@ -392,7 +396,7 @@ Notifications_ID_t addDS18x20(CborValue *entry)
 
     ESP_LOGI(TAG, "addDS18x20: Searching pin %u", pin);
     err = ds18x20_scan_devices(pin, deviceAddrs, DS18x20_MAX_DEVICES, &nrofDevices);
-    
+
     if ((err != ESP_OK) || (nrofDevices == 0)) {
         ESP_LOGE(TAG, "addDS18x20: Failed find any sensor!");
         return NOTIFICATIONS_ID_ERROR;

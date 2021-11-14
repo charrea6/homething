@@ -27,6 +27,7 @@ static const char ON[] = "on";
 
 IOT_DESCRIBE_ELEMENT(
     elementDescription,
+    IOT_ELEMENT_TYPE_SWITCH,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, STRING, "state")
     ),

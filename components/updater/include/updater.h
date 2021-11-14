@@ -21,4 +21,6 @@ void updaterUpdate(char *host, int port, char *path);
  * <configured prefix>/<build profile>/<version>.ota
   */
 void updaterInit();
+
+char *updaterGetVersion(void);
 #endif

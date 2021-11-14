@@ -33,6 +33,7 @@ static int fanCount=0;
 
 IOT_DESCRIBE_ELEMENT(
     elementDescription,
+    IOT_ELEMENT_TYPE_OTHER,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, BOOL, "state"),
         IOT_DESCRIBE_PUB(RETAINED, PERCENT_RH, "humidity"),

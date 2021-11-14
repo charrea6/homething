@@ -46,6 +46,7 @@ static const char TAG[] = "switches";
 
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
     elementDescription,
+    IOT_ELEMENT_TYPE_OTHER,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(NOT_RETAINED, STRING, IOT_PUB_USE_ELEMENT)
     )

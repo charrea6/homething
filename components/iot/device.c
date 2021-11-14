@@ -55,6 +55,7 @@ static char* iotDeviceGetDescription(void);
 
 IOT_DESCRIBE_ELEMENT(
     deviceElementDescription,
+    IOT_ELEMENT_TYPE_OTHER,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, INT, "uptime"),
         IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "ip"),

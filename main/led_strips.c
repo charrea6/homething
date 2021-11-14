@@ -30,6 +30,7 @@ static void ledStripSPIUpdateColor(void);
 
 IOT_DESCRIBE_ELEMENT(
     elementDescription,
+    IOT_ELEMENT_TYPE_OTHER,
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, INT, "ledcount"),
         IOT_DESCRIBE_PUB(RETAINED, BOOL, "state"),
@@ -95,10 +96,10 @@ Notifications_ID_t addLEDStripSPI(CborValue *entry)
     ledStrip->element = iotNewElement(&elementDescription, 0, ledStrip, "ledStrip");
     value.i = strip.length;
     iotElementPublish(ledStrip->element, PUB_IDX_LEDCOUNT, value);
-    
+
     value.b = ledStrip->state;
     iotElementPublish(ledStrip->element, PUB_IDX_STATE, value);
-    
+
     ledStripSPIUpdate();
 
     value.i = ledStrip->brightness;
@@ -145,15 +146,15 @@ void ledStripSPIControl(void *led, iotElement_t *element, iotValue_t value)
     }
 }
 
-void ledStripSPIUpdate(void) 
+void ledStripSPIUpdate(void)
 {
     esp_err_t err;
-    
+
     uint8_t brightness = ledStrip->state ? ledStrip->brightness: 0;
 
     err = led_strip_spi_fill_brightness(&ledStrip->strip, 0, ledStrip->strip.length, ledStrip->color, brightness);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set all leds to %d, %d, %d, %d => %08x", 
+        ESP_LOGE(TAG, "Failed to set all leds to %d, %d, %d, %d => %08x",
                  ledStrip->color.red, ledStrip->color.green, ledStrip->color.blue, brightness, err);
         return;
     }
