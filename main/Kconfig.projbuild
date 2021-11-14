@@ -29,5 +29,8 @@ config NOTIFICATION_LED_PIN
     depends on NOTIFICATION_LED
     range 0 16
     default 2
+
+config HOMEASSISTANT
+    bool "Enable Home Assistant Discovery support"
     
 endmenu
