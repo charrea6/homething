@@ -41,6 +41,7 @@ static char mqttServer[MAX_LENGTH_MQTT_SERVER];
 static int mqttPort;
 static char mqttUsername[MAX_LENGTH_MQTT_USERNAME];
 static char mqttPassword[MAX_LENGTH_MQTT_PASSWORD];
+static SemaphoreHandle_t sendMutex;
 
 static void mqttMessageArrived(char *mqttTopic, int mqttTopicLen, char *data, int dataLen);
 static esp_err_t mqttEventHandler(esp_mqtt_event_handle_t event);
@@ -49,6 +50,8 @@ int mqttInit(void)
 {
     nvs_handle handle;
     esp_err_t err;
+    
+    sendMutex = xSemaphoreCreateMutex();
 
     err = nvs_open("mqtt", NVS_READONLY, &handle);
     if (err == ESP_OK) {
@@ -103,7 +106,11 @@ bool iotMqttIsConnected(void)
 
 int iotMqttPublish(const char *topic, const char *data, int len, int qos, int retain)
 {
-    return esp_mqtt_client_publish(mqttClient, topic, data, len, qos, retain);
+    int result;
+    xSemaphoreTake(sendMutex, portMAX_DELAY);
+    result = esp_mqtt_client_publish(mqttClient, topic, data, len, qos, retain);
+    xSemaphoreGive(sendMutex);
+    return result;
 }
 
 bool mqttSubscribe(char *topic)
