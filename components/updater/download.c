@@ -147,7 +147,7 @@ static int onBody(http_parser* parser, const char *at, size_t length)
     return r;
 }
 
-void updaterUpdate(char *host, int port, char *path)
+void updaterDownloadAndUpdate(char *host, int port, char *path)
 {
     int sock;
     int err = -1;

@@ -16,6 +16,7 @@
 #include "updater.h"
 
 #include "sdkconfig.h"
+#include "updaterInternal.h"
 
 #define MAX_VERSION_LEN 31
 
@@ -113,19 +114,14 @@ static void updaterThread(void *pvParameter)
         snprintf(updatePath, sizeof(updatePath),"%s/homething__%s.ota", CONFIG_UPDATER_PATH_PREFIX, newVersion);
 #endif
 
-        updaterUpdate(CONFIG_UPDATER_HOST, CONFIG_UPDATER_PORT, updatePath);
+        updaterDownloadAndUpdate(CONFIG_UPDATER_HOST, CONFIG_UPDATER_PORT, updatePath);
     }
 }
 
 static void updateVersion(void *userData, iotElement_t element, iotValue_t value)
 {
     ESP_LOGI(TAG, "Updating to version %s", value.s);
-    if (strlen(value.s) <= MAX_VERSION_LEN) {
-        strcpy(newVersion, value.s);
-        xEventGroupSetBits(updateEventGroup, UPDATE_BIT);
-    } else {
-        updaterUpdateStatus("Failed : Version too long");
-    }
+    updaterUpdate(value.s);
 }
 
 void updaterInit()
@@ -153,6 +149,17 @@ void updaterUpdateStatus(char *status)
     iotValue_t value;
     value.s = status;
     iotElementPublish(updaterElement, PUB_INDEX_STATUS, value);
+}
+
+void updaterUpdate(const char *updateVersion)
+{
+    ESP_LOGI(TAG, "Updating to version %s", updateVersion);
+    if (strlen(updateVersion) <= MAX_VERSION_LEN) {
+        strcpy(newVersion, updateVersion);
+        xEventGroupSetBits(updateEventGroup, UPDATE_BIT);
+    } else {
+        updaterUpdateStatus("Failed : Version too long");
+    }
 }
 
 char *updaterGetVersion(void)

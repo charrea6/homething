@@ -8,8 +8,6 @@ extern char updaterStatusBuffer[];
 
 void updaterUpdateStatus(char *);
 
-void updaterUpdate(char *host, int port, char *path);
-
 /** Initialise the OTA updater subsystem.
  * The subsystem is initialised with a profile (generate at build time) that is used to identify builds for
  * this type of device. This will be a string defining the functionality in the build, for example 'LLLTHM'
@@ -21,6 +19,11 @@ void updaterUpdate(char *host, int port, char *path);
  * <configured prefix>/<build profile>/<version>.ota
   */
 void updaterInit();
+
+/**
+ * Update the firmware the version specified in updateVersion
+ */
+void updaterUpdate(const char *updateVersion);
 
 char *updaterGetVersion(void);
 #endif
