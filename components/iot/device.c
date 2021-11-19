@@ -15,6 +15,7 @@
 
 #include "mqtt_client.h"
 #include "cbor.h"
+#include "cJSON.h"
 
 #include "iot.h"
 #include "iotInternal.h"
@@ -27,46 +28,47 @@
 
 static const char *TAG="IOT-DEV";
 static const char *DESC="desc";
+static const char *UPTIME="uptime";
+static const char *MEMORY="mem";
+static const char *MEMORY_FREE="free";
+static const char *MEMORY_LOW="low";
+static const char *TASK_STATS="tasks";
+static const char *TASK_NAME="name";
+static const char *TASK_STACK="stackMinLeft";
 
-#define DEVICE_PUB_INDEX_UPTIME      0
-#define DEVICE_PUB_INDEX_IP          1
-#define DEVICE_PUB_INDEX_MEM_FREE    2
-#define DEVICE_PUB_INDEX_MEM_LOW     3
-#define DEVICE_PUB_INDEX_PROFILE     4
-#define DEVICE_PUB_INDEX_TOPICS      5
-#define DEVICE_PUB_INDEX_DESCRIPTION 6
-#define DEVICE_PUB_INDEX_TASK_STATS  7
+#define DEVICE_PUB_INDEX_IP          0
+#define DEVICE_PUB_INDEX_PROFILE     1
+#define DEVICE_PUB_INDEX_TOPICS      2
+#define DEVICE_PUB_INDEX_DESCRIPTION 3
+#define DEVICE_PUB_INDEX_DIAG        4
 
 static iotElement_t deviceElement;
 
-#define UPTIME_UPDATE_MS 5000
+#define DIAG_UPDATE_MS (1000 * 30) // 30 Seconds
+static char *diagValue = NULL;
 
-static void iotDeviceUpdateUptime(TimerHandle_t xTimer);
-static void iotDeviceUpdateMemoryStats(void);
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
-static uint8_t taskStatsBuffer[1024];
-static iotBinaryValue_t taskStatsBinaryValue;
-static void iotDeviceUpdateTaskStats(TimerHandle_t xTimer);
+static TaskStatus_t *getTaskStats(unsigned long *nrofTasks);
 #endif
+static void iotDeviceUpdateDiag(TimerHandle_t xTimer);
 static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value);
 static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue);
 static void iotDeviceOnConnect(void *userData, iotElement_t element, int pubId, bool release, iotValueType_t *valueType, iotValue_t *value);
 static char* iotDeviceGetDescription(void);
 
+/* CBOR Helper functions */
+static size_t getCborStrRequirement(const char *str);
+static size_t getCborUintRequirement(const uint value) ;
+
 IOT_DESCRIBE_ELEMENT(
     deviceElementDescription,
     IOT_ELEMENT_TYPE_OTHER,
     IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(RETAINED, INT, "uptime"),
         IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "ip"),
-        IOT_DESCRIBE_PUB(RETAINED, INT, "memFree"),
-        IOT_DESCRIBE_PUB(RETAINED, INT, "memLow"),
         IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "profile"),
         IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "topics"),
-        IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "description")
-#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
-        , IOT_DESCRIBE_PUB(RETAINED, BINARY, "taskStats")
-#endif
+        IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "description"),
+        IOT_DESCRIBE_PUB(RETAINED, STRING, "diag")
     ),
     IOT_SUB_DESCRIPTIONS(
         IOT_DESCRIBE_SUB(BINARY, IOT_SUB_DEFAULT_NAME, iotDeviceControl)
@@ -77,9 +79,8 @@ int iotDeviceInit(void)
 {
     iotValue_t value;
     deviceElement = iotNewElement(&deviceElementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE, NULL, "device");
-    iotDeviceUpdateMemoryStats();
-
-
+    iotDeviceUpdateDiag(NULL);
+    
     value.callback = iotDeviceOnConnect;
     iotElementPublish(deviceElement, DEVICE_PUB_INDEX_IP, value);
     iotElementPublish(deviceElement, DEVICE_PUB_INDEX_PROFILE, value);
@@ -90,92 +91,104 @@ int iotDeviceInit(void)
 
 void iotDeviceStart(void)
 {
-    xTimerStart(xTimerCreate("updUptime", UPTIME_UPDATE_MS / portTICK_RATE_MS, pdTRUE, NULL, iotDeviceUpdateUptime), 0);
-
-#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
-    xTimerStart(xTimerCreate("stats", 30*1000 / portTICK_RATE_MS, pdTRUE, NULL, iotDeviceUpdateTaskStats), 0);
-#endif
-}
-
-static void iotDeviceUpdateMemoryStats(void)
-{
-    iotValue_t value;
-    value.i = (int) esp_get_free_heap_size();
-    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_MEM_FREE, value);
-    value.i = (int)esp_get_minimum_free_heap_size();
-    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_MEM_LOW, value);
-}
-
-static void iotDeviceUpdateUptime(TimerHandle_t xTimer)
-{
-    iotValue_t value;
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    value.i = tv.tv_sec;
-    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_UPTIME, value);
-
-    iotDeviceUpdateMemoryStats();
+    xTimerStart(xTimerCreate("deviceDiag", DIAG_UPDATE_MS / portTICK_RATE_MS, pdTRUE, NULL, iotDeviceUpdateDiag), 0);
 }
 
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
-static void iotDeviceUpdateTaskStats(TimerHandle_t xTimer)
+static TaskStatus_t *getTaskStats(unsigned long *nrofTasks)
 {
-    iotValue_t value;
-    CborEncoder encoder, taskArrayEncoder, taskEntryEncoder;
-    CborError cborErr;
-    int i;
-    unsigned long nrofTasks = uxTaskGetNumberOfTasks();
-    TaskStatus_t *tasksStatus = malloc(sizeof(TaskStatus_t) * nrofTasks);
+    *nrofTasks = uxTaskGetNumberOfTasks();
+    TaskStatus_t *tasksStatus = malloc(sizeof(TaskStatus_t) * (*nrofTasks));
     if (tasksStatus == NULL) {
         ESP_LOGE(TAG, "Failed to allocate task status array");
-        return;
+        return NULL;
     }
-    nrofTasks = uxTaskGetSystemState( tasksStatus, nrofTasks, NULL);
-    taskStatsBinaryValue.data = taskStatsBuffer;
-    value.bin = &taskStatsBinaryValue;
-    cbor_encoder_init(&encoder, taskStatsBuffer, sizeof(taskStatsBuffer), 0);
-
-    cborErr = cbor_encoder_create_array(&encoder, &taskArrayEncoder, nrofTasks);
-    if (cborErr != CborNoError) {
-        ESP_LOGE(TAG, "Failed to create task stats array");
-        goto error;
-    }
-
+    *nrofTasks = uxTaskGetSystemState( tasksStatus, *nrofTasks, NULL);
+    return tasksStatus;
+}
+#endif
+#ifdef PRINT_TASK_STATS
+static void printTaskStats(TaskStatus_t *tasksStatus, unsigned long nrofTasks)
+{
+    int i;
     for (i=0; i < 80; i++) {
         putchar('=');
     }
     putchar('\n');
     printf("Name                : Stack Left\n"
            "--------------------------------\n");
-
     for (i=0; i < nrofTasks; i++) {
-        cborErr = cbor_encoder_create_array(&taskArrayEncoder, &taskEntryEncoder, 2);
-        if (cborErr != CborNoError) {
-            ESP_LOGE(TAG, "Failed to create task entry array");
-            goto error;
-        }
-        cbor_encode_text_stringz(&taskEntryEncoder, tasksStatus[i].pcTaskName);
-        cbor_encode_uint(&taskEntryEncoder, tasksStatus[i].usStackHighWaterMark);
-        cbor_encoder_close_container(&taskArrayEncoder, &taskEntryEncoder);
         printf("%-20s: % 10d\n", tasksStatus[i].pcTaskName, tasksStatus[i].usStackHighWaterMark);
     }
-    cbor_encoder_close_container(&encoder, &taskArrayEncoder);
-    taskStatsBinaryValue.len = cbor_encoder_get_buffer_size(&encoder, taskStatsBuffer);
-    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_TASK_STATS, value);
     for (i=0; i < 80; i++) {
         putchar('=');
     }
     putchar('\n');
-
-    free(tasksStatus);
-    return;
-
-error:
-    taskStatsBinaryValue.len = 0;
-    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_TASK_STATS, value);
-    free(tasksStatus);
 }
 #endif
+
+static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
+{
+    if (diagValue != NULL) {
+        free(diagValue);
+    }
+    uint32_t free_at_start = esp_get_free_heap_size();
+    cJSON *object;
+    object = cJSON_CreateObject();
+    if (object == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for diag");
+        return;
+    }
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    cJSON_AddNumberToObject(object, UPTIME, (double)tv.tv_sec);
+
+    cJSON *mem = cJSON_AddObjectToObject(object, MEMORY);
+    if (mem != NULL) {
+        cJSON_AddNumberToObject(mem, MEMORY_FREE, (double)esp_get_free_heap_size());
+        cJSON_AddNumberToObject(mem, MEMORY_LOW, (double)esp_get_minimum_free_heap_size());
+    }
+#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
+    unsigned long nrofTasks = uxTaskGetNumberOfTasks();
+    TaskStatus_t *tasksStatus = getTaskStats(&nrofTasks);
+    if (tasksStatus != NULL) {
+#ifdef PRINT_TASK_STATS
+        printTaskStats(tasksStatus, nrofTasks);
+#endif
+        cJSON *tasks = cJSON_AddArrayToObject(object, TASK_STATS);
+        
+        int i;
+        for (i=0; i < nrofTasks; i++) {
+            cJSON *task = cJSON_CreateObject();
+            if (task == NULL) {
+                break;
+            }
+            if (cJSON_AddStringToObject(task, TASK_NAME, tasksStatus[i].pcTaskName) == NULL){
+                cJSON_Delete(task);
+                break;
+            }
+            if (cJSON_AddNumberToObject(task, TASK_STACK, tasksStatus[i].usStackHighWaterMark) == NULL){
+                cJSON_Delete(task);
+                break;
+            }
+            cJSON_AddItemToArray(tasks, task);
+        }
+        free(tasksStatus);
+    }
+#endif
+    diagValue = cJSON_PrintUnformatted(object);
+    uint32_t free_after_format = esp_get_free_heap_size();
+    cJSON_Delete(object);
+    if (diagValue == NULL) {
+        return;
+    }
+    iotValue_t value;
+    value.s = diagValue;
+    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_DIAG, value);
+    uint32_t free_at_end = esp_get_free_heap_size();
+    ESP_LOGW(TAG, "Diag entry memory: %u @start %u @formatted %u @end", free_at_start, free_after_format, free_at_end);
+}
 
 #define SETPROFILE "setprofile"
 static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value)
@@ -259,40 +272,21 @@ static void iotDeviceOnConnect(void *userData, iotElement_t element, int pubId, 
     }
 }
 
-static size_t get_cbor_str_requirement(const char *str)
-{
-    size_t len = strlen(str);
-    size_t req = len + 1;
-    if (len > 23) {
-        req++;
-        if (len > 255) {
-            req++;
-            if (len > 0xffff) {
-                ESP_LOGE(TAG, "get_cbor_str_requirement: Very large string! len %u", len);
-                req += 2;
-            }
-        }
-    }
-    return req;
-}
-
 static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
 {
     int i, nrofElements = 0;
-    iotElement_t element = iotElementsHead;
+    iotElementIterator_t iterator = IOT_ELEMENT_ITERATOR_START;
+    iotElement_t element;
     iotElementDescription_t const **descriptions;
     size_t descriptionsEstimate = 1, elementsEstimate = 1, totalEstimate;
     int nrofDescriptions = 0;
     uint8_t *buffer = NULL;
     CborEncoder encoder, deArrayEncoder, deMapEncoder;
 
-    for (element = iotElementsHead; element; element = element->next) {
-        if ((element->flags & IOT_ELEMENT_FLAGS_DONT_ANNOUNCE) != 0) {
-            continue;
-        }
+    while(iotElementIterate(&iterator, true, &element)) {
         nrofElements++;
         // String length + 2 bytes for CBOR encoding of string + 5 bytes for description id
-        elementsEstimate += get_cbor_str_requirement(element->name) + 5;
+        elementsEstimate += getCborStrRequirement(element->name) + 5;
     }
 
     descriptions = calloc(nrofElements, sizeof(iotElementDescription_t *));
@@ -300,14 +294,11 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
         ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for descriptions");
         goto error;
     }
-
-    for (element = iotElementsHead; element; element = element->next) {
-        if ((element->flags & IOT_ELEMENT_FLAGS_DONT_ANNOUNCE) != 0) {
-            continue;
-        }
-
+    
+    iterator = IOT_ELEMENT_ITERATOR_START;
+    while(iotElementIterate(&iterator, true, &element)) {
         bool found = false;
-        size_t estimate = 1 + 1; // 1 byte for array of pubs and subs + 2 for pubs map
+        size_t estimate = 1; // 1 byte for array of pubs and subs + 2 for pubs map
         for (i = 0; i < nrofDescriptions; i++) {
             if (descriptions[i] == element->desc) {
                 found = true;
@@ -320,28 +311,22 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
         descriptions[nrofDescriptions] = element->desc;
         nrofDescriptions ++;
 
-        if (element->desc->nrofPubs > 23) {
-            estimate++;
-            if (element->desc->nrofPubs > 255) {
-                ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many pubs for %s", element->name);
-                goto error;
-            }
+        if (element->desc->nrofPubs > 255) {
+            ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many pubs for %s", element->name);
+            goto error;
         }
+        if (element->desc->nrofSubs > 256) {
+            ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many subs for %s", element->name);
+            goto error;
+        }
+        estimate = getCborUintRequirement(element->desc->nrofPubs);
 
         for (i = 0; i < element->desc->nrofPubs; i++) {
             // String length + 2 bytes for CBOR encoding of string + 1 byte for type
-            estimate += get_cbor_str_requirement(PUB_GET_NAME(element, i)) + 1;
+            estimate += getCborStrRequirement(PUB_GET_NAME(element, i)) + 1;
         }
-
-        estimate += 1; // for subs map
+        estimate += getCborUintRequirement(element->desc->nrofSubs);
         if (element->desc->nrofSubs) {
-            if (element->desc->nrofSubs > 23) {
-                estimate += 1;
-                if (element->desc->nrofSubs > 256) {
-                    ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many subs for %s", element->name);
-                    goto error;
-                }
-            }
             for (i = 0; i < element->desc->nrofSubs; i++) {
                 const char *name;
                 if (element->desc->subs[i].type_name[SUB_INDEX_NAME] == 0) {
@@ -350,7 +335,7 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
                     name = SUB_GET_NAME(element, i);
                 }
                 // String length + 2 bytes for CBOR encoding of string + 1 byte for type
-                estimate += get_cbor_str_requirement(name) + 1;
+                estimate += getCborStrRequirement(name) + 1;
             }
         }
 
@@ -405,11 +390,9 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
 
     // Encode elements: { element name: description ptr ...}
     CHECK_CBOR_ERROR(cbor_encoder_create_map(&deArrayEncoder, &deMapEncoder, nrofElements), "Failed to create elements map");
-    for (element = iotElementsHead; element; element = element->next) {
-        if ((element->flags & IOT_ELEMENT_FLAGS_DONT_ANNOUNCE) != 0) {
-            continue;
-        }
-
+    
+    iterator = IOT_ELEMENT_ITERATOR_START;
+    while(iotElementIterate(&iterator, true, &element)) {
         CHECK_CBOR_ERROR(cbor_encode_text_stringz(&deMapEncoder, element->name), "encode failed for element name");
         CHECK_CBOR_ERROR(cbor_encode_uint(&deMapEncoder, (uint32_t)element->desc), "encode failed for element description");
     }
@@ -448,4 +431,29 @@ static char* iotDeviceGetDescription(void)
         return NULL;
     }
     return desc;
+}
+
+static size_t getCborStrRequirement(const char *str)
+{
+    size_t len = strlen(str);
+    size_t req = len + getCborUintRequirement(len);
+    if (len > 0xffff) {
+        ESP_LOGE(TAG, "getCborStrRequirement: Very large string! len %u", len);
+    }
+    return req;
+}
+
+static size_t getCborUintRequirement(const uint value) 
+{
+    size_t req = 1;
+    if (value > 23) {
+        req++;
+        if (value > 255) {
+            req++;
+            if (value > 0xffff) {
+                req += 2;
+            }
+        }
+    }
+    return req;
 }
