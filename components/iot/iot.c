@@ -96,28 +96,28 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value)
         return;
     }
 
-    switch(VT_BARE_TYPE(PUB_GET_TYPE(element, pubId))) {
-    case VT_BOOL:
+    switch(element->desc->pubs[pubId].type) {
+    case IOT_VALUE_TYPE_BOOL:
         updateRequired = value.b != element->values[pubId].b;
         break;
-    case VT_INT:
-    case VT_HUNDREDTHS:
-    case VT_PERCENT_RH:
-    case VT_CELSIUS:
-    case VT_KPA:
+    case IOT_VALUE_TYPE_INT:
+    case IOT_VALUE_TYPE_HUNDREDTHS:
+    case IOT_VALUE_TYPE_PERCENT_RH:
+    case IOT_VALUE_TYPE_CELSIUS:
+    case IOT_VALUE_TYPE_KPA:
         updateRequired = value.i != element->values[pubId].i;
         break;
-    case VT_FLOAT:
+    case IOT_VALUE_TYPE_FLOAT:
         updateRequired = value.f != element->values[pubId].f;
         break;
-    case VT_STRING:
-    case VT_BINARY:
+    case IOT_VALUE_TYPE_STRING:
+    case IOT_VALUE_TYPE_BINARY:
         updateRequired = true;
         break;
-    case VT_ON_CONNECT:
+    case IOT_VALUE_TYPE_ON_CONNECT:
         break;
     default:
-        ESP_LOGE(TAG, "Unknown pub type %d for %s!", PUB_GET_TYPE(element, pubId), PUB_GET_NAME(element, pubId));
+        ESP_LOGE(TAG, "Unknown pub type %d for %s!", element->desc->pubs[pubId].type, element->desc->pubs[pubId].name);
         return;
     }
     if (updateRequired) {
@@ -139,20 +139,20 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
     iotElementCallback_t callback = NULL;
     iotElementCallbackDetails_t details;
 
-    if (element->desc->pubs[pubId][PUB_INDEX_NAME] == 0) {
+    if (element->desc->pubs[pubId].name[0] == 0) {
         asprintf(&path, "%s/%s", prefix, element->name);
     } else {
-        asprintf(&path, "%s/%s/%s", prefix, element->name, PUB_GET_NAME(element, pubId));
+        asprintf(&path, "%s/%s/%s", prefix, element->name, element->desc->pubs[pubId].name);
     }
 
     if (path == NULL) {
         ESP_LOGE(TAG, "Failed to allocate path when publishing message");
         return false;
     }
-    iotValueType_t valueType = PUB_GET_TYPE(element, pubId);
-    int retain = VT_IS_RETAINED(valueType);
+    iotValueType_t valueType = element->desc->pubs[pubId].type;
+    int retain = element->desc->pubs[pubId].retained;
 
-    if (VT_BARE_TYPE(valueType) == VT_ON_CONNECT) {
+    if (valueType == IOT_VALUE_TYPE_ON_CONNECT) {
         callback = element->callback;
         if (callback == NULL) {
             ESP_LOGE(TAG, "Element callback was NULL when publishing message");
@@ -165,23 +165,23 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
         value = details.value;
     }
 
-    switch(VT_BARE_TYPE(valueType)) {
-    case VT_BOOL:
+    switch(valueType) {
+    case IOT_VALUE_TYPE_BOOL:
         message = (value.b) ? "on":"off";
         break;
 
-    case VT_INT:
+    case IOT_VALUE_TYPE_INT:
         sprintf(payload, "%d", value.i);
         break;
 
-    case VT_FLOAT:
+    case IOT_VALUE_TYPE_FLOAT:
         sprintf(payload, "%f", value.f);
         break;
 
-    case VT_HUNDREDTHS:
-    case VT_PERCENT_RH:
-    case VT_CELSIUS:
-    case VT_KPA: {
+    case IOT_VALUE_TYPE_HUNDREDTHS:
+    case IOT_VALUE_TYPE_PERCENT_RH:
+    case IOT_VALUE_TYPE_CELSIUS:
+    case IOT_VALUE_TYPE_KPA: {
         char *str = payload;
         int hundredths = value.i;
         if (hundredths < 0) {
@@ -193,14 +193,14 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
     }
     break;
 
-    case VT_STRING:
+    case IOT_VALUE_TYPE_STRING:
         message = (char*)value.s;
         if (message == NULL) {
             message = "";
         }
         break;
 
-    case VT_BINARY:
+    case IOT_VALUE_TYPE_BINARY:
         if (value.bin == NULL) {
             return false;
         }
@@ -225,7 +225,7 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
         ESP_LOGW(TAG, "PUB: Failed to send message to %s rc %d", path, rc);
         return false;
     } else {
-        if (VT_BARE_TYPE(valueType) == VT_BINARY) {
+        if (valueType == IOT_VALUE_TYPE_BINARY) {
             ESP_LOGV(TAG, "PUB: Sent %d bytes to %s (retain: %d)", messageLen, path, retain);
         } else {
             ESP_LOGV(TAG, "PUB: Sent %s (%d) to %s (retain: %d)", (char *)message, messageLen, path, retain);
@@ -263,32 +263,32 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
     iotBinaryValue_t binValue;
     bool allowNegative = false;
     const char *name;
-    if (element->desc->subs[subId].type_name[SUB_INDEX_NAME] == 0) {
+    if (element->desc->subs[subId].name[0] == 0) {
         name = IOT_DEFAULT_CONTROL_STR;
     } else {
-        name = SUB_GET_NAME(element, subId);
+        name = element->desc->subs[subId].name;
     }
     ESP_LOGI(TAG, "SUB: new message \"%s\" for \"%s/%s\"", payload, element->name, name);
-    switch(VT_BARE_TYPE(SUB_GET_TYPE(element, subId))) {
-    case VT_BOOL:
+    switch(element->desc->subs[subId].type) {
+    case IOT_VALUE_TYPE_BOOL:
         if (iotStrToBool(payload, &value.b)) {
             ESP_LOGW(TAG, "Invalid value for bool type (%s)", payload);
             return;
         }
         break;
 
-    case VT_INT:
+    case IOT_VALUE_TYPE_INT:
         if (sscanf(payload, "%d", &value.i) == 0) {
             ESP_LOGW(TAG, "Invalid value for int type (%s)", payload);
             return;
         }
         break;
 
-    case VT_CELSIUS:
-    case VT_HUNDREDTHS:
+    case IOT_VALUE_TYPE_CELSIUS:
+    case IOT_VALUE_TYPE_HUNDREDTHS:
         allowNegative = true; /* fallthrough */
-    case VT_PERCENT_RH:
-    case VT_KPA: {
+    case IOT_VALUE_TYPE_PERCENT_RH:
+    case IOT_VALUE_TYPE_KPA: {
         char *decimalPoint = NULL;
         if ((payload[0] == '-')  && (!allowNegative)) {
             ESP_LOGW(TAG, "Negative values not allowed for topic (%s)", payload);
@@ -319,25 +319,25 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
     }
     break;
 
-    case VT_FLOAT:
+    case IOT_VALUE_TYPE_FLOAT:
         if (sscanf(payload, "%f", &value.f) == 0) {
             ESP_LOGW(TAG, "Invalid value for float type (%s)", payload);
             return;
         }
         break;
 
-    case VT_STRING:
+    case IOT_VALUE_TYPE_STRING:
         value.s = payload;
         break;
 
-    case VT_BINARY:
+    case IOT_VALUE_TYPE_BINARY:
         binValue.data = (uint8_t*)payload;
         binValue.len = len;
         value.bin = &binValue;
         break;
 
     default:
-        ESP_LOGE(TAG, "Unknown value type %d for %s/%s", SUB_GET_TYPE(element, subId), element->name, name);
+        ESP_LOGE(TAG, "Unknown value type %d for %s/%s", element->desc->subs[subId].type, element->name, name);
         return;
     }
     iotElementCallbackDetails_t details;
@@ -350,15 +350,15 @@ static bool iotElementSubscribe(iotElement_t element)
 {
     int i;
     for (i = 0; i < element->desc->nrofSubs; i++) {
-        if (element->desc->subs[i].type_name[SUB_INDEX_NAME] != 0) {
+        if (element->desc->subs[i].name[0] != 0) {
             char *path = NULL;
             bool result = false;
-            asprintf(&path, "%s/%s/%s", mqttPathPrefix, element->name, SUB_GET_NAME(element, i));
+            asprintf(&path, "%s/%s/%s", mqttPathPrefix, element->name, element->desc->subs[i].name);
             if (path != NULL) {
                 result = mqttSubscribe(path);
                 free(path);
             } else {
-                ESP_LOGE(TAG, "Failed to allocate memory when subscribing to path %s/%s", element->name, SUB_GET_NAME(element, i));
+                ESP_LOGE(TAG, "Failed to allocate memory when subscribing to path %s/%s", element->name, element->desc->subs[i].name);
             }
 
             if (!result) {
@@ -383,10 +383,10 @@ void iotMqttProcessMessage(char *topic, char *data, int dataLen)
                 int i;
                 for (i = 0; i < element->desc->nrofSubs; i++) {
                     const char *name;
-                    if (element->desc->subs[i].type_name[SUB_INDEX_NAME] == 0) {
+                    if (element->desc->subs[i].name[0] == 0) {
                         name = IOT_DEFAULT_CONTROL_STR;
                     } else {
-                        name = SUB_GET_NAME(element, i);
+                        name = element->desc->subs[i].name;
                     }
                     if (strcmp(topic, name) == 0) {
                         iotElementSubUpdate(element, i, data, dataLen);
@@ -481,10 +481,10 @@ char *iotElementGetPubPath(iotElement_t element, int pubId, char *buffer, size_t
         return NULL;
     }
 
-    if (element->desc->pubs[pubId][PUB_INDEX_NAME] == 0) {
+    if (element->desc->pubs[pubId].name[0] == 0) {
         pubName = NULL;
     } else {
-        pubName = &element->desc->pubs[pubId][PUB_INDEX_NAME];
+        pubName = element->desc->pubs[pubId].name;
     }
 
     return checkedPathBuffer(element->name, pubName, buffer, bufferLen);
@@ -498,10 +498,10 @@ char *iotElementGetSubPath(iotElement_t element, int subId, char *buffer, size_t
         return NULL;
     }
 
-    if (element->desc->subs[subId].type_name[SUB_INDEX_NAME] == 0) {
+    if (element->desc->subs[subId].name[0] == 0) {
         subName = IOT_DEFAULT_CONTROL_STR;
     } else {
-        subName = &element->desc->subs[subId].type_name[SUB_INDEX_NAME];
+        subName = element->desc->subs[subId].name;
     }
 
     return checkedPathBuffer(element->name, subName, buffer, bufferLen);
@@ -513,7 +513,7 @@ const char *iotElementGetPubName(iotElement_t element, int pubId)
         return NULL;
     }
 
-    return &element->desc->pubs[pubId][PUB_INDEX_NAME];
+    return element->desc->pubs[pubId].name;
 }
 
 const char *iotElementGetSubName(iotElement_t element, int subId)
@@ -523,10 +523,10 @@ const char *iotElementGetSubName(iotElement_t element, int subId)
         return NULL;
     }
 
-    if (element->desc->subs[subId].type_name[SUB_INDEX_NAME] == 0) {
+    if (element->desc->subs[subId].name[0] == 0) {
         subName = IOT_DEFAULT_CONTROL_STR;
     } else {
-        subName = &element->desc->subs[subId].type_name[SUB_INDEX_NAME];
+        subName = element->desc->subs[subId].name;
     }
     return subName;
 }

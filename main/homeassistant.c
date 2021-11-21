@@ -88,7 +88,7 @@ static void processSensor(struct DeviceDetails *deviceDetails, iotElement_t elem
     for (pubId = 0; pubId < description->nrofPubs; pubId ++) {
         const char *deviceClass = NULL;
         const char *unitOfMeasurement = NULL;
-        switch (description->pubs[pubId][0] & 0x7f) {
+        switch (description->pubs[pubId].type) {
         case IOT_VALUE_TYPE_PERCENT_RH:
             deviceClass = "humidity";
             unitOfMeasurement = "% RH";

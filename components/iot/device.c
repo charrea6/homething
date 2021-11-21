@@ -327,16 +327,16 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
 
         for (i = 0; i < element->desc->nrofPubs; i++) {
             // String length + 2 bytes for CBOR encoding of string + 1 byte for type
-            estimate += getCborStrRequirement(PUB_GET_NAME(element, i)) + 2;
+            estimate += getCborStrRequirement(element->desc->pubs[i].name) + 2;
         }
         estimate += getCborUintRequirement(element->desc->nrofSubs);
         if (element->desc->nrofSubs) {
             for (i = 0; i < element->desc->nrofSubs; i++) {
                 const char *name;
-                if (element->desc->subs[i].type_name[SUB_INDEX_NAME] == 0) {
+                if (element->desc->subs[i].name[0] == 0) {
                     name = IOT_DEFAULT_CONTROL_STR;
                 } else {
-                    name = SUB_GET_NAME(element, i);
+                    name = element->desc->subs[i].name;
                 }
                 // String length + 2 bytes for CBOR encoding of string + 1 byte for type
                 estimate += getCborStrRequirement(name) + 2;
@@ -368,8 +368,8 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
 
         CHECK_CBOR_ERROR(cbor_encoder_create_map(&descriptionArrayEncoder, &psMapEncoder, descriptions[i]->nrofPubs), "Failed to create pubs map");
         for (psIndex = 0; psIndex < descriptions[i]->nrofPubs; psIndex++) {
-            CHECK_CBOR_ERROR(cbor_encode_text_stringz(&psMapEncoder, &descriptions[i]->pubs[psIndex][PUB_INDEX_NAME]), "encode failed for element name");
-            CHECK_CBOR_ERROR(cbor_encode_uint(&psMapEncoder, (uint32_t)VT_BARE_TYPE(descriptions[i]->pubs[psIndex][PUB_INDEX_TYPE])), "encode failed for element type");
+            CHECK_CBOR_ERROR(cbor_encode_text_stringz(&psMapEncoder, descriptions[i]->pubs[psIndex].name), "encode failed for element name");
+            CHECK_CBOR_ERROR(cbor_encode_uint(&psMapEncoder, (uint32_t)descriptions[i]->pubs[psIndex].type), "encode failed for element type");
 
         }
         CHECK_CBOR_ERROR(cbor_encoder_close_container(&descriptionArrayEncoder, &psMapEncoder), "Failed to close pubs map");
@@ -377,13 +377,13 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
         CHECK_CBOR_ERROR(cbor_encoder_create_map(&descriptionArrayEncoder, &psMapEncoder, descriptions[i]->nrofSubs), "Failed to create subs map");
         for (psIndex = 0; psIndex < descriptions[i]->nrofSubs; psIndex++) {
             const char *name;
-            if (descriptions[i]->subs[psIndex].type_name[SUB_INDEX_NAME] == 0) {
+            if (descriptions[i]->subs[psIndex].name[0] == 0) {
                 name = IOT_DEFAULT_CONTROL_STR;
             } else {
-                name = &descriptions[i]->subs[psIndex].type_name[SUB_INDEX_NAME];
+                name = descriptions[i]->subs[psIndex].name;
             }
             CHECK_CBOR_ERROR(cbor_encode_text_stringz(&psMapEncoder, name), "encode failed for element name");
-            CHECK_CBOR_ERROR(cbor_encode_uint(&psMapEncoder, (uint32_t)VT_BARE_TYPE(descriptions[i]->subs[psIndex].type_name[SUB_INDEX_TYPE])), "encode failed for element description");
+            CHECK_CBOR_ERROR(cbor_encode_uint(&psMapEncoder, (uint32_t)descriptions[i]->subs[psIndex].type), "encode failed for element description");
         }
         CHECK_CBOR_ERROR(cbor_encoder_close_container(&descriptionArrayEncoder, &psMapEncoder), "Failed to close subs map");
 
