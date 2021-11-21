@@ -36,11 +36,10 @@ static const char *TASK_STATS="tasks";
 static const char *TASK_NAME="name";
 static const char *TASK_STACK="stackMinLeft";
 
-#define DEVICE_PUB_INDEX_IP          0
+#define DEVICE_PUB_INDEX_INFO        0
 #define DEVICE_PUB_INDEX_PROFILE     1
 #define DEVICE_PUB_INDEX_TOPICS      2
-#define DEVICE_PUB_INDEX_DESCRIPTION 3
-#define DEVICE_PUB_INDEX_DIAG        4
+#define DEVICE_PUB_INDEX_DIAG        3
 
 static iotElement_t deviceElement;
 
@@ -51,10 +50,12 @@ static char *diagValue = NULL;
 static TaskStatus_t *getTaskStats(unsigned long *nrofTasks);
 #endif
 static void iotDeviceUpdateDiag(TimerHandle_t xTimer);
-static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value);
+static void iotDeviceControl(iotValue_t value);
 static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue);
-static void iotDeviceOnConnect(void *userData, iotElement_t element, int pubId, bool release, iotValueType_t *valueType, iotValue_t *value);
+static void iotDeviceElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
+static void iotDeviceOnConnect(int pubId, bool release, iotValueType_t *valueType, iotValue_t *value);
 static char* iotDeviceGetDescription(void);
+static char *iotDeviceGetInfo(void);
 
 /* CBOR Helper functions */
 static size_t getCborStrRequirement(const char *str);
@@ -64,28 +65,21 @@ IOT_DESCRIBE_ELEMENT(
     deviceElementDescription,
     IOT_ELEMENT_TYPE_OTHER,
     IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "ip"),
+        IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "info"),
         IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "profile"),
         IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "topics"),
-        IOT_DESCRIBE_PUB(RETAINED, ON_CONNECT, "description"),
         IOT_DESCRIBE_PUB(RETAINED, STRING, "diag")
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(BINARY, IOT_SUB_DEFAULT_NAME, iotDeviceControl)
+        IOT_DESCRIBE_SUB(BINARY, IOT_SUB_DEFAULT_NAME)
     )
 );
 
 int iotDeviceInit(void)
 {
-    iotValue_t value;
-    deviceElement = iotNewElement(&deviceElementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE, NULL, "device");
+    deviceElement = iotNewElement(&deviceElementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE, 
+                                  iotDeviceElementCallback, NULL, "device");
     iotDeviceUpdateDiag(NULL);
-    
-    value.callback = iotDeviceOnConnect;
-    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_IP, value);
-    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_PROFILE, value);
-    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_TOPICS, value);
-    iotElementPublish(deviceElement, DEVICE_PUB_INDEX_DESCRIPTION, value);
     return 0;
 }
 
@@ -191,7 +185,7 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
 }
 
 #define SETPROFILE "setprofile"
-static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t value)
+static void iotDeviceControl(iotValue_t value)
 {
     if (strcmp("restart", (const char *) value.bin->data) == 0) {
         esp_restart();
@@ -204,15 +198,25 @@ static void iotDeviceControl(void *userData, iotElement_t element, iotValue_t va
     }
 }
 
-static void iotDeviceOnConnect(void *userData, iotElement_t element, int pubId, bool release, iotValueType_t *valueType, iotValue_t *value)
+static void iotDeviceElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
+{
+    switch(reason) {
+        case IOT_CALLBACK_ON_CONNECT:
+            iotDeviceOnConnect(details->index, false, &details->valueType, &details->value);
+            break;
+        case IOT_CALLBACK_ON_CONNECT_RELEASE:
+            iotDeviceOnConnect(details->index, true, &details->valueType, &details->value);
+            break;
+        case IOT_CALLBACK_ON_SUB:
+            iotDeviceControl(details->value);
+        default:
+        break;
+    }
+}
+
+static void iotDeviceOnConnect(int pubId, bool release, iotValueType_t *valueType, iotValue_t *value)
 {
     switch(pubId) {
-    case DEVICE_PUB_INDEX_IP:
-        if (!release) {
-            *valueType = IOT_VALUE_TYPE_STRING;
-            value->s = wifiGetIPAddrStr();
-        }
-        break;
     case DEVICE_PUB_INDEX_PROFILE:
         if (release) {
             if (value->bin) {
@@ -256,14 +260,14 @@ static void iotDeviceOnConnect(void *userData, iotElement_t element, int pubId, 
             value->bin = bin;
         }
         break;
-    case DEVICE_PUB_INDEX_DESCRIPTION:
+    case DEVICE_PUB_INDEX_INFO:
         if (release) {
             if (value->s) {
-                free((char *)value->s);
-            }
+                free((char*)value->s);
+            } 
         } else {
             *valueType = IOT_VALUE_TYPE_STRING;
-            value->s = iotDeviceGetDescription();
+            value->s = iotDeviceGetInfo();
         }
         break;
     default:
@@ -323,7 +327,7 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
 
         for (i = 0; i < element->desc->nrofPubs; i++) {
             // String length + 2 bytes for CBOR encoding of string + 1 byte for type
-            estimate += getCborStrRequirement(PUB_GET_NAME(element, i)) + 1;
+            estimate += getCborStrRequirement(PUB_GET_NAME(element, i)) + 2;
         }
         estimate += getCborUintRequirement(element->desc->nrofSubs);
         if (element->desc->nrofSubs) {
@@ -335,7 +339,7 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
                     name = SUB_GET_NAME(element, i);
                 }
                 // String length + 2 bytes for CBOR encoding of string + 1 byte for type
-                estimate += getCborStrRequirement(name) + 1;
+                estimate += getCborStrRequirement(name) + 2;
             }
         }
 
@@ -431,6 +435,26 @@ static char* iotDeviceGetDescription(void)
         return NULL;
     }
     return desc;
+}
+
+static char *iotDeviceGetInfo(void)
+{
+    cJSON *object = cJSON_CreateObject();
+    if (object == NULL) {
+        return NULL;
+    }
+
+    cJSON_AddStringToObject(object, "ip", wifiGetIPAddrStr());
+    
+    char *desc = iotDeviceGetDescription();
+    cJSON_AddStringToObject(object, "description", desc);
+    free(desc);
+
+
+    char *result = cJSON_PrintUnformatted(object);
+    cJSON_Delete(object);
+    printf("Info: %s\n", result);
+    return result;
 }
 
 static size_t getCborStrRequirement(const char *str)

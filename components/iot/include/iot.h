@@ -6,11 +6,35 @@
 
 #define IOT_DEFAULT_CONTROL NULL
 
+typedef enum iotElementCallbackReason {
+    IOT_CALLBACK_ON_CONNECT,
+    IOT_CALLBACK_ON_CONNECT_RELEASE,
+    IOT_CALLBACK_ON_SUB
+}iotElementCallbackReason_t;
+
 typedef char iotValueType_t;
 
-typedef union iotValue iotValue_t;
+typedef struct {
+    uint8_t *data;
+    int32_t len;
+} iotBinaryValue_t;
+
+typedef union iotValue {
+    int i;
+    float f;
+    bool b;
+    const char *s;
+    const iotBinaryValue_t *bin;
+}iotValue_t;
 
 typedef struct iotElement *iotElement_t;
+
+typedef struct iotElementCallbackDetails {
+    int index;
+    iotValueType_t valueType;
+    iotValue_t value;
+}iotElementCallbackDetails_t;
+
 
 typedef void *iotElementIterator_t;
 
@@ -18,23 +42,16 @@ typedef void (*iotElementSubUpdateCallback_t)(void *userData, iotElement_t eleme
 
 typedef void (*iotValueOnConnectCallback_t)(void *userData, iotElement_t element, int pubId, bool release, iotValueType_t *valueType, iotValue_t *value);
 
-typedef struct {
-    uint8_t *data;
-    int32_t len;
-} iotBinaryValue_t;
+typedef void (*iotElementCallback_t)(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
 
-union iotValue {
-    int i;
-    float f;
-    bool b;
-    const char *s;
-    const iotBinaryValue_t *bin;
-    iotValueOnConnectCallback_t callback;
-};
+typedef struct iotElementPubSubDescription {
+    int type: 31;
+    int retained: 1;
+    const char *name;
+} iotElementPubSubDescription_t;
 
 typedef struct iotElementSubDescription {
     const char *type_name;
-    iotElementSubUpdateCallback_t callback;
 } iotElementSubDescription_t;
 
 typedef struct iotElementDescription {
@@ -108,7 +125,7 @@ typedef struct iotElementDescription {
 
 #define IOT_DESCRIBE_PUB(retain, type, name) _IOT_DEFINE_TYPE(retain, type) name
 #define IOT_PUB_DESCRIPTIONS(pubs...) { pubs }
-#define IOT_DESCRIBE_SUB(type, name, _callback) { .type_name = _IOT_DEFINE_TYPE(NOT_RETAINED, type) name, .callback=_callback }
+#define IOT_DESCRIBE_SUB(type, name) { .type_name = _IOT_DEFINE_TYPE(NOT_RETAINED, type) name }
 #define IOT_SUB_DESCRIPTIONS(subs...) { subs }
 
 #define IOT_DESCRIBE_ELEMENT(name, element_type, pub_descriptions, sub_descriptions) \
@@ -152,7 +169,8 @@ void iotStart();
 
 /** Creates a new IOT Element using the specified pub/sub description and printf formatting for the name.
  */
-iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, void *userContext, const char *nameFormat, ...);
+iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, iotElementCallback_t callback, 
+                           void *userContext, const char *nameFormat, ...);
 
 /** Publish a value to the specified element and pubId.
  */

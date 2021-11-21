@@ -24,7 +24,7 @@
 #define UPDATER_THREAD_PRIO 7
 #define UPDATER_THREAD_STACK_WORDS 2048
 
-static void updateVersion(void *userData, iotElement_t element, iotValue_t value);
+static void updateElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
 
 static const char TAG[]="Updater";
 const int UPDATE_BIT = BIT0;
@@ -44,7 +44,7 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(RETAINED, STRING, "capabilities")
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(STRING, "update", updateVersion)
+        IOT_DESCRIBE_SUB(STRING, "update")
     )
 );
 
@@ -118,17 +118,19 @@ static void updaterThread(void *pvParameter)
     }
 }
 
-static void updateVersion(void *userData, iotElement_t element, iotValue_t value)
+static void updateElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
 {
-    ESP_LOGI(TAG, "Updating to version %s", value.s);
-    updaterUpdate(value.s);
+    if (reason == IOT_CALLBACK_ON_SUB) {
+        updaterUpdate(details->value.s);
+    }
 }
 
 void updaterInit()
 {
     iotValue_t value;
     ESP_LOGI(TAG, "Updater initialised, Version: %s Capabilities: %s", appVersion, capabilities);
-    updaterElement = iotNewElement(&elementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE, NULL, "sw");
+    updaterElement = iotNewElement(&elementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE,
+                                   updateElementCallback, NULL, "sw");
     value.s = appVersion;
     iotElementPublish(updaterElement, PUB_INDEX_VERSION, value);
 

@@ -165,7 +165,7 @@ Notifications_ID_t addDHT22(CborValue *entry)
     gpio_config(&config);
 
     dht->id = NOTIFICATIONS_MAKE_ID(DHT22, pin);
-    dht->element = iotNewElement(&humidityElementDescription, 0, dht, "humidity%d", sensorId);
+    dht->element = iotNewElement(&humidityElementDescription, 0, dht, NULL, "humidity%d", sensorId);
     dht->details.pin = pin;
 
     value.i = 0;
@@ -244,12 +244,12 @@ Notifications_ID_t addBME280(CborValue *entry)
     value.i = 0;
 
     if (bme280p) {
-        bme->element = iotNewElement(&htpElementDescription, 0, bme, "humidity%d", sensorId);
+        bme->element = iotNewElement(&htpElementDescription, 0, NULL, bme, "humidity%d", sensorId);
         iotElementPublish(bme->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
         iotElementPublish(bme->element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
         iotElementPublish(bme->element, HUMIDITY_PUB_INDEX_PRESSURE, value);
     } else {
-        bme->element = iotNewElement(&tpElementDescription, 0, bme, "temperature%d", sensorId);
+        bme->element = iotNewElement(&tpElementDescription, 0, NULL, bme, "temperature%d", sensorId);
         iotElementPublish(bme->element, TEMPERATURE_PUB_INDEX_TEMPERATURE, value);
         iotElementPublish(bme->element, TEMPERATURE_PUB_INDEX_PRESSURE, value);
     }
@@ -325,7 +325,7 @@ Notifications_ID_t addSI7021(CborValue *entry)
     }
     si7021Devices++;
 
-    sensor->element = iotNewElement(&humidityElementDescription, 0, sensor, "humidity%d", sensorId);
+    sensor->element = iotNewElement(&humidityElementDescription, 0, NULL, sensor, "humidity%d", sensorId);
     value.i = 0;
     iotElementPublish(sensor->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
     iotElementPublish(sensor->element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
@@ -419,7 +419,7 @@ Notifications_ID_t addDS18x20(CborValue *entry)
     for (i = 0; i < nrofDevices; i++) {
         pinStruct->sensors[i].addr = deviceAddrs[i];
         pinStruct->sensors[i].id = NOTIFICATIONS_MAKE_ID(DS18x20, (pin << 8) | i);
-        pinStruct->sensors[i].element = iotNewElement(&temperatureElementDescription, 0, NULL, "temperature%llx", deviceAddrs[i]);
+        pinStruct->sensors[i].element = iotNewElement(&temperatureElementDescription, 0, NULL, NULL, "temperature%llx", deviceAddrs[i]);
     }
     pinStruct->measureTimer =xTimerCreate("ds18x20M", SECS_TO_TICKS(5), pdFALSE, pinStruct, ds18x20MeasureTimer);
     pinStruct->readTimer = xTimerCreate("ds18x20R", MSECS_TO_TICKS(750), pdFALSE, pinStruct, ds18x20ReadTimer);

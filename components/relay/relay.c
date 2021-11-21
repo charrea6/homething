@@ -5,7 +5,7 @@
 #include "esp_log.h"
 #include "iot.h"
 
-static void relayControl(Relay_t *relay, iotElement_t *element, iotValue_t value);
+static void relayElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
 
 static const char TAG[] = "relay";
 
@@ -16,7 +16,7 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(RETAINED, BOOL, "state")
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(BOOL, IOT_SUB_DEFAULT_NAME, (iotElementSubUpdateCallback_t)relayControl)
+        IOT_DESCRIBE_SUB(BOOL, IOT_SUB_DEFAULT_NAME)
     )
 );
 
@@ -30,7 +30,7 @@ void relayInit(uint8_t id, uint8_t pin, uint8_t onLevel, Relay_t *relay)
     relay->u.fields.id = id;
     relay->u.fields.pin = pin;
     relay->u.fields.onLevel = onLevel & 1;
-    relay->element = iotNewElement(&elementDescription, 0, relay, "relay%d", id);
+    relay->element = iotNewElement(&elementDescription, 0, relayElementCallback, relay, "relay%d", id);
     relay->u.fields.on = true; // So that we can set it to false in relaySetState!
     relaySetState(relay, false);
 }
@@ -65,7 +65,9 @@ void relaySetState(Relay_t *relay, bool on)
     iotElementPublish(relay->element, 0, value);
 }
 
-static void relayControl(Relay_t *relay, iotElement_t *element, iotValue_t value)
+static void relayElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
 {
-    relaySetState(relay, value.b);
+    if (IOT_CALLBACK_ON_SUB) {
+        relaySetState((Relay_t *)userData, details->value.b);
+    }
 }

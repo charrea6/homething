@@ -60,7 +60,8 @@ void iotStart()
     iotDeviceStart();
 }
 
-iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, void *userContext, const char *nameFormat, ...)
+iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, iotElementCallback_t callback,
+                           void *userContext, const char *nameFormat, ...)
 {
     va_list args;
     struct iotElement *newElement = malloc(sizeof(struct iotElement) + (sizeof(iotValue_t) * desc->nrofPubs));
@@ -79,6 +80,7 @@ iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, 
     memset(&newElement->values, 0, sizeof(iotValue_t) * desc->nrofPubs);
     newElement->desc = desc;
     newElement->flags = flags;
+    newElement->callback = callback;
     newElement->userContext = userContext;
     newElement->next = iotElementsHead;
     iotElementsHead = newElement;
@@ -113,7 +115,6 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value)
         updateRequired = true;
         break;
     case VT_ON_CONNECT:
-        element->values[pubId] = value;
         break;
     default:
         ESP_LOGE(TAG, "Unknown pub type %d for %s!", PUB_GET_TYPE(element, pubId), PUB_GET_NAME(element, pubId));
@@ -135,7 +136,8 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
     int messageLen = -1;
     const char *prefix = mqttPathPrefix;
     int rc;
-    iotValueOnConnectCallback_t callback = NULL;
+    iotElementCallback_t callback = NULL;
+    iotElementCallbackDetails_t details;
 
     if (element->desc->pubs[pubId][PUB_INDEX_NAME] == 0) {
         asprintf(&path, "%s/%s", prefix, element->name);
@@ -151,8 +153,16 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
     int retain = VT_IS_RETAINED(valueType);
 
     if (VT_BARE_TYPE(valueType) == VT_ON_CONNECT) {
-        callback = value.callback;
-        callback(element->userContext, element, pubId, false, &valueType, &value);
+        callback = element->callback;
+        if (callback == NULL) {
+            ESP_LOGE(TAG, "Element callback was NULL when publishing message");
+            free(path);
+            return false;
+        }
+        details.index = pubId;
+        callback(element->userContext, element, IOT_CALLBACK_ON_CONNECT, &details);
+        valueType = details.valueType;
+        value = details.value;
     }
 
     switch(VT_BARE_TYPE(valueType)) {
@@ -209,7 +219,7 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
     rc = iotMqttPublish(path, message, messageLen, 0, retain);
     free(path);
     if (callback) {
-        callback(element->userContext, element, pubId, true, &valueType, &value);
+        callback(element->userContext, element, IOT_CALLBACK_ON_CONNECT_RELEASE, &details);
     }
     if (rc != 0) {
         ESP_LOGW(TAG, "PUB: Failed to send message to %s rc %d", path, rc);
@@ -330,7 +340,10 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
         ESP_LOGE(TAG, "Unknown value type %d for %s/%s", SUB_GET_TYPE(element, subId), element->name, name);
         return;
     }
-    SUB_GET_CALLBACK(element, subId)(element->userContext, element, value);
+    iotElementCallbackDetails_t details;
+    details.index = subId;
+    details.value = value;
+    element->callback(element->userContext, element, IOT_CALLBACK_ON_SUB, &details);
 }
 
 static bool iotElementSubscribe(iotElement_t element)

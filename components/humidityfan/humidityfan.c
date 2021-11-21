@@ -15,7 +15,9 @@
 #define AUTO_CMD "auto"
 
 static void humidityFanUpdateHumidity(HumidityFan_t *fan, NotificationsMessage_t *message);
-static void humidityFanCtrl(void *userData, iotElement_t *element, iotValue_t value);
+static void humidityFanElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, 
+                                       iotElementCallbackDetails_t *details);
+static void humidityFanCtrl(HumidityFan_t *fan, iotValue_t value);
 static void humidityFanRunOnTimeout(TimerHandle_t xTimer);
 static void humidityFanOverThresholdTimeout(TimerHandle_t xTimer);
 static void humidityFanManualModeSecsTimeout(TimerHandle_t xTimer);
@@ -43,7 +45,7 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(RETAINED, INT, "relay")
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(STRING, IOT_SUB_DEFAULT_NAME, (iotElementSubUpdateCallback_t)humidityFanCtrl)
+        IOT_DESCRIBE_SUB(STRING, IOT_SUB_DEFAULT_NAME)
     )
 );
 
@@ -60,7 +62,7 @@ void humidityFanInit(HumidityFan_t *fan, Relay_t *relay, Notifications_ID_t humi
     fan->manualModeSecsLeft = 0u;
     fan->relay = relay;
 
-    fan->element = iotNewElement(&elementDescription, 0, fan, "fan%d", fanCount);
+    fan->element = iotNewElement(&elementDescription, 0, humidityFanElementCallback, fan, "fan%d", fanCount);
     fanCount ++;
 
     value.i = relayId(relay);
@@ -128,9 +130,16 @@ static void humidityFanUpdateHumidity(HumidityFan_t *fan, NotificationsMessage_t
     iotElementPublish(fan->element, PUB_ID_HUMIDITY, value);
 }
 
-static void humidityFanCtrl(void *userData, iotElement_t *element, iotValue_t value)
+static void humidityFanElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, 
+                                       iotElementCallbackDetails_t *details)
 {
-    HumidityFan_t *fan = userData;
+    if (reason == IOT_CALLBACK_ON_SUB) {
+        humidityFanCtrl((HumidityFan_t *)userData, details->value);
+    }
+}
+
+static void humidityFanCtrl(HumidityFan_t *fan, iotValue_t value)
+{
     bool on;
     if (!iotStrToBool(value.s, &on)) {
         if (!on) {

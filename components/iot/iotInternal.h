@@ -39,6 +39,7 @@ struct iotElement {
     uint32_t flags;
     char *name;
     void *userContext;
+    iotElementCallback_t callback;
     struct iotElement *next;
     iotValue_t values[];
 };

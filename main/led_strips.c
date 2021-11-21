@@ -24,7 +24,8 @@ struct LEDStrip {
     bool state;
 } *ledStrip = NULL;
 
-static void ledStripSPIControl(void *led, iotElement_t *element, iotValue_t value);
+static void ledStripSPIElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
+static void ledStripSPIControl(iotValue_t value);
 static void ledStripSPIUpdate(void);
 static void ledStripSPIUpdateColor(void);
 
@@ -38,7 +39,7 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(RETAINED, INT, "brightness")
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(STRING, IOT_SUB_DEFAULT_NAME, (iotElementSubUpdateCallback_t)ledStripSPIControl)
+        IOT_DESCRIBE_SUB(STRING, IOT_SUB_DEFAULT_NAME)
     )
 );
 
@@ -93,7 +94,7 @@ Notifications_ID_t addLEDStripSPI(CborValue *entry)
         return NOTIFICATIONS_ID_ERROR;
     }
     ledStrip->strip = strip;
-    ledStrip->element = iotNewElement(&elementDescription, 0, ledStrip, "ledStrip");
+    ledStrip->element = iotNewElement(&elementDescription, 0, ledStrip, ledStripSPIElementCallback, "ledStrip");
     value.i = strip.length;
     iotElementPublish(ledStrip->element, PUB_IDX_LEDCOUNT, value);
 
@@ -109,7 +110,7 @@ Notifications_ID_t addLEDStripSPI(CborValue *entry)
 }
 
 
-void ledStripSPIControl(void *led, iotElement_t *element, iotValue_t value)
+void ledStripSPIControl(iotValue_t value)
 {
     uint32_t red, green, blue, brightness;
     bool currentState = ledStrip->state;
@@ -172,4 +173,11 @@ void ledStripSPIUpdateColor(void)
     sprintf(ledStrip->colorStr, "%d,%d,%d", ledStrip->color.red, ledStrip->color.green, ledStrip->color.blue);
     value.s = ledStrip->colorStr;
     iotElementPublish(ledStrip->element, PUB_IDX_RGB, value);
+}
+
+static void ledStripSPIElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
+{
+    if (reason == IOT_CALLBACK_ON_SUB) {
+        ledStripSPIControl(details->value);
+    }
 }

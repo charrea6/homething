@@ -19,7 +19,8 @@ struct Led {
 static struct Led *leds;
 static int ledCount = 0;
 
-static void ledControl(struct Led *led, iotElement_t *element, iotValue_t value);
+static void ledControl(struct Led *led, iotValue_t value);
+static void ledElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
 
 static const char TAG[] = "led";
 static const char OFF[] = "off";
@@ -32,7 +33,7 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(RETAINED, STRING, "state")
     ),
     IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(STRING, IOT_SUB_DEFAULT_NAME, (iotElementSubUpdateCallback_t)ledControl)
+        IOT_DESCRIBE_SUB(STRING, IOT_SUB_DEFAULT_NAME)
     )
 );
 
@@ -57,7 +58,7 @@ Notifications_ID_t addLed(CborValue *entry)
         return NOTIFICATIONS_ID_ERROR;
     }
     led = leds ++;
-    led->element = iotNewElement(&elementDescription, 0, led, "led%d", ledCount);
+    led->element = iotNewElement(&elementDescription, 0, ledElementCallback, led, "led%d", ledCount);
     led->led = notificationLedNew(pin);
     led->state = NULL;
     value.s = OFF;
@@ -67,7 +68,7 @@ Notifications_ID_t addLed(CborValue *entry)
     return 0;
 }
 
-static void ledControl(struct Led  *led, iotElement_t *element, iotValue_t value)
+static void ledControl(struct Led  *led, iotValue_t value)
 {
     NotificationLedPattern_t pattern;
     if (led->state) {
@@ -91,5 +92,12 @@ static void ledControl(struct Led  *led, iotElement_t *element, iotValue_t value
                 iotElementPublish(led->element, 0, value);
             }
         }
+    }
+}
+
+static void ledElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
+{
+    if (reason == IOT_CALLBACK_ON_SUB) {
+        ledControl((struct Led*) userData, details->value);
     }
 }
