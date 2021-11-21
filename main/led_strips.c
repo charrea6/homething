@@ -94,7 +94,7 @@ Notifications_ID_t addLEDStripSPI(CborValue *entry)
         return NOTIFICATIONS_ID_ERROR;
     }
     ledStrip->strip = strip;
-    ledStrip->element = iotNewElement(&elementDescription, 0, ledStrip, ledStripSPIElementCallback, "ledStrip");
+    ledStrip->element = iotNewElement(&elementDescription, 0, ledStripSPIElementCallback, ledStrip, "ledStrip");
     value.i = strip.length;
     iotElementPublish(ledStrip->element, PUB_IDX_LEDCOUNT, value);
 

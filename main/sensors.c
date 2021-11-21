@@ -165,7 +165,7 @@ Notifications_ID_t addDHT22(CborValue *entry)
     gpio_config(&config);
 
     dht->id = NOTIFICATIONS_MAKE_ID(DHT22, pin);
-    dht->element = iotNewElement(&humidityElementDescription, 0, dht, NULL, "humidity%d", sensorId);
+    dht->element = iotNewElement(&humidityElementDescription, 0, NULL, dht, "humidity%d", sensorId);
     dht->details.pin = pin;
 
     value.i = 0;
