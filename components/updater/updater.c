@@ -137,8 +137,3 @@ void updaterUpdate(const char *updateVersion)
         updaterUpdateStatus("Failed : Version too long");
     }
 }
-
-char *updaterGetVersion(void)
-{
-    return appVersion;
-}

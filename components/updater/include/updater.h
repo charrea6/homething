@@ -24,6 +24,4 @@ void updaterInit();
  * Update the firmware the version specified in updateVersion
  */
 void updaterUpdate(const char *updateVersion);
-
-char *updaterGetVersion(void);
 #endif
