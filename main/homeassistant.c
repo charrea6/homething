@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "cJSON.h"
+#include "cJSON_AddOns.h"
 #include "iot.h"
 #include "notifications.h"
 #include "updater.h"
@@ -112,8 +113,8 @@ static void processSensor(struct DeviceDetails *deviceDetails, iotElement_t elem
             continue;
         }
 
-        cJSON_AddStringToObject(object, "device_class", deviceClass);
-        cJSON_AddStringToObject(object, "unit_of_measurement", unitOfMeasurement);
+        cJSON_AddStringReferenceToObjectCS(object, "device_class", deviceClass);
+        cJSON_AddStringReferenceToObjectCS(object, "unit_of_measurement", unitOfMeasurement);
 
         char *stateTopic = NULL;
         size_t stateTopicSize = 0;
@@ -133,7 +134,7 @@ static void processSensor(struct DeviceDetails *deviceDetails, iotElement_t elem
             continue;
         }
 
-        cJSON_AddStringToObject(object, "state_topic", stateTopic);
+        cJSON_AddStringToObjectCS(object, "state_topic", stateTopic);
         free(stateTopic);
 
         const char *pubName = iotElementGetPubName(element, pubId);
@@ -161,7 +162,7 @@ static void processSwitch(struct DeviceDetails *deviceDetails, iotElement_t elem
         cJSON_Delete(object);
         return;
     }
-    cJSON_AddStringToObject(object, "state_topic", topic);
+    cJSON_AddStringToObjectCS(object, "state_topic", topic);
     free(topic);
 
     asprintf(&topic, "~/%s", ctrlName);
@@ -169,7 +170,7 @@ static void processSwitch(struct DeviceDetails *deviceDetails, iotElement_t elem
         cJSON_Delete(object);
         return;
     }
-    cJSON_AddStringToObject(object, "command_topic", topic);
+    cJSON_AddStringToObjectCS(object, "command_topic", topic);
     free(topic);
 
     size_t topicSize = 0;
@@ -188,11 +189,11 @@ static void processSwitch(struct DeviceDetails *deviceDetails, iotElement_t elem
         cJSON_Delete(object);
         return;
     }
-    cJSON_AddStringToObject(object, "~", topic);
+    cJSON_AddStringToObjectCS(object, "~", topic);
     free(topic);
 
-    cJSON_AddStringToObject(object, "payload_off", "off");
-    cJSON_AddStringToObject(object, "payload_on", "on");
+    cJSON_AddStringReferenceToObjectCS(object, "payload_off", "off");
+    cJSON_AddStringReferenceToObjectCS(object, "payload_on", "on");
 
     sendDiscoveryMessage(deviceDetails, "switch", element, NULL, object);
 }
@@ -205,7 +206,7 @@ static void sendDiscoveryMessage(struct DeviceDetails *deviceDetails, const char
 
     asprintf(&uniqueId, "%s:%s:%s", deviceDetails->identifier, elementName, pubName == NULL ? "":pubName);    
     if (uniqueId != NULL) {
-        cJSON_AddStringToObject(object, "unique_id", uniqueId);
+        cJSON_AddStringToObjectCS(object, "unique_id", uniqueId);
     }
 
     char *name = NULL;
@@ -215,7 +216,7 @@ static void sendDiscoveryMessage(struct DeviceDetails *deviceDetails, const char
         asprintf(&name, "%s %s %s", deviceDetails->deviceDescription, elementName, pubName);
     }
     if (name != NULL) {
-        cJSON_AddStringToObject(object, "name", name);
+        cJSON_AddStringToObjectCS(object, "name", name);
         free(name);
     }
 
@@ -239,20 +240,20 @@ static void sendDiscoveryMessage(struct DeviceDetails *deviceDetails, const char
 
 static void addDeviceDetails(struct DeviceDetails *deviceDetails, cJSON * obj)
 {
-    cJSON *devObject = cJSON_AddObjectToObject(obj, "dev");
+    cJSON *devObject = cJSON_AddObjectToObjectCS(obj, "dev");
     if (devObject == NULL) {
         return;
     }
 
-    cJSON_AddStringToObject(devObject, "ids", deviceDetails->identifier);
+    cJSON_AddStringToObjectCS(devObject, "ids", deviceDetails->identifier);
 
     if (deviceDetails->deviceDescription) {
-        cJSON_AddStringToObject(devObject, "name", deviceDetails->deviceDescription);
+        cJSON_AddStringToObjectCS(devObject, "name", deviceDetails->deviceDescription);
     }
 
-    cJSON_AddStringToObject(devObject, "sw", updaterGetVersion());
-    cJSON_AddStringToObject(devObject, "mf", "Homething");
-    cJSON_AddStringToObject(devObject, "mdl", MODEL);
+    cJSON_AddStringToObjectCS(devObject, "sw", updaterGetVersion());
+    cJSON_AddStringReferenceToObjectCS(devObject, "mf", "Homething");
+    cJSON_AddStringToObjectCS(devObject, "mdl", MODEL);
 }
 
 static char* deviceGetDescription(void)
