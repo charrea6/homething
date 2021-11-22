@@ -69,6 +69,8 @@ int addRelay(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount)
     relayCount++;
     if (controlled) {
         switch(controller) {
+        case DeviceProfile_RelayController_None:
+            break;
         case DeviceProfile_RelayController_Switch:
             notificationsRegister(Notifications_Class_Switch, ids[id], switchRelayController, relay);
             break;
