@@ -19,7 +19,6 @@
 #include "wifi.h"
 #include "notifications.h"
 #include "sdkconfig.h"
-#include "deviceprofile.h"
 #include "iotInternal.h"
 
 static const char *TAG="IOT-MQTT";

@@ -18,7 +18,6 @@
 #include "wifi.h"
 #include "notifications.h"
 #include "sdkconfig.h"
-#include "deviceprofile.h"
 
 static const char *TAG="IOT";
 const char *IOT_DEFAULT_CONTROL_STR="ctrl";
@@ -36,7 +35,6 @@ static char *checkedPathBuffer(const char *elementName, const char *subTopic, ch
 
 int iotInit(void)
 {
-    int result = 0;
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
 
@@ -46,18 +44,7 @@ int iotInit(void)
     ESP_LOGI(TAG, "device path: %s", mqttPathPrefix);
 
     notificationsRegister(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, iotWifiConnectionStatus, NULL);
-
-    result = mqttInit();
-    if (result != 0) {
-        return result;
-    }
-
-    return iotDeviceInit();
-}
-
-void iotStart()
-{
-    iotDeviceStart();
+    return mqttInit();
 }
 
 iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, iotElementCallback_t callback,

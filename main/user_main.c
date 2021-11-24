@@ -19,6 +19,7 @@
 #include "i2cdev.h"
 #include "switch.h"
 #include "iot.h"
+#include "iotDevice.h"
 #include "updater.h"
 #include "gpiox.h"
 #include "notificationled.h"
@@ -57,6 +58,7 @@ void app_main(void)
     CHECK_ERROR(provisioningInit());
     CHECK_ERROR(gpioxInit());
     CHECK_ERROR(switchInit());
+    CHECK_ERROR(iotDeviceInit());
 
     processProfile();
 
@@ -67,7 +69,6 @@ void app_main(void)
 #endif
 
     switchStart();
-    iotStart();
     wifiStart();
 
     CHECK_ERROR(provisioningStart());

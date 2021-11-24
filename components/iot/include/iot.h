@@ -118,19 +118,12 @@ typedef struct iotElementDescription {
 
 #define IOT_ELEMENT_ITERATOR_START (NULL)
 
+const char *IOT_DEFAULT_CONTROL_STR;
+
 /** Initialse the IOT subsystem.
  * This needs to be done before you can add Elements and Pub/Sub items.
  */
 int iotInit(void);
-
-/** Start the IOT Subsystem
- * Connects to the configured Wifi network and then to the configured MQTT server.
- * Once connected any updates to Pub items will be reflected to the MQTT server if
- * connected or stored for transmission when a connection is established.
- * Any message sent to subscribe topics will be reflected to the specified
- * callback as soon as they are recieved.
- */
-void iotStart();
 
 /** Creates a new IOT Element using the specified pub/sub description and printf formatting for the name.
  */
