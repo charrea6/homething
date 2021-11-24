@@ -54,8 +54,8 @@ static iotElement_t deviceElement;
 #define DIAG_UPDATE_MS (1000 * 30) // 30 Seconds
 static char *diagValue = NULL;
 
-static char *version = NULL;
-static char *capabilities = NULL;
+static const char *version = NULL;
+static const char *capabilities = NULL;
 
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
 static TaskStatus_t *getTaskStats(unsigned long *nrofTasks);
@@ -87,8 +87,10 @@ IOT_DESCRIBE_ELEMENT(
     )
 );
 
-int iotDeviceInit(const char *version, const char *capabilities)
+int iotDeviceInit(const char *_version, const char *_capabilities)
 {
+    version = _version;
+    capabilities = _capabilities;
     deviceElement = iotNewElement(&deviceElementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE, 
                                   iotDeviceElementCallback, NULL, "device");
     iotDeviceUpdateDiag(NULL);
