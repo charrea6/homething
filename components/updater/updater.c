@@ -12,7 +12,6 @@
 #include "esp_system.h"
 #include "esp_ota_ops.h"
 
-#include "iot.h"
 #include "updater.h"
 
 #include "sdkconfig.h"
@@ -23,28 +22,13 @@
 #define UPDATER_THREAD_NAME "updater"
 #define UPDATER_THREAD_PRIO 7
 #define UPDATER_THREAD_STACK_WORDS 2048
-
-static void updateElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
+#define MAX_CALLBACKS 1
 
 static const char TAG[]="Updater";
-const int UPDATE_BIT = BIT0;
+static const int UPDATE_BIT = BIT0;
 
-static iotElement_t updaterElement;
-
-#define PUB_INDEX_VERSION 0
-#define PUB_INDEX_STATUS  1
-
-IOT_DESCRIBE_ELEMENT(
-    elementDescription,
-    IOT_ELEMENT_TYPE_OTHER,
-    IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(RETAINED, STRING, "version"),
-        IOT_DESCRIBE_PUB(RETAINED, STRING, "status"),
-    ),
-    IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(STRING, "update")
-    )
-);
+static int nrofCallbacks = 0;
+static updaterStatusCallback_t callbacks[MAX_CALLBACKS];
 
 static EventGroupHandle_t updateEventGroup;
 
@@ -95,22 +79,9 @@ static void updaterThread(void *pvParameter)
     }
 }
 
-static void updateElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
-{
-    if (reason == IOT_CALLBACK_ON_SUB) {
-        updaterUpdate(details->value.s);
-    }
-}
-
 void updaterInit()
 {
-    iotValue_t value;
     ESP_LOGI(TAG, "Updater initialised, Version: %s", appVersion);
-    updaterElement = iotNewElement(&elementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE,
-                                   updateElementCallback, NULL, "sw");
-    value.s = appVersion;
-    iotElementPublish(updaterElement, PUB_INDEX_VERSION, value);
-
     updateEventGroup = xEventGroupCreate();
     xTaskCreate(updaterThread,
                 UPDATER_THREAD_NAME,
@@ -122,9 +93,10 @@ void updaterInit()
 
 void updaterUpdateStatus(char *status)
 {
-    iotValue_t value;
-    value.s = status;
-    iotElementPublish(updaterElement, PUB_INDEX_STATUS, value);
+    int i;
+    for (i=0; i < nrofCallbacks; i++) {
+        callbacks[i](status);
+    }
 }
 
 void updaterUpdate(const char *updateVersion)
@@ -136,4 +108,14 @@ void updaterUpdate(const char *updateVersion)
     } else {
         updaterUpdateStatus("Failed : Version too long");
     }
+}
+
+void updaterAddStatusCallback(updaterStatusCallback_t callback) 
+{
+    if (nrofCallbacks >= MAX_CALLBACKS) {
+        ESP_LOGE(TAG, "Maximum number of status callbacks reached");
+        return;
+    }
+    callbacks[nrofCallbacks] = callback;
+    nrofCallbacks++;
 }

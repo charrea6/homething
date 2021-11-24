@@ -12,8 +12,7 @@
 #include "esp_system.h"
 #include "esp_ota_ops.h"
 
-#include "iot.h"
-#include "updater.h"
+#include "updaterInternal.h"
 #include "http_parser.h"
 #include "sdkconfig.h"
 
