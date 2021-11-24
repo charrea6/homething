@@ -9,7 +9,7 @@
 int wifiInit(void);
 
 /**
- * Start wifi stack
+ * Start wifi stack and attempts to connect to the configured access point.
  */
 void wifiStart(void);
 
