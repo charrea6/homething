@@ -1,11 +1,11 @@
-
 #include "cJSON_AddOns.h"
+#include "stdio.h"
 
 cJSON* cJSON_AddObjectToObjectCS(cJSON * const object, const char * const name)
 {
-    cJSON *object_item = cJSON_CreateObject();
-    cJSON_AddItemToObjectCS(object, name, object_item);
-    return object_item;
+    cJSON *objectItem = cJSON_CreateObject();
+    cJSON_AddItemToObjectCS(object, name, objectItem);
+    return objectItem;
 }
 
 cJSON* cJSON_AddArrayToObjectCS(cJSON * const object, const char * const name)
@@ -16,23 +16,25 @@ cJSON* cJSON_AddArrayToObjectCS(cJSON * const object, const char * const name)
 }
 
 
-cJSON* cJSON_AddNumberToObjectCS(cJSON * const object, const char * const name, const double number)
+cJSON* cJSON_AddUIntToObjectCS(cJSON * const object, const char * const name, const uint32_t number)
 {
-    cJSON *number_item = cJSON_CreateNumber(number);
-    cJSON_AddItemToObjectCS(object, name, number_item);
-    return number_item;
+    char numberStr[11];
+    sprintf(numberStr, "%u", number);
+    cJSON *numberItem = cJSON_CreateRaw(numberStr);
+    cJSON_AddItemToObjectCS(object, name, numberItem);
+    return numberItem;
 }
 
 cJSON* cJSON_AddStringToObjectCS(cJSON *object, const char * const name, const char * const string)
 {
-    cJSON *string_item = cJSON_CreateString(string);
-    cJSON_AddItemToObjectCS(object, name, string_item);
-    return string_item;
+    cJSON *stringItem = cJSON_CreateString(string);
+    cJSON_AddItemToObjectCS(object, name, stringItem);
+    return stringItem;
 }
 
 cJSON* cJSON_AddStringReferenceToObjectCS(cJSON *object, const char * const name, const char * const string)
 {
-    cJSON *string_item = cJSON_CreateStringReference(string);
-    cJSON_AddItemToObjectCS(object, name, string_item);
-    return string_item;
+    cJSON *stringItem = cJSON_CreateStringReference(string);
+    cJSON_AddItemToObjectCS(object, name, stringItem);
+    return stringItem;
 }

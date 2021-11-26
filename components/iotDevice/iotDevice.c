@@ -155,13 +155,13 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
 
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    cJSON_AddNumberToObjectCS(object, UPTIME, (double)tv.tv_sec);
+    cJSON_AddUIntToObjectCS(object, UPTIME, tv.tv_sec);
 
     ESP_LOGI(TAG, "Memory: %d/%d", esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
     cJSON *mem = cJSON_AddObjectToObjectCS(object, MEMORY);
     if (mem != NULL) {
-        cJSON_AddNumberToObjectCS(mem, MEMORY_FREE, (double)esp_get_free_heap_size());
-        cJSON_AddNumberToObjectCS(mem, MEMORY_LOW, (double)esp_get_minimum_free_heap_size());
+        cJSON_AddUIntToObjectCS(mem, MEMORY_FREE, esp_get_free_heap_size());
+        cJSON_AddUIntToObjectCS(mem, MEMORY_LOW, esp_get_minimum_free_heap_size());
     }
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
     unsigned long nrofTasks = uxTaskGetNumberOfTasks();
@@ -182,7 +182,7 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
                 cJSON_Delete(task);
                 break;
             }
-            if (cJSON_AddNumberToObjectCS(task, TASK_STACK, tasksStatus[i].usStackHighWaterMark) == NULL){
+            if (cJSON_AddUIntToObjectCS(task, TASK_STACK, tasksStatus[i].usStackHighWaterMark) == NULL){
                 cJSON_Delete(task);
                 break;
             }
@@ -219,7 +219,7 @@ static void iotDeviceControl(iotValue_t value)
             esp_restart();
         }
     } else if (strncmp(UPDATE, (const char *)value.bin->data, sizeof(UPDATE) - 1) == 0) {
-        char *version = (char *)value.bin->data + sizeof(UPDATE);
+        char *version = (char *)value.bin->data + sizeof(UPDATE) - 1 /* remove the \0 */;
         for (;isspace((int)*version) && *version != 0; version ++);
         updaterUpdate(version);
     }
