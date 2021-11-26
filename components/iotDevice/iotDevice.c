@@ -141,6 +141,7 @@ static void printTaskStats(TaskStatus_t *tasksStatus, unsigned long nrofTasks)
 
 static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
 {
+    ESP_LOGI(TAG, "Diag update starting");
     if (diagValue != NULL) {
         free(diagValue);
     }
@@ -156,6 +157,7 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
     gettimeofday(&tv, NULL);
     cJSON_AddNumberToObjectCS(object, UPTIME, (double)tv.tv_sec);
 
+    ESP_LOGI(TAG, "Memory: %d/%d", esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
     cJSON *mem = cJSON_AddObjectToObjectCS(object, MEMORY);
     if (mem != NULL) {
         cJSON_AddNumberToObjectCS(mem, MEMORY_FREE, (double)esp_get_free_heap_size());
@@ -193,6 +195,7 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
     uint32_t free_after_format = esp_get_free_heap_size();
     cJSON_Delete(object);
     if (diagValue == NULL) {
+        ESP_LOGW(TAG, "Diag failed to allocate memory for formatted string");
         return;
     }
     iotValue_t value;
