@@ -1,3 +1,7 @@
+/*
+ * Inspiration for this code and more details about the Drayton SCR protocol can be found here: 
+ * https://github.com/tul/drayton_controller
+ */
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -10,7 +14,6 @@
 
 #include "esp_log.h"
 #include "iot.h"
-
 
 typedef struct DraytonSCR {
     uint8_t pin;
