@@ -33,4 +33,6 @@ config NOTIFICATION_LED_PIN
 config HOMEASSISTANT
     bool "Enable Home Assistant Discovery support"
     
+config DRAYTONSCR
+    bool "Enable Drayton SCR transmit support"
 endmenu

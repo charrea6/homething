@@ -19,8 +19,14 @@
 #include "humidityfan.h"
 #include "led.h"
 #include "led_strips.h"
+#include "draytonscr.h"
 
 static const char TAG[] = "profile";
+
+#ifdef CONFIG_DRAYTONSCR
+static int profileDraytonSCRInit(int num);
+static Notifications_ID_t profileDraytonSCRAdd(CborValue *entry);
+#endif
 
 typedef int (*initFunc_t)(int);
 typedef Notifications_ID_t (*addFunc_t)(CborValue *);
@@ -37,7 +43,12 @@ struct Component {
     BME280_COMPONENT,
     DS18x20_COMPONENT,
     LED_COMPONENT,
-    LED_STRIP_SPI_COMPONENT
+    LED_STRIP_SPI_COMPONENT,
+#ifdef CONFIG_DRAYTONSCR
+    {profileDraytonSCRInit, profileDraytonSCRAdd}
+#else
+    {NULL, NULL}
+#endif
 };
 
 void processProfile(void)
@@ -115,3 +126,37 @@ error:
         free(ids);
     }
 }
+
+#ifdef CONFIG_DRAYTONSCR
+static int profileDraytonSCRInit(int num)
+{
+    if (num == 1) {
+        return 0;
+    }
+    ESP_LOGE(TAG, "Only 1 draytonscr device is supported! %d detected in profile.", num);
+    return 1;
+}
+
+static Notifications_ID_t profileDraytonSCRAdd(CborValue *entry)
+{
+    uint32_t pin;
+    char *onSequence = NULL;
+    char *offSequence = NULL;
+    if (deviceProfileParserEntryGetUint32(entry, &pin)) {
+        ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to get pin!");
+        return NOTIFICATIONS_ID_ERROR;
+    }
+    if (deviceProfileParserEntryGetStr(entry, &onSequence)) {
+        ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to get on sequence!");
+        return NOTIFICATIONS_ID_ERROR;
+    }
+    if (deviceProfileParserEntryGetStr(entry, &offSequence)) {
+        free(onSequence);
+        ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to get off sequence!");
+        return NOTIFICATIONS_ID_ERROR;
+    }
+    draytonSCRInit(pin, onSequence, offSequence);
+    return NOTIFICATIONS_ID_ALL;
+}
+
+#endif

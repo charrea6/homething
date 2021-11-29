@@ -144,6 +144,23 @@ int deviceProfileParserEntryGetI2CDetails(CborValue *parserEntry, DeviceProfile_
     return 0;
 }
 
+int deviceProfileParserEntryGetStr(CborValue *parserEntry, char **str)
+{
+    if (cbor_value_at_end(parserEntry)) {
+        return  -1;
+    }
+    if (!cbor_value_is_text_string(parserEntry)) {
+        return -1;
+    }
+    CborValue next;
+    size_t len;
+    if (cbor_value_dup_text_string(parserEntry, str, &len, &next)) {
+        return -1;
+    }
+    *parserEntry = next;
+    return 0;
+}
+
 static int nextUint32(CborValue *it, uint32_t *result)
 {
     uint64_t uintValue;

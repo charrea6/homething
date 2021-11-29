@@ -15,6 +15,7 @@ typedef enum {
     DeviceProfile_EntryType_DS18B20,
     DeviceProfile_EntryType_LED,
     DeviceProfile_EntryType_LEDStripSPI,
+    DeviceProfile_EntryType_DraytonSCR,
     DeviceProfile_EntryType_Max
 } DeviceProfile_EntryType_e;
 
@@ -58,5 +59,5 @@ int deviceProfileParserCloseEntry(DeviceProfile_Parser_t *parser, CborValue *ent
 
 int deviceProfileParserEntryGetUint32(CborValue *parserEntry, uint32_t *result);
 int deviceProfileParserEntryGetI2CDetails(CborValue *parserEntry, DeviceProfile_I2CDetails_t *details);
-
+int deviceProfileParserEntryGetStr(CborValue *parserEntry, char **str);
 #endif

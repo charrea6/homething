@@ -51,7 +51,10 @@ static char capabilities[] = ""
                              ",humidistat"
 #endif
 #ifdef CONFIG_HOMEASSISTANT
-                              ",homeassistant"
+                             ",homeassistant"
+#endif
+#ifdef CONFIG_DRAYTONSCR
+                             ",draytonscr"
 #endif
                              ;
 /* Device capabilities string creation - finish */
