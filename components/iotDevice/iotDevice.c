@@ -91,7 +91,7 @@ int iotDeviceInit(const char *_version, const char *_capabilities)
 {
     version = _version;
     capabilities = _capabilities;
-    deviceElement = iotNewElement(&deviceElementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE, 
+    deviceElement = iotNewElement(&deviceElementDescription, IOT_ELEMENT_FLAGS_DONT_ANNOUNCE,
                                   iotDeviceElementCallback, NULL, "device");
     iotDeviceUpdateDiag(NULL);
     xTimerStart(xTimerCreate("deviceDiag", DIAG_UPDATE_MS / portTICK_RATE_MS, pdTRUE, NULL, iotDeviceUpdateDiag), 0);
@@ -171,18 +171,18 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
         printTaskStats(tasksStatus, nrofTasks);
 #endif
         cJSON *tasks = cJSON_AddArrayToObjectCS(object, TASK_STATS);
-        
+
         int i;
         for (i=0; i < nrofTasks; i++) {
             cJSON *task = cJSON_CreateObject();
             if (task == NULL) {
                 break;
             }
-            if (cJSON_AddStringToObjectCS(task, TASK_NAME, tasksStatus[i].pcTaskName) == NULL){
+            if (cJSON_AddStringToObjectCS(task, TASK_NAME, tasksStatus[i].pcTaskName) == NULL) {
                 cJSON_Delete(task);
                 break;
             }
-            if (cJSON_AddUIntToObjectCS(task, TASK_STACK, tasksStatus[i].usStackHighWaterMark) == NULL){
+            if (cJSON_AddUIntToObjectCS(task, TASK_STACK, tasksStatus[i].usStackHighWaterMark) == NULL) {
                 cJSON_Delete(task);
                 break;
             }
@@ -220,7 +220,7 @@ static void iotDeviceControl(iotValue_t value)
         }
     } else if (strncmp(UPDATE, (const char *)value.bin->data, sizeof(UPDATE) - 1) == 0) {
         char *version = (char *)value.bin->data + sizeof(UPDATE) - 1 /* remove the \0 */;
-        for (;isspace((int)*version) && *version != 0; version ++);
+        for (; isspace((int)*version) && *version != 0; version ++);
         updaterUpdate(version);
     }
 }
@@ -228,15 +228,15 @@ static void iotDeviceControl(iotValue_t value)
 static void iotDeviceElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
 {
     switch(reason) {
-        case IOT_CALLBACK_ON_CONNECT:
-            iotDeviceOnConnect(details->index, false, &details->valueType, &details->value);
-            break;
-        case IOT_CALLBACK_ON_CONNECT_RELEASE:
-            iotDeviceOnConnect(details->index, true, &details->valueType, &details->value);
-            break;
-        case IOT_CALLBACK_ON_SUB:
-            iotDeviceControl(details->value);
-        default:
+    case IOT_CALLBACK_ON_CONNECT:
+        iotDeviceOnConnect(details->index, false, &details->valueType, &details->value);
+        break;
+    case IOT_CALLBACK_ON_CONNECT_RELEASE:
+        iotDeviceOnConnect(details->index, true, &details->valueType, &details->value);
+        break;
+    case IOT_CALLBACK_ON_SUB:
+        iotDeviceControl(details->value);
+    default:
         break;
     }
 }
@@ -291,7 +291,7 @@ static void iotDeviceOnConnect(int pubId, bool release, iotValueType_t *valueTyp
         if (release) {
             if (value->s) {
                 free((char*)value->s);
-            } 
+            }
         } else {
             *valueType = IOT_VALUE_TYPE_STRING;
             value->s = iotDeviceGetInfo();
@@ -325,7 +325,7 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
         ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for descriptions");
         goto error;
     }
-    
+
     iterator = IOT_ELEMENT_ITERATOR_START;
     while(iotElementIterate(&iterator, true, &element)) {
         bool found = false;
@@ -376,14 +376,14 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
         ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Failed to allocate buffer");
         goto error;
     }
-    
+
 
 #define MAX_CONTAINERS 5
     CborEncoder containers[MAX_CONTAINERS];
     char *containerNames[MAX_CONTAINERS];
     int currentContainer = 0;
     CborError err;
-    
+
     cbor_encoder_init(&containers[0], buffer, totalEstimate, 0);
 
 #define CHECK_CBOR_ERROR(call, message) do{ CborError err = call; if (err != CborNoError){ ESP_LOGE(TAG, message ", error %d", err); goto error;} }while(0)
@@ -447,7 +447,7 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
         CREATE_MAP(descriptions[i]->nrofSubs, "subs map");
         for (psIndex = 0; psIndex < descriptions[i]->nrofSubs; psIndex++) {
             const char *name = descriptions[i]->subs[psIndex].name;
-            if (name == NULL){
+            if (name == NULL) {
                 name = IOT_DEFAULT_CONTROL_STR;
             }
             ADD_STRING(name, "sub name");
@@ -473,7 +473,7 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
         }
     }
     CLOSE_CONTAINER();
-    
+
     CLOSE_CONTAINER();
 
     binValue->data = buffer;
@@ -540,7 +540,7 @@ static size_t getCborStrRequirement(const char *str)
     return req;
 }
 
-static size_t getCborUintRequirement(const uint value) 
+static size_t getCborUintRequirement(const uint value)
 {
     size_t req = 1;
     if (value > 23) {

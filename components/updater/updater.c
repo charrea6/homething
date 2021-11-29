@@ -110,7 +110,7 @@ void updaterUpdate(const char *updateVersion)
     }
 }
 
-void updaterAddStatusCallback(updaterStatusCallback_t callback) 
+void updaterAddStatusCallback(updaterStatusCallback_t callback)
 {
     if (nrofCallbacks >= MAX_CALLBACKS) {
         ESP_LOGE(TAG, "Maximum number of status callbacks reached");

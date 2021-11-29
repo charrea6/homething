@@ -10,7 +10,7 @@ typedef enum iotElementCallbackReason {
     IOT_CALLBACK_ON_CONNECT,
     IOT_CALLBACK_ON_CONNECT_RELEASE,
     IOT_CALLBACK_ON_SUB
-}iotElementCallbackReason_t;
+} iotElementCallbackReason_t;
 
 typedef char iotValueType_t;
 
@@ -25,7 +25,7 @@ typedef union iotValue {
     bool b;
     const char *s;
     const iotBinaryValue_t *bin;
-}iotValue_t;
+} iotValue_t;
 
 typedef struct iotElement *iotElement_t;
 
@@ -33,7 +33,7 @@ typedef struct iotElementCallbackDetails {
     int index;
     iotValueType_t valueType;
     iotValue_t value;
-}iotElementCallbackDetails_t;
+} iotElementCallbackDetails_t;
 
 
 typedef void *iotElementIterator_t;
@@ -127,7 +127,7 @@ int iotInit(void);
 
 /** Creates a new IOT Element using the specified pub/sub description and printf formatting for the name.
  */
-iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, iotElementCallback_t callback, 
+iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, iotElementCallback_t callback,
                            void *userContext, const char *nameFormat, ...);
 
 /** Publish a value to the specified element and pubId.

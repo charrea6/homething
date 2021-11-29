@@ -49,7 +49,7 @@ int mqttInit(void)
 {
     nvs_handle handle;
     esp_err_t err;
-    
+
     sendMutex = xSemaphoreCreateMutex();
 
     err = nvs_open("mqtt", NVS_READONLY, &handle);

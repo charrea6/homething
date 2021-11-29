@@ -15,7 +15,7 @@
 #define AUTO_CMD "auto"
 
 static void humidityFanUpdateHumidity(HumidityFan_t *fan, NotificationsMessage_t *message);
-static void humidityFanElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, 
+static void humidityFanElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason,
                                        iotElementCallbackDetails_t *details);
 static void humidityFanCtrl(HumidityFan_t *fan, iotValue_t value);
 static void humidityFanRunOnTimeout(TimerHandle_t xTimer);
@@ -130,7 +130,7 @@ static void humidityFanUpdateHumidity(HumidityFan_t *fan, NotificationsMessage_t
     iotElementPublish(fan->element, PUB_ID_HUMIDITY, value);
 }
 
-static void humidityFanElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, 
+static void humidityFanElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason,
                                        iotElementCallbackDetails_t *details)
 {
     if (reason == IOT_CALLBACK_ON_SUB) {
