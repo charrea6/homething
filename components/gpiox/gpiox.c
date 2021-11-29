@@ -173,8 +173,6 @@ int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
 
 int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
 {
-    ESP_LOGI(TAG,"Pins 0x%08x 0x%08x Values 0x%08x 0x%08x", pins->pins[0], pins->pins[1],
-             values->pins[0], values->pins[1]);
     if (pins->pins[0] != 0) {
         for (int i=0; i < GPIO_NUM_MAX; i++) {
             if (GPIOX_PINS_IS_SET(*pins, i)) {
