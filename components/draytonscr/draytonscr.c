@@ -1,5 +1,5 @@
 /*
- * Inspiration for this code and more details about the Drayton SCR protocol can be found here: 
+ * Inspiration for this code and more details about the Drayton SCR protocol can be found here:
  * https://github.com/tul/drayton_controller
  */
 #include <stdbool.h>
@@ -13,26 +13,21 @@
 #include "draytonscr.h"
 
 #include "esp_log.h"
-#include "iot.h"
 
-typedef struct DraytonSCR {
+struct DraytonSCR {
     uint8_t pin;
     bool on;
 
     const char* onSequence;
     const char* offSequence;
     TaskHandle_t task;
-    iotElement_t element;
-} DraytonSCR_t;
+};
 
 #define BASE_DURATION 500 /* microseconds */
 #define RETRANSMIT_INTERVAL 5000 /* milliseconds */
 #define RETRANSMIT_COUNT 3
 #define REPEAT_INTERVAL 60*1000 /* milliseconds */
 
-static DraytonSCR_t *draytonSCR = NULL;
-
-static void draytonSCRElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
 static void draytonSCRTransmitTask(void* pvParameters);
 
 static const char TAG[] = "draytonSCR";
@@ -41,27 +36,14 @@ static const char TAG[] = "draytonSCR";
 #define SWITCH_THREAD_PRIO 8
 #define SWITCH_THREAD_STACK_WORDS 2048
 
-
-IOT_DESCRIBE_ELEMENT(
-    elementDescription,
-    IOT_ELEMENT_TYPE_SWITCH,
-    IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(RETAINED, BOOL, "state")
-    ),
-    IOT_SUB_DESCRIPTIONS(
-        IOT_DESCRIBE_SUB(BOOL, IOT_SUB_DEFAULT_NAME)
-    )
-);
-
-void draytonSCRInit(uint8_t pin, const char *onSequence, const char *offSequence)
+DraytonSCR_t* draytonSCRInit(uint8_t pin, const char *onSequence, const char *offSequence)
 {
-    draytonSCR = malloc(sizeof(DraytonSCR_t));
+    DraytonSCR_t *draytonSCR = malloc(sizeof(DraytonSCR_t));
     if (draytonSCR == NULL) {
-        return;
+        return NULL;
     }
 
     draytonSCR->pin = pin;
-    draytonSCR->element = iotNewElement(&elementDescription, 0, draytonSCRElementCallback, draytonSCR, "draytonSCR");
     draytonSCR->on = false;
     draytonSCR->onSequence = onSequence;
     draytonSCR->offSequence = offSequence;
@@ -69,12 +51,13 @@ void draytonSCRInit(uint8_t pin, const char *onSequence, const char *offSequence
     xTaskCreate(draytonSCRTransmitTask,
                 SWITCH_THREAD_NAME,
                 SWITCH_THREAD_STACK_WORDS,
-                NULL,
+                draytonSCR,
                 SWITCH_THREAD_PRIO,
                 &draytonSCR->task);
+    return draytonSCR;
 }
 
-void draytonSCRSetState(bool on)
+void draytonSCRSetState(DraytonSCR_t *draytonSCR, bool on)
 {
     if (on == draytonSCR->on) {
         return;
@@ -83,20 +66,15 @@ void draytonSCRSetState(bool on)
     ESP_LOGI(TAG, "draytonSCR: Is on? %s", on ? "On":"Off");
     draytonSCR->on = on;
 
-    iotValue_t value;
-    value.b = on;
-    iotElementPublish(draytonSCR->element, 0, value);
     xTaskNotifyGive(draytonSCR->task);
 }
 
-static void draytonSCRElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
+bool draytonSCRIsOn(DraytonSCR_t *draytonSCR)
 {
-    if (IOT_CALLBACK_ON_SUB) {
-        draytonSCRSetState(details->value.b);
-    }
+    return draytonSCR->on;
 }
 
-static void draytonSCRTransmit(const char *code)
+static void draytonSCRTransmit(DraytonSCR_t *draytonSCR, const char *code)
 {
     int i;
     GPIOX_Pins_t pins, onValues, offValues;
@@ -136,6 +114,7 @@ static void draytonSCRTransmit(const char *code)
 
 static void draytonSCRTransmitTask(void* pvParameters)
 {
+    DraytonSCR_t *draytonSCR = pvParameters;
     GPIOX_Pins_t pins;
     GPIOX_PINS_CLEAR_ALL(pins);
     GPIOX_PINS_SET(pins, draytonSCR->pin);
@@ -146,7 +125,7 @@ static void draytonSCRTransmitTask(void* pvParameters)
     TickType_t toWait;
     while(true) {
         ESP_LOGI(TAG, "Sending \"%s\" sequence", draytonSCR->on ? draytonSCR->onSequence : draytonSCR->offSequence);
-        draytonSCRTransmit(draytonSCR->on ? draytonSCR->onSequence : draytonSCR->offSequence);
+        draytonSCRTransmit(draytonSCR, draytonSCR->on ? draytonSCR->onSequence : draytonSCR->offSequence);
         transmitCount ++;
         if (transmitCount >= RETRANSMIT_COUNT) {
             toWait = (REPEAT_INTERVAL / portTICK_RATE_MS);

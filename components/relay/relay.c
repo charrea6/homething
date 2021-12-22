@@ -65,6 +65,11 @@ void relaySetState(Relay_t *relay, bool on)
     iotElementPublish(relay->element, 0, value);
 }
 
+bool relayIsOn(Relay_t *relay)
+{
+    return relay->u.fields.on;
+}
+
 static void relayElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
 {
     if (IOT_CALLBACK_ON_SUB) {

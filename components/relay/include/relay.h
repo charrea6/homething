@@ -17,6 +17,6 @@ typedef struct Relay {
 
 void relayInit(uint8_t id, uint8_t pin, uint8_t onLevel, Relay_t *relay);
 void relaySetState(Relay_t *relay, bool on);
-#define relayIsOn(relay) ((relay)->u.fields.on)
+bool relayIsOn(Relay_t *relay);
 #define relayId(relay) ((relay)->u.fields.id)
 #endif

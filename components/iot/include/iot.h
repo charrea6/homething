@@ -140,6 +140,12 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value);
  */
 int iotStrToBool(const char *str, bool *out);
 
+/** Converts a string to the specified value type storing the value in 'out'.
+ * All value types are supported apart from IOT_VALUE_TYPE_BINARY and IOT_VALUE_TYPE_ON_CONNECT.
+ * Returns 0 on success, non-zero otherwise.
+ */
+int iotParseString(const char *str, const iotValueType_t type, iotValue_t *out);
+
 /** Publish a message to the MQTT server.
  * Returns a negative number on error.
  */

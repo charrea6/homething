@@ -20,23 +20,28 @@
 #include "led.h"
 #include "led_strips.h"
 #include "draytonscr.h"
+#include "thermostat.h"
 
 static const char TAG[] = "profile";
 
 #ifdef CONFIG_DRAYTONSCR
 static int profileDraytonSCRInit(int num);
-static Notifications_ID_t profileDraytonSCRAdd(CborValue *entry);
+static int profileDraytonSCRAdd(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount);
+#define DRAYTONSCR_COMPONENT {profileDraytonSCRInit, NULL}
+#else
+#define DRAYTONSCR_COMPONENT {NULL, NULL}
 #endif
 
 typedef int (*initFunc_t)(int);
 typedef Notifications_ID_t (*addFunc_t)(CborValue *);
+typedef int (*addWithIds_t)(CborValue *, Notifications_ID_t *, uint32_t );
 
 struct Component {
     initFunc_t init;
     addFunc_t add;
 } components[DeviceProfile_EntryType_Max] = {
     SWITCHES_COMPONENT,
-    {initRelays, NULL},
+    RELAY_COMPONENT,
     DHT22_COMPONENT,
     SI7021_COMPONENT,
     {NULL, NULL},
@@ -44,11 +49,7 @@ struct Component {
     DS18x20_COMPONENT,
     LED_COMPONENT,
     LED_STRIP_SPI_COMPONENT,
-#ifdef CONFIG_DRAYTONSCR
-    {profileDraytonSCRInit, profileDraytonSCRAdd}
-#else
-    {NULL, NULL}
-#endif
+    DRAYTONSCR_COMPONENT
 };
 
 void processProfile(void)
@@ -119,6 +120,11 @@ void processProfile(void)
             }
             relayIndex ++;
         }
+#ifdef CONFIG_DRAYTONSCR
+        if (entryType == DeviceProfile_EntryType_DraytonSCR) {
+            profileDraytonSCRAdd(&entry, ids, entryCount);
+        }
+#endif
         deviceProfileParserCloseEntry(&parser, &entry);
     }
 error:
@@ -137,26 +143,47 @@ static int profileDraytonSCRInit(int num)
     return 1;
 }
 
-static Notifications_ID_t profileDraytonSCRAdd(CborValue *entry)
+static int profileDraytonSCRAdd(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount)
 {
     uint32_t pin;
+    uint32_t id;
     char *onSequence = NULL;
     char *offSequence = NULL;
     if (deviceProfileParserEntryGetUint32(entry, &pin)) {
         ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to get pin!");
-        return NOTIFICATIONS_ID_ERROR;
+        return -1;
     }
     if (deviceProfileParserEntryGetStr(entry, &onSequence)) {
         ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to get on sequence!");
-        return NOTIFICATIONS_ID_ERROR;
+        return -1;
     }
     if (deviceProfileParserEntryGetStr(entry, &offSequence)) {
         free(onSequence);
         ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to get off sequence!");
-        return NOTIFICATIONS_ID_ERROR;
+        return -1;
     }
-    draytonSCRInit(pin, onSequence, offSequence);
-    return NOTIFICATIONS_ID_ALL;
+    if (deviceProfileParserEntryGetUint32(entry, &id) == -1) {
+        ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to get controller id");
+        return  -1;
+    }
+    if (id >= idCount) {
+        ESP_LOGE(TAG, "profileDraytonSCRAdd: Controller id %u too big!", id);
+        return  -1;
+    }
+
+    DraytonSCR_t *draytonSCR = draytonSCRInit(pin, onSequence, offSequence);
+    if (draytonSCR == NULL) {
+        ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to allocate memory for draytonSCR");
+        return -1;
+    }
+    Thermostat_t *thermostat = malloc(sizeof(Thermostat_t));
+    if (thermostat) {
+        thermostatInit(thermostat, (ThermostatCallForHeatStateSet_t)draytonSCRSetState,
+                       (ThermostatCallForHeatStateGet_t)draytonSCRIsOn, draytonSCR, ids[id]);
+    } else {
+        ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to allocate memory for thermostat");
+    }
+    return 0;
 }
 
 #endif

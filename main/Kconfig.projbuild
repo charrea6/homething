@@ -33,6 +33,11 @@ config NOTIFICATION_LED_PIN
 config HOMEASSISTANT
     bool "Enable Home Assistant Discovery support"
     
+config THERMOSTAT
+    bool "Enable support for thermostatically controlled relays"
+
 config DRAYTONSCR
     bool "Enable Drayton SCR transmit support"
+    depends on THERMOSTAT
+    
 endmenu

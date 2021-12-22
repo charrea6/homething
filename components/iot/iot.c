@@ -19,6 +19,11 @@
 #include "notifications.h"
 #include "sdkconfig.h"
 
+#define HUNDRETHS_MAX_INTEGER_DIGITS 8
+#define HUNDRETHS_MAX_DECIMAL_DIGITS 2
+#define HUNDRETHS_MAX_DIGITS (HUNDRETHS_MAX_INTEGER_DIGITS + HUNDRETHS_MAX_DECIMAL_DIGITS)
+
+
 static const char *TAG="IOT";
 const char *IOT_DEFAULT_CONTROL_STR="ctrl";
 
@@ -244,30 +249,20 @@ int iotStrToBool(const char *str, bool *out)
     return 0;
 }
 
-static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, size_t len)
+int iotParseString(const char *str, const iotValueType_t type, iotValue_t *out)
 {
-    iotValue_t value;
-    iotBinaryValue_t binValue;
     bool allowNegative = false;
-    const char *name;
-    if (element->desc->subs[subId].name[0] == 0) {
-        name = IOT_DEFAULT_CONTROL_STR;
-    } else {
-        name = element->desc->subs[subId].name;
-    }
-    ESP_LOGI(TAG, "SUB: new message \"%s\" for \"%s/%s\"", payload, element->name, name);
-    switch(element->desc->subs[subId].type) {
+
+    switch(type) {
     case IOT_VALUE_TYPE_BOOL:
-        if (iotStrToBool(payload, &value.b)) {
-            ESP_LOGW(TAG, "Invalid value for bool type (%s)", payload);
-            return;
+        if (iotStrToBool(str, &out->b)) {
+            return -1;
         }
         break;
 
     case IOT_VALUE_TYPE_INT:
-        if (sscanf(payload, "%d", &value.i) == 0) {
-            ESP_LOGW(TAG, "Invalid value for int type (%s)", payload);
-            return;
+        if (sscanf(str, "%d", &out->i) == 0) {
+            return -1;
         }
         break;
 
@@ -276,57 +271,94 @@ static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, 
         allowNegative = true; /* fallthrough */
     case IOT_VALUE_TYPE_PERCENT_RH:
     case IOT_VALUE_TYPE_KPA: {
-        char *decimalPoint = NULL;
-        if ((payload[0] == '-')  && (!allowNegative)) {
-            ESP_LOGW(TAG, "Negative values not allowed for topic (%s)", payload);
-            return;
-        }
-        decimalPoint = strchr(payload, '.');
-        if (decimalPoint != NULL) {
-            *decimalPoint = 0;
+        int hundreths = 0;
+        int i;
+        const char *ch = str;
+        bool negative = false;
+
+        if (*ch == '-') {
+            if (!allowNegative) {
+                return -1;
+            }
+            negative = true;
+            ch++;
         }
 
-        if (sscanf(payload, "%d", &value.i) ==  0) {
-            ESP_LOGW(TAG, "Invalid value for topic type (%s)", payload);
-            return;
-        }
-
-        value.i *= 100;
-        if (decimalPoint != NULL) {
-            unsigned int hundredths = 0;
-            if (strlen(decimalPoint +1) > 2) {
-                decimalPoint[3] = 0;
+        for (i = 0; i < HUNDRETHS_MAX_INTEGER_DIGITS && *ch; i++, ch++) {
+            if (*ch == '.') {
+                break;
             }
-            if (sscanf(payload, "%u", &hundredths) ==  0) {
-                ESP_LOGW(TAG, "Invalid value for topic type (%s)", payload);
-                return;
+            if ((*ch >= '0') && (*ch <= '9')) {
+                hundreths = (hundreths * 10) + (*ch - '0');
+            } else {
+                return -1;
             }
-            value.i += hundredths;
         }
+        if (*ch == '.') {
+            ch++;
+            for (i = 0; i < HUNDRETHS_MAX_DECIMAL_DIGITS && *ch; i++, ch++) {
+                if ((*ch >= '0') && (*ch <= '9')) {
+                    hundreths = (hundreths * 10) + (*ch - '0');
+                } else {
+                    return -1;
+                }
+            }
+            if (i < HUNDRETHS_MAX_DECIMAL_DIGITS) {
+                for (; i < HUNDRETHS_MAX_DECIMAL_DIGITS; i++) {
+                    hundreths *= 10;
+                }
+            }
+        } else {
+            hundreths *= 100;
+        }
+        if (negative) {
+            hundreths *= -1;
+        }
+        out->i = hundreths;
     }
     break;
 
     case IOT_VALUE_TYPE_FLOAT:
-        if (sscanf(payload, "%f", &value.f) == 0) {
-            ESP_LOGW(TAG, "Invalid value for float type (%s)", payload);
-            return;
+        if (sscanf(str, "%f", &out->f) == 0) {
+            return -1;
         }
         break;
 
     case IOT_VALUE_TYPE_STRING:
-        value.s = payload;
+        out->s = str;
         break;
 
     case IOT_VALUE_TYPE_BINARY:
+    default:
+        return -1;
+    }
+
+    return 0;
+}
+
+static void iotElementSubUpdate(iotElement_t element, int subId, char *payload, size_t len)
+{
+    iotValue_t value;
+    iotBinaryValue_t binValue;
+    const char *name;
+    if (element->desc->subs[subId].name[0] == 0) {
+        name = IOT_DEFAULT_CONTROL_STR;
+    } else {
+        name = element->desc->subs[subId].name;
+    }
+    ESP_LOGI(TAG, "SUB: new message \"%s\" for \"%s/%s\"", payload, element->name, name);
+
+    if (element->desc->subs[subId].type == IOT_VALUE_TYPE_BINARY) {
         binValue.data = (uint8_t*)payload;
         binValue.len = len;
         value.bin = &binValue;
-        break;
-
-    default:
-        ESP_LOGE(TAG, "Unknown value type %d for %s/%s", element->desc->subs[subId].type, element->name, name);
-        return;
+    } else {
+        if (iotParseString(payload, element->desc->subs[subId].type, &value)) {
+            ESP_LOGE(TAG, "Failed to parse value type %d for %s/%s", element->desc->subs[subId].type, element->name, name);
+            return;
+        }
     }
+
     iotElementCallbackDetails_t details;
     details.index = subId;
     details.value = value;

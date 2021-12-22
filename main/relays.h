@@ -5,4 +5,5 @@
 
 int initRelays(int nrofRelays);
 int addRelay(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount);
+#define RELAY_COMPONENT { initRelays, NULL }
 #endif

@@ -10,6 +10,7 @@
 
 #include "switches.h"
 #include "humidityfan.h"
+#include "thermostat.h"
 
 static const char TAG[] = "relays";
 
@@ -74,8 +75,20 @@ int addRelay(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount)
         case DeviceProfile_RelayController_Switch:
             notificationsRegister(Notifications_Class_Switch, ids[id], switchRelayController, relay);
             break;
-        case DeviceProfile_RelayController_Temperature:
-            break;
+        case DeviceProfile_RelayController_Temperature: {
+#ifdef CONFIG_THERMOSTAT
+            Thermostat_t *thermostat = malloc(sizeof(Thermostat_t));
+            if (thermostat) {
+                thermostatInit(thermostat, (ThermostatCallForHeatStateSet_t)relaySetState,
+                               (ThermostatCallForHeatStateGet_t)relayIsOn, relay, ids[id]);
+            } else {
+                ESP_LOGE(TAG, "setupRelay: Failed to allocate memory for thermostat");
+            }
+#else
+            ESP_LOGW(TAG, "setupRelay: Unsupported thermostat controller!");
+#endif
+        }
+        break;
         case DeviceProfile_RelayController_Humidity: {
 #ifdef CONFIG_HUMIDISTAT
             HumidityFan_t *fanController = malloc(sizeof(HumidityFan_t));
