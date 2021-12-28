@@ -38,10 +38,6 @@ typedef struct iotElementCallbackDetails {
 
 typedef void *iotElementIterator_t;
 
-typedef void (*iotElementSubUpdateCallback_t)(void *userData, iotElement_t element, iotValue_t value);
-
-typedef void (*iotValueOnConnectCallback_t)(void *userData, iotElement_t element, int pubId, bool release, iotValueType_t *valueType, iotValue_t *value);
-
 typedef void (*iotElementCallback_t)(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
 
 typedef struct iotElementPubSubDescription {
