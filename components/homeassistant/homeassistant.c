@@ -30,9 +30,11 @@ struct DeviceDetails {
 static void onMqttStatusUpdated(void *user,  NotificationsMessage_t *message);
 static void sendDiscoveryMessages();
 static char* deviceGetDescription(void);
+static void getDeviceDetails(struct DeviceDetails *details);
 static void processElement(struct DeviceDetails *deviceDetails, iotElement_t element);
 static void processSensor(struct DeviceDetails *deviceDetails, iotElement_t element);
 static void processSwitch(struct DeviceDetails *deviceDetails, iotElement_t element);
+static void addBasePathToObject(iotElement_t element, cJSON *object);
 static void addDeviceDetails(struct DeviceDetails *deviceDetails, cJSON * obj);
 static void sendDiscoveryMessage(struct DeviceDetails *deviceDetails, const char* type,
                                  iotElement_t element, const char *pubName, cJSON *object);
@@ -40,6 +42,16 @@ static void sendDiscoveryMessage(struct DeviceDetails *deviceDetails, const char
 void homeAssistantDiscoveryInit(void)
 {
     notificationsRegister(Notifications_Class_Network, NOTIFICATIONS_ID_MQTT, onMqttStatusUpdated, NULL);
+}
+
+void homeAssistantDiscoveryAnnounce(const char* type, iotElement_t element, const char *pubName, cJSON *details, bool addBasePath)
+{
+    struct DeviceDetails deviceDetails;
+    getDeviceDetails(&deviceDetails);
+    if (addBasePath) {
+        addBasePathToObject(element, details);
+    }
+    sendDiscoveryMessage(&deviceDetails, type, element, pubName, details);
 }
 
 static void onMqttStatusUpdated(void *user,  NotificationsMessage_t *message)
@@ -54,10 +66,7 @@ static void sendDiscoveryMessages()
     iotElementIterator_t iterator = IOT_ELEMENT_ITERATOR_START;
     iotElement_t element;
     struct DeviceDetails details;
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    sprintf(details.identifier, "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    details.deviceDescription = deviceGetDescription();
+    getDeviceDetails(&details);
 
     while(iotElementIterate(&iterator, true, &element)) {
         processElement(&details, element);
@@ -174,6 +183,17 @@ static void processSwitch(struct DeviceDetails *deviceDetails, iotElement_t elem
     cJSON_AddStringToObjectCS(object, "command_topic", topic);
     free(topic);
 
+    addBasePathToObject(element, object);
+
+    cJSON_AddStringReferenceToObjectCS(object, "payload_off", "off");
+    cJSON_AddStringReferenceToObjectCS(object, "payload_on", "on");
+
+    sendDiscoveryMessage(deviceDetails, "switch", element, NULL, object);
+}
+
+static void addBasePathToObject(iotElement_t element, cJSON *object)
+{
+    char *topic;
     size_t topicSize = 0;
     iotElementGetBasePath(element, NULL, &topicSize);
     if (topicSize == 0) {
@@ -192,11 +212,6 @@ static void processSwitch(struct DeviceDetails *deviceDetails, iotElement_t elem
     }
     cJSON_AddStringToObjectCS(object, "~", topic);
     free(topic);
-
-    cJSON_AddStringReferenceToObjectCS(object, "payload_off", "off");
-    cJSON_AddStringReferenceToObjectCS(object, "payload_on", "on");
-
-    sendDiscoveryMessage(deviceDetails, "switch", element, NULL, object);
 }
 
 static void sendDiscoveryMessage(struct DeviceDetails *deviceDetails, const char* type,
@@ -255,6 +270,14 @@ static void addDeviceDetails(struct DeviceDetails *deviceDetails, cJSON * obj)
     cJSON_AddStringToObjectCS(devObject, "sw", appVersion);
     cJSON_AddStringReferenceToObjectCS(devObject, "mf", "Homething");
     cJSON_AddStringToObjectCS(devObject, "mdl", MODEL);
+}
+
+static void getDeviceDetails(struct DeviceDetails *details)
+{
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    sprintf(details->identifier, "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    details->deviceDescription = deviceGetDescription();
 }
 
 static char* deviceGetDescription(void)

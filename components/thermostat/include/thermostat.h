@@ -15,8 +15,7 @@ typedef struct Thermostat {
     ThermostatCallForHeatStateGet_t getState;
     void *context;
 
-    int heatOn;
-    int heatOff;
+    int targetTemperature;
 
     iotElement_t element;
     char modeState[44]; // {"mode":"manual","secondsLeft":1234567890}

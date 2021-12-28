@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
+#include "sdkconfig.h"
 #include "thermostat.h"
-
+#include "cJSON.h"
+#include "cJSON_AddOns.h"
+#include "homeassistant.h"
 
 #define SECS_TO_TICKS(secs) ((secs * 1000) / portTICK_RATE_MS)
 
@@ -24,6 +27,10 @@ static void thermostatUpdateTemperature(Thermostat_t *thermostat, NotificationsM
 static void thermostatUpdateMode(Thermostat_t *thermostat);
 static void thermostatUpdateTargetTemps(Thermostat_t *thermostat);
 
+#ifdef CONFIG_HOMEASSISTANT
+static void onMqttStatusUpdated(void *user,  NotificationsMessage_t *message);
+#endif
+
 static const char TAG[] = "thermostat";
 static int thermostatCount=0;
 
@@ -31,11 +38,10 @@ static int thermostatCount=0;
 #define TEMPERATURE_RANGE_LOW     0 // 0.0 C
 #define TEMPERATURE_RANGE_HIGH 3500 // 35.0 C
 
-#define PUB_ID_STATE       0
-#define PUB_ID_TEMPERATURE 1
-#define PUB_ID_HEAT_ON      2
-#define PUB_ID_HEAT_OFF     3
-#define PUB_ID_MODE        4
+#define PUB_ID_STATE               0
+#define PUB_ID_TEMPERATURE         1
+#define PUB_ID_TARGET_TEMPERATURE  2
+#define PUB_ID_MODE                3
 
 IOT_DESCRIBE_ELEMENT(
     elementDescription,
@@ -43,8 +49,7 @@ IOT_DESCRIBE_ELEMENT(
     IOT_PUB_DESCRIPTIONS(
         IOT_DESCRIBE_PUB(RETAINED, BOOL, "state"),
         IOT_DESCRIBE_PUB(RETAINED, CELSIUS, "temperature"),
-        IOT_DESCRIBE_PUB(RETAINED, CELSIUS, "heatOn"),
-        IOT_DESCRIBE_PUB(RETAINED, CELSIUS, "heatOff"),
+        IOT_DESCRIBE_PUB(RETAINED, CELSIUS, "targetTemperature"),
         IOT_DESCRIBE_PUB(RETAINED, STRING, "mode")
     ),
     IOT_SUB_DESCRIPTIONS(
@@ -57,8 +62,7 @@ void thermostatInit(Thermostat_t *thermostat, ThermostatCallForHeatStateSet_t se
                     Notifications_ID_t temperatureSensor)
 {
     iotValue_t value;
-    thermostat->heatOn = 1950; // Default 19.50 C
-    thermostat->heatOff = 2050; // Default 20.50 C
+    thermostat->targetTemperature = 2000; // Default 20.00 C
     thermostat->manualMode = false;
     thermostat->manualModeSecsLeft = 0u;
     thermostat->context = context;
@@ -68,17 +72,52 @@ void thermostatInit(Thermostat_t *thermostat, ThermostatCallForHeatStateSet_t se
     thermostat->element = iotNewElement(&elementDescription, 0, thermostatElementCallback, thermostat, "thermostat%d", thermostatCount);
     thermostatCount ++;
 
-    value.i = thermostat->heatOn;
-    iotElementPublish(thermostat->element, PUB_ID_HEAT_ON, value);
-    value.i = thermostat->heatOff;
-    iotElementPublish(thermostat->element, PUB_ID_HEAT_OFF, value);
+    value.i = thermostat->targetTemperature;
+    iotElementPublish(thermostat->element, PUB_ID_TARGET_TEMPERATURE, value);
     value.i = 0;
     iotElementPublish(thermostat->element, PUB_ID_TEMPERATURE, value);
     thermostatUpdateMode(thermostat);
 
     thermostat->manualModeTimer = xTimerCreate("tMM", SECS_TO_TICKS(1), pdTRUE, thermostat, thermostatManualModeSecsTimeout);
     notificationsRegister(Notifications_Class_Temperature, temperatureSensor, (NotificationsCallback_t)thermostatUpdateTemperature, thermostat);
+#ifdef CONFIG_HOMEASSISTANT
+    notificationsRegister(Notifications_Class_Network, NOTIFICATIONS_ID_MQTT, onMqttStatusUpdated, thermostat);
+#endif
 }
+
+#ifdef CONFIG_HOMEASSISTANT
+static void onMqttStatusUpdated(void *user,  NotificationsMessage_t *message)
+{
+    Thermostat_t *thermostat = user;
+    if (message->data.connectionState != Notifications_ConnectionState_Connected) {
+        return;
+    }
+    cJSON *details = cJSON_CreateObject();
+    if (details == NULL) {
+        return;
+    }
+    cJSON_AddStringReferenceToObjectCS(details, "action_topic", "~/state");
+    cJSON_AddStringReferenceToObjectCS(details, "action_template", "{{ {'on':'heating'}.get(value, 'off') }}");
+    cJSON_AddStringReferenceToObjectCS(details, "current_temperature_topic", "~/temperature");
+
+    char temperature[10];
+    sprintf(temperature, "%d", TEMPERATURE_RANGE_HIGH / 100);
+    cJSON_AddStringToObjectCS(details, "max_temp", temperature);
+    sprintf(temperature, "%d", TEMPERATURE_RANGE_LOW / 100);
+    cJSON_AddStringToObjectCS(details, "min_temp", temperature);
+
+    cJSON_AddStringReferenceToObjectCS(details, "temperature_command_topic", "~/ctrl");
+    cJSON_AddStringReferenceToObjectCS(details, "temperature_command_template", "target {{ value }}");
+    cJSON_AddStringReferenceToObjectCS(details, "temperature_state_topic", "~/targetTemperature");
+
+    const char *modes[] = { "heat", "off"};
+    cJSON_AddItemToObjectCS(details, "modes", cJSON_CreateStringArray(modes, 2));
+    cJSON_AddStringReferenceToObjectCS(details, "mode_state_template", "{{ {'auto':'heat'}.get(value_json['mode'], 'off') }}");
+    cJSON_AddStringReferenceToObjectCS(details, "mode_state_topic", "~/mode");
+
+    homeAssistantDiscoveryAnnounce("climate", thermostat->element, NULL, details, true);
+}
+#endif
 
 static void thermostatSetState(Thermostat_t *thermostat, bool state)
 {
@@ -92,20 +131,22 @@ static void thermostatUpdateTemperature(Thermostat_t *thermostat, NotificationsM
 {
     iotValue_t value;
     int32_t celsiusTenths = message->data.temperature;
+    int heatOn = thermostat->targetTemperature - TARGET_HYSTERESIS;
+    int heatOff = thermostat->targetTemperature + TARGET_HYSTERESIS;
 
     ESP_LOGI(TAG, "%s: Temperature %d (Heat On %d Heat Off %d) Manual Mode %d", iotElementGetName(thermostat->element),
-             celsiusTenths, thermostat->heatOn, thermostat->heatOff, thermostat->manualMode);
+             celsiusTenths, heatOn, heatOff, thermostat->manualMode);
 
     if (thermostat->manualMode == false) {
         if (thermostat->getState(thermostat->context)) {
             // Call for Heat is on, so wait until we're greater than or equal to heatOff
-            if (celsiusTenths >= thermostat->heatOff) {
+            if (celsiusTenths >= heatOff) {
                 thermostatSetState(thermostat, false);
             }
 
         } else {
             // Call for Heat is off, so wait until we're below target by 0.5 C before turning on
-            if (celsiusTenths <= thermostat->heatOn) {
+            if (celsiusTenths <= heatOn) {
                 thermostatSetState(thermostat, true);
             }
         }
@@ -132,8 +173,7 @@ static void thermostatCtrl(Thermostat_t *thermostat, iotValue_t value)
         iotValue_t targetTemp;
         if (iotParseString(value.s + TARGET_CMD_LEN, IOT_VALUE_TYPE_CELSIUS, &targetTemp) == 0) {
             if ((targetTemp.i >= TEMPERATURE_RANGE_LOW) && (targetTemp.i <= TEMPERATURE_RANGE_HIGH)) {
-                thermostat->heatOn = targetTemp.i - TARGET_HYSTERESIS;
-                thermostat->heatOff = targetTemp.i + TARGET_HYSTERESIS;
+                thermostat->targetTemperature = targetTemp.i;
                 thermostatUpdateTargetTemps(thermostat);
                 thermostatReevaluateState(thermostat);
             }
@@ -191,8 +231,6 @@ static void thermostatUpdateMode(Thermostat_t *thermostat)
 static void thermostatUpdateTargetTemps(Thermostat_t *thermostat)
 {
     iotValue_t value;
-    value.i = thermostat->heatOn;
-    iotElementPublish(thermostat->element, PUB_ID_HEAT_ON, value);
-    value.i = thermostat->heatOff;
-    iotElementPublish(thermostat->element, PUB_ID_HEAT_OFF, value);
+    value.i = thermostat->targetTemperature;
+    iotElementPublish(thermostat->element, PUB_ID_TARGET_TEMPERATURE, value);
 }
