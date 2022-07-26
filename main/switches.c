@@ -120,6 +120,11 @@ void switchRelayController(void *user, NotificationsMessage_t *message)
     for (i = 0; i < switchCount; i ++) {
         if (switches[i].id == message->id) {
             switch(switches[i].type) {
+            case DeviceProfile_SwitchType_Momentary:
+                if (message->data.switchState) {
+                    relaySetState(relay, !relayIsOn(relay));    
+                }
+                break;
             case DeviceProfile_SwitchType_Toggle:
                 relaySetState(relay, !relayIsOn(relay));
                 break;
