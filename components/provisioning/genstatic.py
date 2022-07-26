@@ -37,11 +37,11 @@ def load(path):
 
             url = None
             if path.endswith(".html"):
-                url = 'https://html-minifier.com/raw'
+                url = 'https://www.toptal.com/developers/html-minifier/raw'
             elif path.endswith(".js"):
-                url = 'https://javascript-minifier.com/raw'
+                url = 'https://www.toptal.com/developers/javascript-minifier/api/raw'
             elif path.endswith(".css"):
-                url = 'https://cssminifier.com/raw'
+                url = 'https://www.toptal.com/developers/cssminifier/raw'
                 
             if url is None:
                 return data
