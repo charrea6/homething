@@ -205,9 +205,10 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
     ESP_LOGW(TAG, "Diag entry memory: %u @start %u @formatted %u @end", free_at_start, free_after_format, free_at_end);
 }
 
-#define RESTART    "restart"
-#define SETPROFILE "setprofile"
-#define UPDATE     "update "
+#define RESTART             "restart"
+#define SETPROFILE          "setprofile"
+#define UPDATE              "update "
+#define VALUE_UPDATE_POLICY "valueupdatepolicy "
 static void iotDeviceControl(iotValue_t value)
 {
     if (strcmp(RESTART, (const char *)value.bin->data) == 0) {
@@ -222,6 +223,17 @@ static void iotDeviceControl(iotValue_t value)
         char *version = (char *)value.bin->data + sizeof(UPDATE) - 1 /* remove the \0 */;
         for (; isspace((int)*version) && *version != 0; version ++);
         updaterUpdate(version);
+    } else if (strncmp(VALUE_UPDATE_POLICY, (const char *)value.bin->data, sizeof(VALUE_UPDATE_POLICY) - 1) == 0) {
+        char *policy = (char *)value.bin->data + sizeof(VALUE_UPDATE_POLICY) - 1 /* remove the \0 */;
+        for (; isspace((int)*policy) && *policy != 0; policy ++);
+        ESP_LOGE(TAG, "Policy: %s", policy);
+        if (strcasecmp(policy, "always") == 0) {
+            ESP_LOGE(TAG, "Policy updated to always");
+            iotSetValueUpdatePolicy(IOT_VALUE_UPDATE_POLICY_ALWAYS);
+        } else if (strcasecmp(policy, "onchange") == 0) {
+            ESP_LOGE(TAG, "Policy updated to on change");
+            iotSetValueUpdatePolicy(IOT_VALUE_UPDATE_POLICY_ON_CHANGE);
+        }
     }
 }
 

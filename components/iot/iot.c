@@ -31,6 +31,7 @@ iotElement_t iotElementsHead = NULL;
 
 static char mqttPathPrefix[MQTT_PATH_PREFIX_LEN];
 static char mqttCommonCtrlSub[MQTT_COMMON_CTRL_SUB_LEN];
+static iotValueUpdatePolicy_e valueUpdatePolicy = IOT_VALUE_UPDATE_POLICY_ON_CHANGE;
 
 static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t value);
 static bool iotElementSendUpdate(iotElement_t element);
@@ -50,6 +51,11 @@ int iotInit(void)
 
     notificationsRegister(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, iotWifiConnectionStatus, NULL);
     return mqttInit();
+}
+
+void iotSetValueUpdatePolicy(iotValueUpdatePolicy_e policy) 
+{
+    valueUpdatePolicy = policy;
 }
 
 iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, iotElementCallback_t callback,
@@ -87,30 +93,33 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value)
         ESP_LOGE(TAG, "Invalid publish id %d for element %s", pubId, element->name);
         return;
     }
-
-    switch(element->desc->pubs[pubId].type) {
-    case IOT_VALUE_TYPE_BOOL:
-        updateRequired = value.b != element->values[pubId].b;
-        break;
-    case IOT_VALUE_TYPE_INT:
-    case IOT_VALUE_TYPE_HUNDREDTHS:
-    case IOT_VALUE_TYPE_PERCENT_RH:
-    case IOT_VALUE_TYPE_CELSIUS:
-    case IOT_VALUE_TYPE_KPA:
-        updateRequired = value.i != element->values[pubId].i;
-        break;
-    case IOT_VALUE_TYPE_FLOAT:
-        updateRequired = value.f != element->values[pubId].f;
-        break;
-    case IOT_VALUE_TYPE_STRING:
-    case IOT_VALUE_TYPE_BINARY:
+    if (valueUpdatePolicy == IOT_VALUE_UPDATE_POLICY_ALWAYS) {
         updateRequired = true;
-        break;
-    case IOT_VALUE_TYPE_ON_CONNECT:
-        break;
-    default:
-        ESP_LOGE(TAG, "Unknown pub type %d for %s!", element->desc->pubs[pubId].type, element->desc->pubs[pubId].name);
-        return;
+    } else {
+        switch(element->desc->pubs[pubId].type) {
+        case IOT_VALUE_TYPE_BOOL:
+            updateRequired = value.b != element->values[pubId].b;
+            break;
+        case IOT_VALUE_TYPE_INT:
+        case IOT_VALUE_TYPE_HUNDREDTHS:
+        case IOT_VALUE_TYPE_PERCENT_RH:
+        case IOT_VALUE_TYPE_CELSIUS:
+        case IOT_VALUE_TYPE_KPA:
+            updateRequired = value.i != element->values[pubId].i;
+            break;
+        case IOT_VALUE_TYPE_FLOAT:
+            updateRequired = value.f != element->values[pubId].f;
+            break;
+        case IOT_VALUE_TYPE_STRING:
+        case IOT_VALUE_TYPE_BINARY:
+            updateRequired = true;
+            break;
+        case IOT_VALUE_TYPE_ON_CONNECT:
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown pub type %d for %s!", element->desc->pubs[pubId].type, element->desc->pubs[pubId].name);
+            return;
+        }
     }
     if (updateRequired) {
         element->values[pubId] = value;

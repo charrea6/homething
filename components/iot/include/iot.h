@@ -116,6 +116,11 @@ typedef struct iotElementDescription {
 
 const char *IOT_DEFAULT_CONTROL_STR;
 
+typedef enum iotValueUpdatePolicy {
+    IOT_VALUE_UPDATE_POLICY_ALWAYS = 0,
+    IOT_VALUE_UPDATE_POLICY_ON_CHANGE
+} iotValueUpdatePolicy_e;
+
 /** Initialse the IOT subsystem.
  * This needs to be done before you can add Elements and Pub/Sub items.
  */
@@ -209,4 +214,9 @@ const char *iotElementGetPubName(iotElement_t element, int pubId);
  * The function will return a pointer to a zero terminated string on success or NULL if the subId was invalid.
  */
 const char *iotElementGetSubName(iotElement_t element, int subId);
+
+/**
+ * Set when a value sent to iotElementPublish should be published.
+ */
+void iotSetValueUpdatePolicy(iotValueUpdatePolicy_e policy);
 #endif
