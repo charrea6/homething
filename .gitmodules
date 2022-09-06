@@ -10,9 +10,3 @@
 [submodule "components/tinycbor/tinycbor"]
 	path = components/tinycbor/tinycbor
 	url = https://github.com/intel/tinycbor.git
-[submodule "components/yaml/libcyaml"]
-	path = components/cyaml/libcyaml
-	url = https://github.com/tlsa/libcyaml.git
-[submodule "components/yaml/libyaml"]
-	path = components/yaml/libyaml
-	url = https://github.com/yaml/libyaml.git
