@@ -558,3 +558,23 @@ const char *iotElementGetSubName(iotElement_t element, int subId)
     }
     return subName;
 }
+
+void iotElementSetHumanDescription(iotElement_t element, char *description)
+{
+    element->humanDescription = description;
+}
+
+char *iotElementGetHumanDescription(iotElement_t element)
+{
+    return element->humanDescription;
+}
+
+iotElement_t iotFindElementByHumanDescription(char *description)
+{
+    for (iotElement_t current = iotElementsHead; current; current = current->next) {
+        if (strcmp(current->humanDescription, description) == 0) {
+            return current;
+        }
+    }
+    return NULL;
+}

@@ -218,6 +218,7 @@ static void sendDiscoveryMessage(struct DeviceDetails *deviceDetails, const char
                                  iotElement_t element, const char *pubName, cJSON *object)
 {
     const char *elementName = iotElementGetName(element);
+    const char *humanDesc = iotElementGetHumanDescription(element);
     char *uniqueId = NULL;
 
     asprintf(&uniqueId, "%s:%s:%s", deviceDetails->identifier, elementName, pubName == NULL ? "":pubName);
@@ -226,10 +227,18 @@ static void sendDiscoveryMessage(struct DeviceDetails *deviceDetails, const char
     }
 
     char *name = NULL;
-    if ((pubName == NULL) || (pubName[0] == 0)) {
-        asprintf(&name, "%s %s", deviceDetails->deviceDescription, elementName);
+    if (humanDesc == NULL) {
+        if ((pubName == NULL) || (pubName[0] == 0)) {
+            asprintf(&name, "%s %s", deviceDetails->deviceDescription, elementName);
+        } else {
+            asprintf(&name, "%s %s %s", deviceDetails->deviceDescription, elementName, pubName);
+        }
     } else {
-        asprintf(&name, "%s %s %s", deviceDetails->deviceDescription, elementName, pubName);
+        if ((pubName == NULL) || (pubName[0] == 0)) {
+            asprintf(&name, "%s", humanDesc);
+        } else {
+            asprintf(&name, "%s %s", humanDesc, pubName);
+        }
     }
     if (name != NULL) {
         cJSON_AddStringToObjectCS(object, "name", name);

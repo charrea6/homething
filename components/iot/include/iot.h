@@ -46,10 +46,6 @@ typedef struct iotElementPubSubDescription {
     const char *name;
 } iotElementPubSubDescription_t;
 
-typedef struct iotElementSubDescription {
-    const char *type_name;
-} iotElementSubDescription_t;
-
 typedef struct iotElementDescription {
     const int type;
     const iotElementPubSubDescription_t *pubs;
@@ -219,4 +215,21 @@ const char *iotElementGetSubName(iotElement_t element, int subId);
  * Set when a value sent to iotElementPublish should be published.
  */
 void iotSetValueUpdatePolicy(iotValueUpdatePolicy_e policy);
+
+/**
+ * Set the human description of this element.
+ * The passed in string should be valid for the lifetime of this element.
+ */
+void iotElementSetHumanDescription(iotElement_t element, char *description);
+
+/**
+ * Get the human description of this element.
+ */
+char *iotElementGetHumanDescription(iotElement_t element);
+
+/**
+ * Find an element matching the Human Description string.
+ * Returns NULL if not found.
+ */
+iotElement_t iotFindElementByHumanDescription(char *description);
 #endif

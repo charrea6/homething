@@ -8,6 +8,7 @@ struct iotElement {
     const iotElementDescription_t *desc;
     uint32_t flags;
     char *name;
+    char *humanDescription;
     void *userContext;
     iotElementCallback_t callback;
     struct iotElement *next;
