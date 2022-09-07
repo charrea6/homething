@@ -1,0 +1,75 @@
+switch:
+  args:
+    pin: gpioPin
+    type:
+      type: choice
+      choices:
+        - momemetary
+        - toggle
+        - onOff
+        - contact
+        - motion
+    icon:
+      type: string
+      optional: true
+
+relay:
+  args:
+    pin: gpioPin
+    level: gpioLevel
+
+dht22:
+  args:
+    pin: gpioPin
+
+si7021:
+  args:
+    sda: gpioPin
+    scr: gpioPin
+    addr: 
+      type: i2cAddr
+      default: 0x40
+
+tsl2561:
+  args:
+    sda: gpioPin
+    scr: gpioPin
+    addr: 
+      type: i2cAddr
+      default: 0x39
+
+bme280:
+  args:
+    sda: gpioPin
+    scr: gpioPin
+    addr: 
+      type: i2cAddr
+      default: 0x76
+
+ds18x20:
+  args:
+    pin: gpioPin
+
+led:
+  args:
+    pin: gpioPin
+
+led_strip_spi:
+  args:
+    numberOfLEDs: uint
+
+draytonscr:
+  args:
+    pin: gpioPin
+    onCode: string
+    offCode: string
+
+humidistat:
+  args:
+    sensor: id
+    controller: id
+
+thermostat:
+  args:
+    sensor: id
+    controller: id

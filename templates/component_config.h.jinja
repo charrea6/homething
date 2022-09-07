@@ -1,0 +1,47 @@
+/* AUTO-GENERATED DO NOT EDIT */
+#ifndef _COMPONENT_CONFIG_H_
+#define _COMPONENT_CONFIG_H_
+#include <stdint.h>
+
+/* Enum Mappings */
+{% for component in components %}
+    {% for arg in component.arguments %}
+    {% if arg.type == "choice" %}
+enum Choices_{{arg.component|title}}_{{arg.name|title}} {
+    {% for choice in arg.options['choices'] %}
+    Choices_{{arg.component|title}}_{{arg.name|title}}_{{choice|title}},
+    {% endfor %}
+};
+    {% endif %}
+    {% endfor %}
+{% endfor %}
+
+/* Config structures */
+{% for component in components %}
+struct Config_{{component.normalised_name}} {
+  {% for arg in component.arguments %}
+    {% if arg.type == "choice" %}
+    enum Choices_{{arg.component|title}}_{{arg.name|title}} {{arg.name}};
+    {% elif arg.type in ("gpioPin", "gpioLevel", "i2cAddr") %}
+    uint8_t {{arg.name}};
+    {% elif arg.type == 'bool' %}
+    bool {{arg.name}};
+    {% elif arg.type in ("string", "id") %}
+    char *{{arg.name}};
+    {% elif arg.type == 'int' %}
+    int32_t {{arg.name}};
+    {% elif arg.type == 'uint' %}
+    uint32_t {{arg.name}};
+    {% endif %}
+  {% endfor %}
+};
+
+{% endfor %}
+struct DeviceConfig {
+{% for component in components %}
+    struct Config_{{component.normalised_name}} *{{component.normalised_field_name}}Config;
+    uint32_t {{component.normalised_field_name}}Count;
+{% endfor %}
+};
+#endif
+

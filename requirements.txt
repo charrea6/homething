@@ -4,3 +4,5 @@ pyyaml
 beautifulsoup4
 parsimonious
 cbor2
+jinja2
+jinja2-strcase
