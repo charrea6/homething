@@ -81,6 +81,7 @@ iotElement_t iotNewElement(const iotElementDescription_t *desc, uint32_t flags, 
     newElement->callback = callback;
     newElement->userContext = userContext;
     newElement->next = iotElementsHead;
+    newElement->humanDescription = NULL;
     iotElementsHead = newElement;
     return newElement;
 }
