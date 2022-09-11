@@ -39,9 +39,6 @@ struct BME280 {
 
 struct SI7021 {
     i2c_dev_t dev;
-    struct HumiditySensor *sensor;
-    float lastTemperature;
-    float lastHumidity;
 };
 
 struct DS18x20Sensor {
