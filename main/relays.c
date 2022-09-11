@@ -79,8 +79,7 @@ int addRelay(CborValue *entry, Notifications_ID_t *ids, uint32_t idCount)
 #ifdef CONFIG_THERMOSTAT
             Thermostat_t *thermostat = malloc(sizeof(Thermostat_t));
             if (thermostat) {
-                thermostatInit(thermostat, (ThermostatCallForHeatStateSet_t)relaySetState,
-                               (ThermostatCallForHeatStateGet_t)relayIsOn, relay, ids[id]);
+                thermostatInit(thermostat, relay, ids[id]);
             } else {
                 ESP_LOGE(TAG, "setupRelay: Failed to allocate memory for thermostat");
             }

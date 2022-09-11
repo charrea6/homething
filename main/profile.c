@@ -171,15 +171,14 @@ static int profileDraytonSCRAdd(CborValue *entry, Notifications_ID_t *ids, uint3
         return  -1;
     }
 
-    DraytonSCR_t *draytonSCR = draytonSCRInit(pin, onSequence, offSequence);
+    Relay_t *draytonSCR = draytonSCRInit(pin, onSequence, offSequence);
     if (draytonSCR == NULL) {
         ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to allocate memory for draytonSCR");
         return -1;
     }
     Thermostat_t *thermostat = malloc(sizeof(Thermostat_t));
     if (thermostat) {
-        thermostatInit(thermostat, (ThermostatCallForHeatStateSet_t)draytonSCRSetState,
-                       (ThermostatCallForHeatStateGet_t)draytonSCRIsOn, draytonSCR, ids[id]);
+        thermostatInit(thermostat, draytonSCR, ids[id]);
     } else {
         ESP_LOGE(TAG, "profileDraytonSCRAdd: Failed to allocate memory for thermostat");
     }

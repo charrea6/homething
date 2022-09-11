@@ -42,7 +42,7 @@ IOT_DESCRIBE_ELEMENT(
         IOT_DESCRIBE_PUB(RETAINED, INT, "threshold"),
         IOT_DESCRIBE_PUB(RETAINED, BOOL, "manual"),
         IOT_DESCRIBE_PUB(RETAINED, INT, "manualSecs"),
-        IOT_DESCRIBE_PUB(RETAINED, INT, "relay")
+        IOT_DESCRIBE_PUB(RETAINED, STRING, "relay")
     ),
     IOT_SUB_DESCRIPTIONS(
         IOT_DESCRIBE_SUB(STRING, IOT_SUB_DEFAULT_NAME)
@@ -65,7 +65,7 @@ void humidityFanInit(HumidityFan_t *fan, Relay_t *relay, Notifications_ID_t humi
     fan->element = iotNewElement(&elementDescription, 0, humidityFanElementCallback, fan, "fan%d", fanCount);
     fanCount ++;
 
-    value.i = relayId(relay);
+    value.s = relayGetName(relay);
     iotElementPublish(fan->element, PUB_ID_RELAY, value);
     value.i = fan->threshold;
     iotElementPublish(fan->element, PUB_ID_THRESHOLD, value);

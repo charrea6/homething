@@ -5,15 +5,14 @@
 
 #include "iot.h"
 #include "notifications.h"
+#include "relay.h"
 
 typedef void (*ThermostatCallForHeatStateSet_t)(void *, bool);
 typedef bool (*ThermostatCallForHeatStateGet_t)(void *);
 
 typedef struct Thermostat {
     int id;
-    ThermostatCallForHeatStateSet_t setState;
-    ThermostatCallForHeatStateGet_t getState;
-    void *context;
+    Relay_t *relay;
 
     int targetTemperature;
 
@@ -26,8 +25,7 @@ typedef struct Thermostat {
     int lastTemperature;
 } Thermostat_t;
 
-void thermostatInit(Thermostat_t *thermostat, ThermostatCallForHeatStateSet_t setState,
-                    ThermostatCallForHeatStateGet_t getState, void *context,
+void thermostatInit(Thermostat_t *thermostat, Relay_t *relay,
                     Notifications_ID_t temperatureSensor);
 
 #endif

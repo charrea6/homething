@@ -57,17 +57,14 @@ IOT_DESCRIBE_ELEMENT(
     )
 );
 
-void thermostatInit(Thermostat_t *thermostat, ThermostatCallForHeatStateSet_t setState,
-                    ThermostatCallForHeatStateGet_t getState, void *context,
+void thermostatInit(Thermostat_t *thermostat, Relay_t *relay,
                     Notifications_ID_t temperatureSensor)
 {
     iotValue_t value;
     thermostat->targetTemperature = 2000; // Default 20.00 C
     thermostat->manualMode = false;
     thermostat->manualModeSecsLeft = 0u;
-    thermostat->context = context;
-    thermostat->getState = getState;
-    thermostat->setState = setState;
+    thermostat->relay = relay;
 
     thermostat->element = iotNewElement(&elementDescription, 0, thermostatElementCallback, thermostat, "thermostat%d", thermostatCount);
     thermostatCount ++;
@@ -122,7 +119,7 @@ static void onMqttStatusUpdated(void *user,  NotificationsMessage_t *message)
 static void thermostatSetState(Thermostat_t *thermostat, bool state)
 {
     iotValue_t value;
-    thermostat->setState(thermostat->context, state);
+    relaySetState(thermostat->relay, state);
     value.b = state;
     iotElementPublish(thermostat->element, PUB_ID_STATE, value);
 }
@@ -138,7 +135,7 @@ static void thermostatUpdateTemperature(Thermostat_t *thermostat, NotificationsM
              celsiusTenths, heatOn, heatOff, thermostat->manualMode);
 
     if (thermostat->manualMode == false) {
-        if (thermostat->getState(thermostat->context)) {
+        if (relayIsOn(thermostat->relay)) {
             // Call for Heat is on, so wait until we're greater than or equal to heatOff
             if (celsiusTenths >= heatOff) {
                 thermostatSetState(thermostat, false);

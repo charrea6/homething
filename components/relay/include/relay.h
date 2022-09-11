@@ -2,7 +2,14 @@
 #define _RELAY_H_
 #include "iot.h"
 
-typedef struct Relay {
+typedef struct Relay Relay_t;
+
+typedef struct RelayInterface {
+    void (*setState)(Relay_t *, bool);
+}RelayInterface_t;
+
+struct Relay {
+    const RelayInterface_t *intf;
     union {
         uint32_t data;
         struct {
@@ -11,12 +18,16 @@ typedef struct Relay {
             bool on;
             uint8_t id;
         } fields;
-    } u;
+    };
     iotElement_t element;
-} Relay_t;
+};
 
 void relayInit(uint8_t id, uint8_t pin, uint8_t onLevel, Relay_t *relay);
+void relayNewIOTElement(Relay_t *relay, char *nameFmt);
 void relaySetState(Relay_t *relay, bool on);
 bool relayIsOn(Relay_t *relay);
-#define relayId(relay) ((relay)->u.fields.id)
+const char* relayGetName(Relay_t *relay);
+
+void relayRegister(char *id, Relay_t *);
+Relay_t* relayFind(char *id);
 #endif
