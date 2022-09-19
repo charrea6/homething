@@ -68,14 +68,14 @@ static void addLed(DeviceProfile_LedConfig_t *config, int id, struct Led *led)
 static void ledControl(struct Led  *led, iotValue_t value)
 {
     NotificationLedPattern_t pattern;
-    if (led->state) {
-        free(led->state);
-        led->state = NULL;
-    }
     if (iotStrToBool(value.s, &pattern.on) == 0) {
         pattern.onTime = 0;
         pattern.offTime = 0;
         notificationLedSetPattern(led->led, &pattern);
+        if (led->state) {
+            free(led->state);
+            led->state = NULL;
+        }
         value.s = pattern.on ? ON:OFF;
         iotElementPublish(led->element, 0, value);
     } else {
@@ -84,6 +84,10 @@ static void ledControl(struct Led  *led, iotValue_t value)
             if ((pattern.onTime > 10) && (pattern.offTime > 10)) {
                 pattern.on = true;
                 notificationLedSetPattern(led->led, &pattern);
+                if (led->state) {
+                    free(led->state);
+                    led->state = NULL;
+                }
                 asprintf(&led->state, "pulse,%u,%u", pattern.onTime, pattern.offTime);
                 value.s = led->state;
                 iotElementPublish(led->element, 0, value);
