@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "component_config.h"
 #include "cbor.h"
 
 typedef enum {
@@ -52,6 +53,8 @@ typedef struct {
 int deviceProfileGetProfile(uint8_t **profile, size_t *profileLen);
 int deviceProfileSetProfile(const uint8_t *profile, size_t profileLen);
 int deviceProfileValidateProfile(const uint8_t *profile, size_t profileLen);
+
+int deviceProfileDeserialize(const uint8_t *profile, size_t profileLen, DeviceProfile_DeviceConfig_t *config);
 
 int deviceProfileParseProfile(const uint8_t *profile, size_t profileLen, DeviceProfile_Parser_t *parser);
 int deviceProfileParserNextEntry(DeviceProfile_Parser_t *parser, CborValue *entry, DeviceProfile_EntryType_e *entryType);

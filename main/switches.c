@@ -12,34 +12,61 @@
 #include "relay.h"
 #include "notifications.h"
 
-static void switchUpdated(void *user,  NotificationsMessage_t *message);
 
-static uint32_t switchTypeCounts[DeviceProfile_SwitchType_Max] = {0};
+struct SwitchTypeInfo {
+    enum DeviceProfile_Choices_Switch_Type type;
+    const char *deviceName;
+    const char *highState;
+    const char *lowState;
+};
+
+static struct Switch {
+    Notifications_ID_t id;
+    const struct SwitchTypeInfo *typeInfo;
+    iotElement_t element;
+    const char *relayId;
+    Relay_t *relay;
+} *switches = NULL;
+
+static void addSwitch(struct Switch *switchInstance, DeviceProfile_SwitchConfig_t *config, uint32_t devId);
+static void switchUpdated(void *user,  NotificationsMessage_t *message);
+static void switchInitFinished(void *user, NotificationsMessage_t *message);
+static void switchRelayController(struct Switch *switchInstance, bool switchState);
 
 static uint32_t switchCount = 0;
 
-static const char * const switchTypes[DeviceProfile_SwitchType_Max] = {
-    "toggle%d",
-    "onOff%d",
-    "momentary%d",
-    "contact%d",
-    "motion%d"
-};
 
-static const char * const switchStateOn[DeviceProfile_SwitchType_Max] = {
-    "toggled",
-    "off",
-    "released",
-    "open",
-    "motion detected"
-};
-
-static const char * const switchStateOff[DeviceProfile_SwitchType_Max] = {
-    "toggled",
-    "on",
-    "pressed",
-    "closed",
-    "motion stopped"
+static const struct SwitchTypeInfo allSwitchTypeInfo[] = {
+    { 
+        .type = DeviceProfile_Choices_Switch_Type_Momemetary,
+        .deviceName = "momentary%d",
+        .highState = "released",
+        .lowState = "pressed",
+    },
+    { 
+        .type = DeviceProfile_Choices_Switch_Type_Toggle,
+        .deviceName = "toggle%d",
+        .highState = "toggled",
+        .lowState = "toggled",
+    },
+    {
+        .type = DeviceProfile_Choices_Switch_Type_Onoff,
+        .deviceName = "onOff%d",
+        .highState = "off",
+        .lowState = "on",
+    },
+    {   
+        .type = DeviceProfile_Choices_Switch_Type_Contact,
+        .deviceName = "contact%d",
+        .highState = "open",
+        .lowState = "closed",
+    },
+    { 
+        .type = DeviceProfile_Choices_Switch_Type_Motion,
+        .deviceName = "motion%d",
+        .highState = "motion detected",
+        .lowState = "motion stopped",
+    }
 };
 
 static const char TAG[] = "switches";
@@ -52,48 +79,68 @@ IOT_DESCRIBE_ELEMENT_NO_SUBS(
     )
 );
 
-static struct Switch {
-    Notifications_ID_t id;
-    uint32_t type;
-    iotElement_t element;
-} *switches = NULL;
 
-int initSwitches(int norfSwitches)
+int initSwitches(DeviceProfile_SwitchConfig_t *switchConfigs, int norfSwitches)
 {
+    int i;
+    uint32_t switchTypeCounts[DeviceProfile_Choices_Switch_Type_ChoiceCount] = {0};
+
     notificationsRegister(Notifications_Class_Switch, NOTIFICATIONS_ID_ALL, switchUpdated, NULL);
+    notificationsRegister(Notifications_Class_System, NOTIFICATIONS_ID_ALL, switchInitFinished, NULL);
     switches = calloc(norfSwitches, sizeof(struct Switch));
     if (switches == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for switch ids");
     }
+    switchCount = norfSwitches;
+    ESP_LOGI(TAG, "%u switches", norfSwitches);
+    for (i = 0; i < norfSwitches; i ++) {
+        if (switchConfigs[i].type >= DeviceProfile_Choices_Switch_Type_ChoiceCount) {
+            ESP_LOGE(TAG, "Skipping entry with invalid switch type: %u", switchConfigs[i].type);
+            continue;
+        }
+        addSwitch(&switches[i], &switchConfigs[i], switchTypeCounts[switchConfigs[i].type]);
+        switchTypeCounts[switchConfigs[i].type] ++;
+    }
+
     return 0;
 }
 
-Notifications_ID_t addSwitch(CborValue *entry)
+void addSwitch(struct Switch *switchInstance, DeviceProfile_SwitchConfig_t *config, uint32_t devId)
 {
-    uint32_t pin;
-    uint32_t type = DeviceProfile_SwitchType_Toggle;
     Notifications_ID_t id;
-
-    if (deviceProfileParserEntryGetUint32(entry, &pin)) {
-        ESP_LOGE(TAG, "addSwitch: Failed to get pin!");
-        return NOTIFICATIONS_ID_ERROR;
+    const struct SwitchTypeInfo *typeInfo = NULL;
+    int i;
+    
+    for (i =0; i < sizeof(allSwitchTypeInfo) / sizeof(struct SwitchTypeInfo); i++){
+        if (allSwitchTypeInfo[i].type == config->type) {
+            typeInfo = &allSwitchTypeInfo[i];
+            break;
+        }
     }
 
-    if (deviceProfileParserEntryGetUint32(entry, &type)) {
-        ESP_LOGW(TAG, "addSwitch: Failed to get type using default Toggle.");
+    if (typeInfo == NULL) {
+        ESP_LOGE(TAG, "Failed to find type info");
+        return;
     }
 
-    if (type >= DeviceProfile_SwitchType_Max) {
-        ESP_LOGE(TAG, "addSwitch: Unknown switch type %u", type);
-        return NOTIFICATIONS_ID_ERROR;
+    id = switchAdd(config->pin);
+    switchInstance->id = id;
+    switchInstance->typeInfo = typeInfo;
+    switchInstance->relayId = config->relay;
+    switchInstance->element = iotNewElement(&elementDescription, 0, NULL, NULL, typeInfo->deviceName, devId);
+    if (config->id) {
+        notificationsRegisterId(id, config->id);
     }
-    id = switchAdd(pin);
-    switches[switchCount].id = id;
-    switches[switchCount].type = type;
-    switches[switchCount].element = iotNewElement(&elementDescription, 0, NULL, NULL, switchTypes[type], switchTypeCounts[type]);
-    switchTypeCounts[type]++;
-    switchCount++;
-    return id;
+}
+
+static void switchInitFinished(void *user, NotificationsMessage_t *message)
+{
+    uint32_t i;
+    for (i = 0; i < switchCount; i ++) {
+        if (switches[i].relayId != NULL) {
+            switches[i].relay = relayFind(switches[i].relayId);
+        }
+    }
 }
 
 static void switchUpdated(void *user,  NotificationsMessage_t *message)
@@ -102,38 +149,33 @@ static void switchUpdated(void *user,  NotificationsMessage_t *message)
     for (i = 0; i < switchCount; i ++) {
         if (switches[i].id == message->id) {
             iotValue_t value;
-            if (message->data.switchState) {
-                value.s = switchStateOn[switches[i].type];
-            } else {
-                value.s = switchStateOff[switches[i].type];
-            }
+            const struct SwitchTypeInfo *typeInfo = switches[i].typeInfo;
+            value.s = message->data.switchState ? typeInfo->highState: typeInfo->lowState;
             iotElementPublish(switches[i].element, 0, value);
+            if (switches[i].relay) {
+                switchRelayController(&switches[i], message->data.switchState);
+            }
             break;
         }
     }
 }
 
-void switchRelayController(void *user, NotificationsMessage_t *message)
-{
-    Relay_t *relay = user;
-    uint32_t i;
-    for (i = 0; i < switchCount; i ++) {
-        if (switches[i].id == message->id) {
-            switch(switches[i].type) {
-            case DeviceProfile_SwitchType_Momentary:
-                if (message->data.switchState) {
-                    relaySetState(relay, !relayIsOn(relay));    
-                }
-                break;
-            case DeviceProfile_SwitchType_Toggle:
-                relaySetState(relay, !relayIsOn(relay));
-                break;
-            case DeviceProfile_SwitchType_OnOff:
-                relaySetState(relay, message->data.switchState);
-                break;
-            default:
-                break;
-            }
+static void switchRelayController(struct Switch *switchInstance, bool switchState)
+{   
+    Relay_t *relay = switchInstance->relay;
+    switch(switchInstance->typeInfo->type) {
+    case DeviceProfile_Choices_Switch_Type_Momemetary:
+        if (switchState) {
+            relaySetState(relay, !relayIsOn(relay));    
         }
+        break;
+    case DeviceProfile_Choices_Switch_Type_Toggle:
+        relaySetState(relay, !relayIsOn(relay));
+        break;
+    case DeviceProfile_Choices_Switch_Type_Onoff:
+        relaySetState(relay, switchState);
+        break;
+    default:
+        break;
     }
 }

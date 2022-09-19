@@ -23,7 +23,10 @@ struct static_file_data {
 esp_err_t provisioningStaticFileHandler(httpd_req_t *req);
 esp_err_t provisioningConfigPostHandler(httpd_req_t *req);
 esp_err_t provisioningConfigGetHandler(httpd_req_t *req);
+esp_err_t provisioningComponentsJsonFileHandler(httpd_req_t *req);
 
 void provisioningRegisterStaticFileHandlers(httpd_handle_t server);
 void provisioningSetContentType(httpd_req_t *req, enum ContentType content_type);
+
+
 #endif

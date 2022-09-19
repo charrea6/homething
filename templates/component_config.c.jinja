@@ -2,8 +2,13 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include "sdkconfig.h"
+#include "esp_log.h"
 #include "cbor.h"
 #include "component_config.h"
+
+#define SUPPORTED_VERSION 2
+static const char TAG[] = "compcfg";
 
 /* Enum Mappings */
 struct choice {
@@ -37,6 +42,10 @@ struct component {
     size_t fieldsCount;
 };
 
+{% if "choice" in used_types %}
+{% if type_conditions["choice"] %}
+#if {{type_conditions["choice"]}}
+{% endif %}
 static int findChoice(const struct choice *choices, char *input, int *output) 
 {
     int i;
@@ -48,7 +57,6 @@ static int findChoice(const struct choice *choices, char *input, int *output)
     }
     return -1;
 }
-
 static int validateAndSetChoice(CborValue *value, struct field *field, void *output)
 {
     char *text = NULL;
@@ -67,7 +75,15 @@ static int validateAndSetChoice(CborValue *value, struct field *field, void *out
     free(text);
     return 0;
 }
+{% if type_conditions["choice"] %}
+#endif
+{% endif %}
+{% endif %}
 
+{% if uint_types.intersection(used_types) %}
+{% if type_conditions["uint"] %}
+#if {{type_conditions["uint"]}}
+{% endif %}
 static int validateAndSetUInt(CborValue *value, struct field *field, void *output)
 {
     if (!cbor_value_is_unsigned_integer(value)) {
@@ -80,7 +96,15 @@ static int validateAndSetUInt(CborValue *value, struct field *field, void *outpu
     *((uint32_t*)output) = (uint32_t)uintVal;
     return 0;
 }
+{% if type_conditions["uint"] %}
+#endif
+{% endif %}
+{% endif %}
 
+{% if "gpioPin" in used_types %}
+{% if type_conditions["gpioPin"] %}
+#if {{type_conditions["gpioPin"]}}
+{% endif %}
 static int validateAndSetGPIOPin(CborValue *value, struct field *field, void *output)
 {
     uint32_t uintVal;
@@ -91,7 +115,15 @@ static int validateAndSetGPIOPin(CborValue *value, struct field *field, void *ou
     *((uint8_t*)output) = (uint8_t)uintVal;
     return 0;
 }
+{% if type_conditions["gpioPin"] %}
+#endif
+{% endif %}
+{% endif %}
 
+{% if "gpioLevel" in used_types %}
+{% if type_conditions["gpioLevel"] %}
+#if {{type_conditions["gpioLevel"]}}
+{% endif %}
 static int validateAndSetGPIOLevel(CborValue *value, struct field *field, void *output)
 {
     uint32_t uintVal;
@@ -102,7 +134,15 @@ static int validateAndSetGPIOLevel(CborValue *value, struct field *field, void *
     *((uint8_t*)output) = (uint8_t)uintVal;
     return 0;
 }
+{% if type_conditions["gpioLevel"] %}
+#endif
+{% endif %}
+{% endif %}
 
+{% if "i2cAddr" in used_types %}
+{% if type_conditions["i2cAddr"] %}
+#if {{type_conditions["i2cAddr"]}}
+{% endif %}
 static int validateAndSetI2CAddr(CborValue *value, struct field *field, void *output)
 {
     uint32_t uintVal;
@@ -113,8 +153,15 @@ static int validateAndSetI2CAddr(CborValue *value, struct field *field, void *ou
     *((uint8_t*)output) = (uint8_t)uintVal;
     return 0;
 }
+{% if type_conditions["i2cAddr"] %}
+#endif
+{% endif %}
+{% endif %}
 
-
+{% if "int" in used_types %}
+{% if type_conditions["int"] %}
+#if {{type_conditions["int"]}}
+{% endif %}
 static int validateAndSetInt(CborValue *value, struct field *field, void *output)
 {
     if (!cbor_value_is_integer(value)) {
@@ -127,7 +174,15 @@ static int validateAndSetInt(CborValue *value, struct field *field, void *output
     *((int32_t*)output) = (int32_t)intVal;
     return 0;
 }
+{% if type_conditions["int"] %}
+#endif
+{% endif %}
+{% endif %}
 
+{% if "bool" in used_types %}
+{% if type_conditions["bool"] %}
+#if {{type_conditions["bool"]}}
+{% endif %}
 static int validateAndSetBool(CborValue *value, struct field *field, void *output)
 {
     if (!cbor_value_is_boolean(value)) {
@@ -139,7 +194,15 @@ static int validateAndSetBool(CborValue *value, struct field *field, void *outpu
     }
     return 0;
 }
+{% if type_conditions["bool"] %}
+#endif
+{% endif %}
+{% endif %}
 
+{% if "string" in used_types %}
+{% if type_conditions["string"] %}
+#if {{type_conditions["string"]}}
+{% endif %}
 static int validateAndSetString(CborValue *value, struct field *field, void *output)
 {
     if (!cbor_value_is_text_string(value)) {
@@ -151,14 +214,21 @@ static int validateAndSetString(CborValue *value, struct field *field, void *out
     }
     return 0;
 }
+{% if type_conditions["string"] %}
+#endif
+{% endif %}
+{% endif %}
 
 {% for component in components %}
 /**** {{component.name}} ****/
+{% if component.condition %}
+#if {{ component.condition}}
+{% endif %}
     {% for arg in component.arguments %}
     {% if arg.type == "choice" %}
 static const struct choice {{arg.enum_name}}Strings[] = {
     {% for choice in arg.options['choices'] %}
-    { "{{ choice }}", Choices_{{arg.component|title}}_{{arg.name|title}}_{{choice|title}} },
+    { "{{ choice }}", DeviceProfile_Choices_{{arg.component|title}}_{{arg.name|title}}_{{choice|title}} },
     {% endfor %}
     { NULL, 0 }
 };
@@ -170,7 +240,7 @@ struct field fields_{{component.normalised_name}}[] = {
     {
         .key = "{{arg.name}}",  
         .flags = {% if arg.is_optional %} FIELD_FLAG_OPTIONAL{% else %} FIELD_FLAG_DEFAULT{% endif %}, 
-        .dataOffset = offsetof(struct {{component.struct_name}}, {{ arg.name }}),
+        .dataOffset = offsetof(struct DeviceProfile_{{component.normalised_name}}Config, {{ arg.name }}),
         {% if arg.type == 'choice' %}
         .choices = {{arg.enum_name}}Strings,
         .validateAndSet = validateAndSetChoice
@@ -186,7 +256,7 @@ struct field fields_{{component.normalised_name}}[] = {
         .validateAndSet = validateAndSetInt
         {% elif arg.type == "bool" %}
         .validateAndSet = validateAndSetBool
-        {% elif arg.type == "string" %}
+        {% elif arg.type in ("string", "id") %}
         .validateAndSet = validateAndSetString
         {% else %}
         .validateAndSet = NULL
@@ -194,19 +264,27 @@ struct field fields_{{component.normalised_name}}[] = {
     },
     {% endfor %}
 };
-
+{% if component.condition %}
+#endif
+{% endif %}
 {% endfor %}
 
 struct component componentDefinitions[] = {
 {% for component in components %}
+{% if component.condition %}
+#if {{ component.condition}}
+{% endif %}
     {
         .name = "{{component.name}}",
-        .structSize = sizeof(struct {{component.struct_name}}),
-        .arrayOffset = offsetof(struct DeviceConfig, {{component.normalised_field_name}}Config),
-        .arrayCountOffset = offsetof(struct DeviceConfig, {{component.normalised_field_name}}Count),
+        .structSize = sizeof(struct DeviceProfile_{{component.normalised_name}}Config),
+        .arrayOffset = offsetof(struct DeviceProfile_DeviceConfig, {{component.normalised_field_name}}Config),
+        .arrayCountOffset = offsetof(struct DeviceProfile_DeviceConfig, {{component.normalised_field_name}}Count),
         .fields = fields_{{component.normalised_name}},
         .fieldsCount = sizeof(fields_{{component.normalised_name}}) / sizeof(struct field)
     },
+{% if component.condition %}
+#endif
+{% endif %}
 {% endfor %}
 };
 
@@ -236,7 +314,7 @@ int deserializeComponent(struct component *componentDef, CborValue *map, void *s
     return 0;
 }
 
-int deserializeComponents(struct DeviceConfig *config, struct component *componentDef, CborValue *array) {
+int deserializeComponents(struct DeviceProfile_DeviceConfig *config, struct component *componentDef, CborValue *array) {
     CborValue iter;
     size_t len;
     void *structs = NULL, *current;
@@ -274,31 +352,74 @@ error:
     return -1;
 }
 
-int DeviceProfile_deserialize(const uint8_t *profile, size_t profileLen, struct DeviceConfig *config)
+static int nextUint32(CborValue *it, uint32_t *result)
+{
+    uint64_t uintValue;
+    if (cbor_value_at_end(it)) {
+        return  -1;
+    }
+    if (cbor_value_is_unsigned_integer(it)) {
+        if (cbor_value_get_uint64(it, &uintValue) != CborNoError) {
+            return -1;
+        }
+        *result = (uint32_t)uintValue;
+        cbor_value_advance(it);
+    } else {
+        return -1;
+    }
+    return 0;
+}
+
+
+int deviceProfileDeserialize(const uint8_t *profile, size_t profileLen, struct DeviceProfile_DeviceConfig *config)
 {
     CborParser parser;
-    CborValue root;
+    CborValue root, array;
     int i;
+    uint32_t version;
 
-    memset(config, 0, sizeof(struct DeviceConfig));
+    memset(config, 0, sizeof(struct DeviceProfile_DeviceConfig));
 
     if (cbor_parser_init(profile, profileLen, 0, &parser, &root) != CborNoError) {
+        ESP_LOGE(TAG, "Failed to init cbor parser");
         return -1;
     }
 
-    if (cbor_value_get_type(&root) != CborMapType) {
+    if (cbor_value_get_type(&root) != CborArrayType) {
+        ESP_LOGE(TAG, "Incorrect root element type, %d expected %d", cbor_value_get_type(&root), CborArrayType);
+        return -1;
+    }
+
+    cbor_value_enter_container(&root, &array);
+    if (nextUint32(&array, &version)) {
+        ESP_LOGE(TAG, "Failed to get version");
+        return -1;
+    }
+
+    if (version != SUPPORTED_VERSION) {
+        ESP_LOGE(TAG, "Unsupported version: %d", version);
+        return -1;
+    }
+
+    ESP_LOGI(TAG, "Profile version %u", version);
+
+    if (cbor_value_get_type(&array) != CborMapType) {
+        ESP_LOGE(TAG, "Incorrect element type, %d expected %d", cbor_value_get_type(&array), CborMapType);
         return -1;
     }
 
     for (i = 0; i < sizeof(componentDefinitions) / sizeof(struct component); i ++) {
         CborValue value;
-        if (cbor_value_map_find_value(&root, componentDefinitions[i].name, &value) != CborNoError) {
+        CborError err = cbor_value_map_find_value(&array, componentDefinitions[i].name, &value);
+
+        if (err!= CborNoError) {
+            ESP_LOGE(TAG, "Find value returned error, %d", err);
             return -1;
         }
-        if (cbor_value_get_type(&value) != CborArrayType) {
-            return -1;
+
+        if (cbor_value_get_type(&value) == CborArrayType) {
+            deserializeComponents(config, &componentDefinitions[i], &value);
         }
-        deserializeComponents(config, &componentDefinitions[i], &value);
     }
     return 0;
 }

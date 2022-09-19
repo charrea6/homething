@@ -4,112 +4,126 @@
 #include <stdint.h>
 
 /* Enum Mappings */
-enum Choices_Switch_Type {
-    Choices_Switch_Type_Momemetary,
-    Choices_Switch_Type_Toggle,
-    Choices_Switch_Type_Onoff,
-    Choices_Switch_Type_Contact,
-    Choices_Switch_Type_Motion,
+enum DeviceProfile_Choices_Switch_Type {
+    DeviceProfile_Choices_Switch_Type_Momemetary,
+    DeviceProfile_Choices_Switch_Type_Toggle,
+    DeviceProfile_Choices_Switch_Type_Onoff,
+    DeviceProfile_Choices_Switch_Type_Contact,
+    DeviceProfile_Choices_Switch_Type_Motion,
+    DeviceProfile_Choices_Switch_Type_ChoiceCount
 };
 
 /* Config structures */
-struct Config_Switch {
+typedef struct DeviceProfile_SwitchConfig {
     uint8_t pin;
-    enum Choices_Switch_Type type;
+    enum DeviceProfile_Choices_Switch_Type type;
+    char *relay;
     char *icon;
     char *name;
-};
+    char *id;
+} DeviceProfile_SwitchConfig_t;
 
-struct Config_Relay {
+typedef struct DeviceProfile_RelayConfig {
     uint8_t pin;
     uint8_t level;
     char *name;
-};
+    char *id;
+} DeviceProfile_RelayConfig_t;
 
-struct Config_Dht22 {
+typedef struct DeviceProfile_Dht22Config {
     uint8_t pin;
     char *name;
-};
+    char *id;
+} DeviceProfile_Dht22Config_t;
 
-struct Config_Si7021 {
+typedef struct DeviceProfile_Si7021Config {
     uint8_t sda;
-    uint8_t scr;
+    uint8_t scl;
     uint8_t addr;
     char *name;
-};
+    char *id;
+} DeviceProfile_Si7021Config_t;
 
-struct Config_Tsl2561 {
+typedef struct DeviceProfile_Tsl2561Config {
     uint8_t sda;
-    uint8_t scr;
+    uint8_t scl;
     uint8_t addr;
     char *name;
-};
+    char *id;
+} DeviceProfile_Tsl2561Config_t;
 
-struct Config_Bme280 {
+typedef struct DeviceProfile_Bme280Config {
     uint8_t sda;
-    uint8_t scr;
+    uint8_t scl;
     uint8_t addr;
     char *name;
-};
+    char *id;
+} DeviceProfile_Bme280Config_t;
 
-struct Config_Ds18X20 {
+typedef struct DeviceProfile_Ds18x20Config {
     uint8_t pin;
     char *name;
-};
+    char *id;
+} DeviceProfile_Ds18x20Config_t;
 
-struct Config_Led {
+typedef struct DeviceProfile_LedConfig {
     uint8_t pin;
     char *name;
-};
+    char *id;
+} DeviceProfile_LedConfig_t;
 
-struct Config_LedStripSpi {
+typedef struct DeviceProfile_LedStripSpiConfig {
     uint32_t numberOfLEDs;
     char *name;
-};
+    char *id;
+} DeviceProfile_LedStripSpiConfig_t;
 
-struct Config_Draytonscr {
+typedef struct DeviceProfile_DraytonscrConfig {
     uint8_t pin;
     char *onCode;
     char *offCode;
     char *name;
-};
+    char *id;
+} DeviceProfile_DraytonscrConfig_t;
 
-struct Config_Humidistat {
+typedef struct DeviceProfile_HumidistatConfig {
     char *sensor;
-    char *controller;
+    char *relay;
     char *name;
-};
+    char *id;
+} DeviceProfile_HumidistatConfig_t;
 
-struct Config_Thermostat {
+typedef struct DeviceProfile_ThermostatConfig {
     char *sensor;
-    char *controller;
+    char *relay;
     char *name;
-};
+    char *id;
+} DeviceProfile_ThermostatConfig_t;
 
-struct DeviceConfig {
-    struct Config_Switch *switchConfig;
+typedef struct DeviceProfile_DeviceConfig {
+    DeviceProfile_SwitchConfig_t *switchConfig;
     uint32_t switchCount;
-    struct Config_Relay *relayConfig;
+    DeviceProfile_RelayConfig_t *relayConfig;
     uint32_t relayCount;
-    struct Config_Dht22 *dht22Config;
+    DeviceProfile_Dht22Config_t *dht22Config;
     uint32_t dht22Count;
-    struct Config_Si7021 *si7021Config;
+    DeviceProfile_Si7021Config_t *si7021Config;
     uint32_t si7021Count;
-    struct Config_Tsl2561 *tsl2561Config;
+    DeviceProfile_Tsl2561Config_t *tsl2561Config;
     uint32_t tsl2561Count;
-    struct Config_Bme280 *bme280Config;
+    DeviceProfile_Bme280Config_t *bme280Config;
     uint32_t bme280Count;
-    struct Config_Ds18X20 *ds18x20Config;
+    DeviceProfile_Ds18x20Config_t *ds18x20Config;
     uint32_t ds18x20Count;
-    struct Config_Led *ledConfig;
+    DeviceProfile_LedConfig_t *ledConfig;
     uint32_t ledCount;
-    struct Config_LedStripSpi *ledStripSpiConfig;
+    DeviceProfile_LedStripSpiConfig_t *ledStripSpiConfig;
     uint32_t ledStripSpiCount;
-    struct Config_Draytonscr *draytonscrConfig;
+    DeviceProfile_DraytonscrConfig_t *draytonscrConfig;
     uint32_t draytonscrCount;
-    struct Config_Humidistat *humidistatConfig;
+    DeviceProfile_HumidistatConfig_t *humidistatConfig;
     uint32_t humidistatCount;
-    struct Config_Thermostat *thermostatConfig;
+    DeviceProfile_ThermostatConfig_t *thermostatConfig;
     uint32_t thermostatCount;
-};
+}DeviceProfile_DeviceConfig_t;
 #endif

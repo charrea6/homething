@@ -42,6 +42,11 @@ static const httpd_uri_t handlers[] = {{
         .uri = "/config",
         .handler = provisioningConfigPostHandler,
         .user_ctx = NULL
+    }, {
+        .method = HTTP_GET,
+        .uri = "/components.json",
+        .handler = provisioningComponentsJsonFileHandler,
+        .user_ctx = NULL
     }
 };
 

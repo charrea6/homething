@@ -1,4 +1,4 @@
-idf_component_register(SRCS "config.c" "provisioning.c" "captdns.c" "${CMAKE_BINARY_DIR}/static_files.c"
+idf_component_register(SRCS "config.c" "provisioning.c" "captdns.c" "${CMAKE_BINARY_DIR}/static_files.c" "components_json.c"
                     INCLUDE_DIRS "include" 
                     PRIV_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}
                     REQUIRES "esp_http_server" "json" "wifi" "iot" "uzlib" "tinycbor" "utils") 

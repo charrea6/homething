@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "esp_log.h"
 #include "notifications.h"
 
@@ -9,8 +10,16 @@ typedef struct NotificationsCallbackDetails {
     struct NotificationsCallbackDetails *next;
 } NotificationsCallbackDetails_t;
 
+typedef struct NotificationsNamedID {
+    const char *name;
+    Notifications_ID_t id;
+    struct NotificationsNamedID *next;
+} NotificationsNamedID_t;
+
 static NotificationsCallbackDetails_t *callbacks[Notifications_Class_Max];
 static const char TAG[]="notifications";
+static Notifications_ID_t nextID = NOTIFICATIONS_ID_DYNAMIC_START;
+static NotificationsNamedID_t *rootEntry = NULL;
 
 void notificationsInit(void)
 {
@@ -20,7 +29,7 @@ void notificationsInit(void)
     }
 }
 
-void notificationsRegister(Notifications_Class_e clazz, uint32_t id, NotificationsCallback_t callback, void *user)
+void notificationsRegister(Notifications_Class_e clazz, Notifications_ID_t id, NotificationsCallback_t callback, void *user)
 {
     if (clazz >= Notifications_Class_Max) {
         ESP_LOGE(TAG, "Register: Class %d >= %d", clazz, Notifications_Class_Max);
@@ -46,7 +55,25 @@ void notificationsRegister(Notifications_Class_e clazz, uint32_t id, Notificatio
     }
 }
 
-void notificationsNotify(Notifications_Class_e clazz, uint32_t id, NotificationsData_t *data)
+void notificationsUnregister(Notifications_Class_e clazz, Notifications_ID_t id, NotificationsCallback_t callback, void *user)
+{
+    NotificationsCallbackDetails_t *current = NULL, *prev = NULL;
+
+    for (current = callbacks[clazz]; current; current = current->next) {
+        if ((current->id == id) && (current->callback == callback) && (current->user == user)) {
+            if (prev) {
+                prev->next = current->next;
+            } else {
+                callbacks[clazz] = current->next;
+            }
+            free(current);
+            break;
+        }
+        prev = current;
+    }
+}
+
+void notificationsNotify(Notifications_Class_e clazz, Notifications_ID_t id, NotificationsData_t *data)
 {
     if (clazz >= Notifications_Class_Max) {
         ESP_LOGE(TAG, "Notify: Class %d >= %d", clazz, Notifications_Class_Max);
@@ -65,4 +92,53 @@ void notificationsNotify(Notifications_Class_e clazz, uint32_t id, Notifications
             callback->callback(callback->user, &message);
         }
     }
+}
+
+Notifications_ID_t notificationsNewId(const char *name)
+{
+    Notifications_ID_t id = nextID;
+    NotificationsNamedID_t *entry;
+
+    nextID ++;
+    if (name == NULL) {
+        return id;
+    }
+
+    entry = calloc(1, sizeof(NotificationsNamedID_t));
+    if (entry == NULL) {
+        return NOTIFICATIONS_ID_ERROR;
+    }
+    
+    entry->id = id;
+    entry->name = name;
+    entry->next = rootEntry;
+    rootEntry = entry;   
+    return id;
+}
+
+int notificationsRegisterId(Notifications_ID_t id, const char *name)
+{
+    NotificationsNamedID_t *entry;
+
+    entry = calloc(1, sizeof(NotificationsNamedID_t));
+    if (entry == NULL) {
+        return -1;
+    }
+    
+    entry->id = id;
+    entry->name = name;
+    entry->next = rootEntry;
+    rootEntry = entry;
+    return 0;
+}
+
+Notifications_ID_t notificationsFindId(const char *name)
+{
+    NotificationsNamedID_t *entry;
+    for (entry = rootEntry; entry; entry = entry->next) {
+        if (strcmp(name, entry->name) == 0) {
+            return entry->id;
+        }
+    }
+    return NOTIFICATIONS_ID_ERROR;
 }

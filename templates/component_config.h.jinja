@@ -7,10 +7,11 @@
 {% for component in components %}
     {% for arg in component.arguments %}
     {% if arg.type == "choice" %}
-enum Choices_{{arg.component|title}}_{{arg.name|title}} {
+enum DeviceProfile_Choices_{{arg.component|title}}_{{arg.name|title}} {
     {% for choice in arg.options['choices'] %}
-    Choices_{{arg.component|title}}_{{arg.name|title}}_{{choice|title}},
+    DeviceProfile_Choices_{{arg.component|title}}_{{arg.name|title}}_{{choice|title}},
     {% endfor %}
+    DeviceProfile_Choices_{{arg.component|title}}_{{arg.name|title}}_ChoiceCount
 };
     {% endif %}
     {% endfor %}
@@ -18,10 +19,10 @@ enum Choices_{{arg.component|title}}_{{arg.name|title}} {
 
 /* Config structures */
 {% for component in components %}
-struct Config_{{component.normalised_name}} {
+typedef struct DeviceProfile_{{component.normalised_name}}Config {
   {% for arg in component.arguments %}
     {% if arg.type == "choice" %}
-    enum Choices_{{arg.component|title}}_{{arg.name|title}} {{arg.name}};
+    enum DeviceProfile_Choices_{{arg.component|title}}_{{arg.name|title}} {{arg.name}};
     {% elif arg.type in ("gpioPin", "gpioLevel", "i2cAddr") %}
     uint8_t {{arg.name}};
     {% elif arg.type == 'bool' %}
@@ -34,14 +35,14 @@ struct Config_{{component.normalised_name}} {
     uint32_t {{arg.name}};
     {% endif %}
   {% endfor %}
-};
+} DeviceProfile_{{component.normalised_name}}Config_t;
 
 {% endfor %}
-struct DeviceConfig {
+typedef struct DeviceProfile_DeviceConfig {
 {% for component in components %}
-    struct Config_{{component.normalised_name}} *{{component.normalised_field_name}}Config;
+    DeviceProfile_{{component.normalised_name}}Config_t *{{component.normalised_field_name}}Config;
     uint32_t {{component.normalised_field_name}}Count;
 {% endfor %}
-};
+}DeviceProfile_DeviceConfig_t;
 #endif
 

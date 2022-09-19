@@ -38,6 +38,8 @@ config THERMOSTAT
 
 config DRAYTONSCR
     bool "Enable Drayton SCR transmit support"
-    depends on THERMOSTAT
-    
+
+config LED_STRIP
+    bool "Enable LED Strip (SPI) support"
+
 endmenu

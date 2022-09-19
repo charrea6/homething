@@ -132,38 +132,38 @@ static struct DS18x20Pin *ds18x20Pins;
 #endif
 
 #ifdef CONFIG_DHT22
-int initDHT22(int nrofSensors)
+int sensorsDHT22Init(int nrofSensors)
 {
     nrofHumiditySensors += nrofSensors;
     return 0;
 }
 
-Notifications_ID_t addDHT22(CborValue *entry)
+int sensorsDHT22Add(DeviceProfile_Dht22Config_t *config)
 {
     struct Sensor *dht;
-    gpio_config_t config;
+    gpio_config_t pinConfig;
     iotValue_t value;
-    uint32_t pin;
     uint32_t sensorId;
 
-    if (deviceProfileParserEntryGetUint32(entry, &pin)) {
-        ESP_LOGE(TAG, "addDHT22: Failed to get pin!");
-        return NOTIFICATIONS_ID_ERROR;
-    }
     if (addHumiditySensor(&dht, &sensorId)) {
-        return NOTIFICATIONS_ID_ERROR;
+        return -1;
     }
 
-    config.pin_bit_mask = 1<<pin;
-    config.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    config.intr_type = GPIO_INTR_DISABLE;
-    config.mode = GPIO_MODE_INPUT;
-    config.pull_up_en = GPIO_PULLUP_ENABLE;
-    gpio_config(&config);
+    pinConfig.pin_bit_mask = 1<<config->pin;
+    pinConfig.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    pinConfig.intr_type = GPIO_INTR_DISABLE;
+    pinConfig.mode = GPIO_MODE_INPUT;
+    pinConfig.pull_up_en = GPIO_PULLUP_ENABLE;
+    gpio_config(&pinConfig);
 
-    dht->id = NOTIFICATIONS_MAKE_ID(DHT22, pin);
+    if (config->id){
+        dht->id = notificationsNewId(config->id);
+    }
     dht->element = iotNewElement(&humidityElementDescription, 0, NULL, dht, "humidity%d", sensorId);
-    dht->details.pin = pin;
+    if (config->name) {
+        iotElementSetHumanDescription(dht->element, config->name);
+    }
+    dht->details.pin = config->pin;
 
     value.i = 0;
     iotElementPublish(dht->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
@@ -188,7 +188,7 @@ static void dht22MeasureTimer(TimerHandle_t xTimer)
 #endif
 
 #ifdef CONFIG_BME280
-int initBME280(int nrofSensors)
+int sensorsBME280Init(int nrofSensors)
 {
     bme280Devices = calloc(nrofSensors, sizeof(struct BME280));
     if (bme280Devices == NULL) {
@@ -199,31 +199,26 @@ int initBME280(int nrofSensors)
     return 0;
 }
 
-Notifications_ID_t addBME280(CborValue *entry)
+int sensorsBME280Add(DeviceProfile_Bme280Config_t *config)
 {
     struct Sensor *bme;
     iotValue_t value;
     uint32_t sensorId;
-    DeviceProfile_I2CDetails_t i2cDetails;
+
     bmp280_params_t params;
     bmp280_init_default_params(&params);
     struct BME280 *dev;
     esp_err_t err;
 
-    if (deviceProfileParserEntryGetI2CDetails(entry, &i2cDetails)) {
-        ESP_LOGE(TAG, "Failed to get I2C details!");
-        return NOTIFICATIONS_ID_ERROR;
-    }
-
     if (addHumiditySensor(&bme, &sensorId)) {
-        return NOTIFICATIONS_ID_ERROR;
+        return -1;
     }
 
     dev = bme280Devices;
     bme->details.dev = dev;
     memset(dev, 0, sizeof(struct BME280));
 
-    err = bmp280_init_desc(&dev->dev, i2cDetails.addr, 0, i2cDetails.sda, i2cDetails.scl);
+    err = bmp280_init_desc(&dev->dev, config->addr, 0, config->sda, config->scl);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "addBME280: init desc failed! err = %d", err);
         return NOTIFICATIONS_ID_ERROR;
@@ -250,8 +245,13 @@ Notifications_ID_t addBME280(CborValue *entry)
         iotElementPublish(bme->element, TEMPERATURE_PUB_INDEX_TEMPERATURE, value);
         iotElementPublish(bme->element, TEMPERATURE_PUB_INDEX_PRESSURE, value);
     }
+    if (config->id) {
+        bme->id = notificationsNewId(config->id);
+    }
+    if (config->name) {
+        iotElementSetHumanDescription(bme->element, config->name);
+    }
 
-    bme->id = NOTIFICATIONS_MAKE_I2C_ID(i2cDetails.sda, i2cDetails.scl, i2cDetails.addr);
     xTimerStart(xTimerCreate("bme", SECS_TO_TICKS(5), pdTRUE, bme, bme280MeasureTimer), 0);
 
     return bme->id;
@@ -284,7 +284,7 @@ static void bme280MeasureTimer(TimerHandle_t xTimer)
 #endif
 
 #ifdef CONFIG_SI7021
-int initSI7021(int nrofSensors)
+int sensorsSI7021Init(int nrofSensors)
 {
     si7021Devices = calloc(nrofSensors, sizeof(struct SI7021));
     if (si7021Devices == NULL) {
@@ -295,38 +295,38 @@ int initSI7021(int nrofSensors)
     return 0;
 }
 
-Notifications_ID_t addSI7021(CborValue *entry)
+int sensorsSI7021Add(DeviceProfile_Si7021Config_t *config)
 {
     struct Sensor *sensor;
     iotValue_t value;
     uint32_t sensorId;
-    DeviceProfile_I2CDetails_t i2cDetails;
     struct SI7021 *dev;
     esp_err_t err;
 
-    if (deviceProfileParserEntryGetI2CDetails(entry, &i2cDetails)) {
-        ESP_LOGE(TAG, "Failed to get I2C details!");
-        return NOTIFICATIONS_ID_ERROR;
-    }
-
     if (addHumiditySensor(&sensor, &sensorId)) {
-        return NOTIFICATIONS_ID_ERROR;
+        return -1;
     }
 
     dev = si7021Devices;
     memset(dev, 0, sizeof(struct SI7021));
-    err = si7021_init_desc(&dev->dev, 0, i2cDetails.sda, i2cDetails.scl);
+    err = si7021_init_desc(&dev->dev, 0, config->sda, config->scl);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "addSI7021: Failed to init %d", err);
-        return NOTIFICATIONS_ID_ERROR;
+        return -1;
     }
     si7021Devices++;
 
     sensor->element = iotNewElement(&humidityElementDescription, 0, NULL, sensor, "humidity%d", sensorId);
+    if (config->id) {
+        sensor->id = notificationsNewId(config->id);
+    }
+    if (config->name) {
+        iotElementSetHumanDescription(sensor->element, config->name);
+    }
+
     value.i = 0;
     iotElementPublish(sensor->element, HUMIDITY_PUB_INDEX_HUMIDITY, value);
     iotElementPublish(sensor->element, HUMIDITY_PUB_INDEX_TEMPERTURE, value);
-    sensor->id = NOTIFICATIONS_MAKE_I2C_ID(i2cDetails.sda, i2cDetails.scl, SI7021_I2C_ADDR);
     sensor->details.dev = dev;
     xTimerStart(xTimerCreate("si7021", SECS_TO_TICKS(5), pdTRUE, sensor, si7021MeasureTimer), 0);
     return sensor->id;
@@ -357,7 +357,7 @@ static void si7021MeasureTimer(TimerHandle_t xTimer)
 #endif
 
 #ifdef CONFIG_DS18x20
-int initDS18x20(int nrofSensors)
+int sensorsDS18x20Init(int nrofSensors)
 {
     ds18x20Pins = calloc(nrofSensors, sizeof(struct DS18x20Pin));
     if (ds18x20Pins == NULL) {
@@ -369,34 +369,29 @@ int initDS18x20(int nrofSensors)
 
 #define DS18x20_MAX_DEVICES 20
 
-Notifications_ID_t addDS18x20(CborValue *entry)
+int sensorsDS18x20Add(DeviceProfile_Ds18x20Config_t *config)
 {
     Notifications_ID_t notificationId = NOTIFICATIONS_ID_ALL;
-    uint32_t pin;
     ds18x20_addr_t deviceAddrs[DS18x20_MAX_DEVICES];
     struct DS18x20Pin *pinStruct;
     size_t nrofDevices = 0, i;
-    gpio_config_t config;
+    gpio_config_t pinConfig;
     esp_err_t err;
 
-    if (deviceProfileParserEntryGetUint32(entry, &pin)) {
-        ESP_LOGE(TAG, "addDS18x20: Failed to get pin!");
-        return NOTIFICATIONS_ID_ERROR;
-    }
 
-    config.pin_bit_mask = 1<<pin;
-    config.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    config.intr_type = GPIO_INTR_DISABLE;
-    config.mode = GPIO_MODE_INPUT;
-    config.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&config);
+    pinConfig.pin_bit_mask = 1<<config->pin;
+    pinConfig.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    pinConfig.intr_type = GPIO_INTR_DISABLE;
+    pinConfig.mode = GPIO_MODE_INPUT;
+    pinConfig.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&pinConfig);
 
-    ESP_LOGI(TAG, "addDS18x20: Searching pin %u", pin);
-    err = ds18x20_scan_devices(pin, deviceAddrs, DS18x20_MAX_DEVICES, &nrofDevices);
+    ESP_LOGI(TAG, "addDS18x20: Searching pin %u", config->pin);
+    err = ds18x20_scan_devices(config->pin, deviceAddrs, DS18x20_MAX_DEVICES, &nrofDevices);
 
     if ((err != ESP_OK) || (nrofDevices == 0)) {
         ESP_LOGE(TAG, "addDS18x20: Failed find any sensor!");
-        return NOTIFICATIONS_ID_ERROR;
+        return -1;
     }
     if (nrofDevices > DS18x20_MAX_DEVICES) {
         ESP_LOGW(TAG, "addDS18x20: Found %d devices however only %d are supported on a pin", nrofDevices, DS18x20_MAX_DEVICES);
@@ -408,17 +403,20 @@ Notifications_ID_t addDS18x20(CborValue *entry)
     pinStruct->sensors = calloc(nrofDevices, sizeof(struct DS18x20Sensor));
     if (pinStruct->sensors == NULL) {
         ESP_LOGE(TAG, "addDS18x20: Failed to allocate memory for sensors");
-        return NOTIFICATIONS_ID_ERROR;
+        return -1;
     }
-    pinStruct->pin = pin;
+    pinStruct->pin = config->pin;
     pinStruct->nrofSensors = nrofDevices;
     ds18x20Pins++;
     for (i = 0; i < nrofDevices; i++) {
         pinStruct->sensors[i].addr = deviceAddrs[i];
-        pinStruct->sensors[i].id = NOTIFICATIONS_MAKE_ID(DS18x20, (pin << 8) | i);
+        pinStruct->sensors[i].id = NOTIFICATIONS_ID_ERROR;
+        if ((i == 0) && (config->id)) {
+            pinStruct->sensors[i].id = notificationsNewId(config->id);
+        }
         pinStruct->sensors[i].element = iotNewElement(&temperatureElementDescription, 0, NULL, NULL, "temperature%llx", deviceAddrs[i]);
     }
-    pinStruct->measureTimer =xTimerCreate("ds18x20M", SECS_TO_TICKS(5), pdFALSE, pinStruct, ds18x20MeasureTimer);
+    pinStruct->measureTimer = xTimerCreate("ds18x20M", SECS_TO_TICKS(5), pdFALSE, pinStruct, ds18x20MeasureTimer);
     pinStruct->readTimer = xTimerCreate("ds18x20R", MSECS_TO_TICKS(750), pdFALSE, pinStruct, ds18x20ReadTimer);
     xTimerStart(pinStruct->measureTimer, 0);
     return notificationId;
@@ -454,8 +452,6 @@ static void ds18x20ReadTimer(TimerHandle_t xTimer)
 
     xTimerStart(pinStruct->measureTimer, 0);
 }
-
-
 #endif
 
 static int addHumiditySensor(struct Sensor **sensor, uint32_t *sensorId)
@@ -489,5 +485,45 @@ static void updateForHundredth(int hundredths, Notifications_Class_e clazz, stru
     ESP_LOGI(TAG, "updateForHundredth: Class %d Id %d: Index: %d Value %d", clazz, sensor->id, index, hundredths);
     value.i = hundredths;
     iotElementPublish(sensor->element, index, value);
-    notificationsNotify(clazz, sensor->id, &data);
+    if (sensor->id != NOTIFICATIONS_ID_ERROR) {
+        notificationsNotify(clazz, sensor->id, &data);
+    }
+}
+
+void sensorsInit(DeviceProfile_DeviceConfig_t *config)
+{
+    int i;
+#ifdef CONFIG_DHT22
+    sensorsDHT22Init(config->dht22Count);
+#endif
+#ifdef CONFIG_BME280
+    sensorsBME280Init(config->bme280Count);
+#endif
+#ifdef CONFIG_SI7021
+    sensorsSI7021Init(config->si7021Count);
+#endif
+#ifdef CONFIG_DS18x20
+    sensorsDS18x20Init(config->ds18x20Count);
+#endif
+
+#ifdef CONFIG_DHT22
+    for (i = 0; i < config->dht22Count; i ++) {
+        sensorsDHT22Add(&config->dht22Config[i]);
+    }
+#endif
+#ifdef CONFIG_BME280
+    for (i = 0; i < config->bme280Count; i ++) {
+        sensorsBME280Add(&config->bme280Config[i]);
+    }
+#endif
+#ifdef CONFIG_SI7021
+    for (i = 0; i < config->si7021Count; i ++) {
+        sensorsSI7021Add(&config->si7021Config[i]);
+    }
+#endif
+#ifdef CONFIG_DS18x20
+    for (i = 0; i < config->ds18x20Count; i ++) {
+        sensorsDS18x20Add(&config->ds18x20Config[i]);
+    }
+#endif
 }

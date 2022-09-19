@@ -17,8 +17,8 @@ struct Led {
 };
 
 static struct Led *leds;
-static int ledCount = 0;
 
+static void addLed(DeviceProfile_LedConfig_t *config, int id, struct Led *led);
 static void ledControl(struct Led *led, iotValue_t value);
 static void ledElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
 
@@ -37,36 +37,33 @@ IOT_DESCRIBE_ELEMENT(
     )
 );
 
-int initLeds(int nrofLeds)
+int initLeds(DeviceProfile_LedConfig_t *config, uint32_t ledCount)
 {
-    leds = calloc(nrofLeds, sizeof(struct Led));
+    int i;
+    leds = calloc(ledCount, sizeof(struct Led));
     if (leds == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for leds");
         return -1;
     }
+    for (i = 0; i < ledCount; i++) {
+        addLed(&config[i], i, &leds[i]);
+    }
     return 0;
 }
 
-Notifications_ID_t addLed(CborValue *entry)
+static void addLed(DeviceProfile_LedConfig_t *config, int id, struct Led *led)
 {
-    uint32_t pin;
-    struct Led *led;
     iotValue_t value;
-
-    if (deviceProfileParserEntryGetUint32(entry, &pin)) {
-        ESP_LOGE(TAG, "Failed to get pin!");
-        return NOTIFICATIONS_ID_ERROR;
-    }
-    led = leds ++;
-    led->element = iotNewElement(&elementDescription, 0, ledElementCallback, led, "led%d", ledCount);
-    led->led = notificationLedNew(pin);
+    led->element = iotNewElement(&elementDescription, 0, ledElementCallback, led, "led%d", id);
+    led->led = notificationLedNew(config->pin);
     led->state = NULL;
     value.s = OFF;
     iotElementPublish(led->element, 0, value);
-
-    ledCount ++;
-    return 0;
+    if (config->name) {
+        iotElementSetHumanDescription(led->element, config->name);
+    }
 }
+
 
 static void ledControl(struct Led  *led, iotValue_t value)
 {

@@ -98,7 +98,7 @@ static void gpioRelaySetState(Relay_t *relay, bool on)
 
 static void relayElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details)
 {
-    if (IOT_CALLBACK_ON_SUB) {
+    if (reason == IOT_CALLBACK_ON_SUB) {
         relaySetState((Relay_t *)userData, details->value.b);
     }
 }

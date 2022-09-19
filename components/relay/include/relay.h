@@ -28,6 +28,6 @@ void relaySetState(Relay_t *relay, bool on);
 bool relayIsOn(Relay_t *relay);
 const char* relayGetName(Relay_t *relay);
 
-void relayRegister(char *id, Relay_t *);
-Relay_t* relayFind(char *id);
+void relayRegister(Relay_t *relay, const char *id);
+Relay_t* relayFind(const char *id);
 #endif

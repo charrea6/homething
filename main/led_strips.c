@@ -24,6 +24,7 @@ struct LEDStrip {
     bool state;
 } *ledStrip = NULL;
 
+static void addLEDStripSPI(DeviceProfile_LedStripSpiConfig_t *config);
 static void ledStripSPIElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
 static void ledStripSPIControl(iotValue_t value);
 static void ledStripSPIUpdate(void);
@@ -43,33 +44,27 @@ IOT_DESCRIBE_ELEMENT(
     )
 );
 
-int initLEDStripSPI(int nrofStrips)
+void initLEDStripSPI(DeviceProfile_LedStripSpiConfig_t *config, uint32_t ledStripCount)
 {
     esp_err_t err;
+    if (ledStripCount == 0) {
+        return;
+    }
     err = led_strip_spi_install();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "led_strip_spi_install(): %s", esp_err_to_name(err));
-        return -1;
     }
-    return 0;
+
+    addLEDStripSPI(config);
 }
 
-Notifications_ID_t addLEDStripSPI(CborValue *entry)
+static void addLEDStripSPI(DeviceProfile_LedStripSpiConfig_t *config)
 {
     esp_err_t err;
     led_strip_spi_t strip = LED_STRIP_SPI_DEFAULT();
     iotValue_t value;
 
-    if (ledStrip != NULL) {
-        ESP_LOGE(TAG, "Only a single LED strip is supported!");
-        return NOTIFICATIONS_ID_ERROR;
-    }
-
-    if (deviceProfileParserEntryGetUint32(entry, &strip.length)) {
-        ESP_LOGE(TAG, "Failed to get number of LEDs!");
-        return NOTIFICATIONS_ID_ERROR;
-    }
-
+    strip.length = config->numberOfLEDs;
 #if HELPER_TARGET_IS_ESP32
     static spi_device_handle_t device_handle;
     strip.device_handle = device_handle;
@@ -83,7 +78,6 @@ Notifications_ID_t addLEDStripSPI(CborValue *entry)
     ledStrip = calloc(1, sizeof(struct LEDStrip));
     if (ledStrip == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for led strip");
-        return NOTIFICATIONS_ID_ERROR;
     }
 
     ESP_LOGI(TAG, "Initializing LED strip");
@@ -91,10 +85,13 @@ Notifications_ID_t addLEDStripSPI(CborValue *entry)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init led strip, %08x", err);
         free(ledStrip);
-        return NOTIFICATIONS_ID_ERROR;
     }
     ledStrip->strip = strip;
     ledStrip->element = iotNewElement(&elementDescription, 0, ledStripSPIElementCallback, ledStrip, "ledStrip");
+    if (config->name) {
+        iotElementSetHumanDescription(ledStrip->element, config->name);
+    }
+
     value.i = strip.length;
     iotElementPublish(ledStrip->element, PUB_IDX_LEDCOUNT, value);
 
@@ -106,7 +103,6 @@ Notifications_ID_t addLEDStripSPI(CborValue *entry)
     value.i = ledStrip->brightness;
     iotElementPublish(ledStrip->element, PUB_IDX_BRIGHTNESS, value);
     ledStripSPIUpdateColor();
-    return 0;
 }
 
 

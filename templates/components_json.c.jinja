@@ -1,0 +1,46 @@
+#include <esp_http_server.h>
+#include "sdkconfig.h"
+#include "provisioning_int.h"
+
+static const char json[] = "{"
+{% set component_comma = joiner(",") %}
+{% for component in components %}
+{% if component.condition %}
+#if {{ component.condition}}
+{% endif %}
+    "{{component_comma()}}\"{{component.name}}\":{"
+    {% set arg_comma= joiner(",") %}
+    {% for arg in component.arguments %}
+        "{{arg_comma()}}\"{{arg.name}}\":{" 
+            "\"type\":\"{{arg.type}}\""
+        {% if arg.options %}
+        {% if "default" in arg.options %}
+            ",\"default\":{% if arg.type in ("choice", "string") %}\"{{ arg.options['default']}}\"{% else %}{{ arg.options['default']}}{% endif %}"
+        {% endif %}
+        {% if "choices" in arg.options %}
+            ",\"choices\":["
+            {% set choices_comma=joiner(",") %}
+            {% for choice in arg.options["choices"] %}
+                "{{choices_comma()}}\"{{choice}}\""
+            {% endfor %}
+            "]"
+        {% endif %}
+        {% if "optional" in arg.options %}
+            ",\"optional\":{% if arg.options['optional'] %}true{% else %}false{% endif %}"
+        {% endif %}
+        {% endif %}
+        "}"
+    {% endfor %}
+    "}"
+{% if component.condition %}
+#endif
+{% endif %}
+{% endfor %}
+"}";
+
+esp_err_t provisioningComponentsJsonFileHandler(httpd_req_t *req)
+{
+    provisioningSetContentType(req, CT_JSON);
+    httpd_resp_send(req, json, sizeof(json) - 1);
+    return ESP_OK;
+}
