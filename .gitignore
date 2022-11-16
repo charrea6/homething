@@ -1,6 +1,6 @@
 build
-sdkconfig*
-!sdkconfig.defaults
+sdkconfig
+CMakePresets.json
 components/updater/version.h
 *.pyc
 .vscode
