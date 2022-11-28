@@ -1,0 +1,32 @@
+name: Build
+on:
+  push:
+    branches: [ master, main ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      
+      - name: Checkout SDK
+        uses: actions/checkout@v2
+        with:
+          repository: espressif/ESP8266_RTOS_SDK
+          ref: release/v3.4
+          path: sdk
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10' 
+
+      - name: Setup environment
+        run: |
+          cd sdk
+          ./install.sh
