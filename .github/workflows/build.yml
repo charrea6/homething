@@ -43,7 +43,7 @@ jobs:
           idf.py build otagen
       
       - name: Store images
-        uses: action/upload-artifact@v3
+        uses: actions/upload-artifact@v3
         with:
           name: esp8266-${{ matrix.build_type }}
           path: |
