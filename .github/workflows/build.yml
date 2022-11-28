@@ -41,7 +41,12 @@ jobs:
         run: |
           source sdk/export.sh
           pip install -r requirements.txt
-      
+
+      - name: Patch SDK for pthread link issue
+        run: |
+          cd sdk
+          git apply ../esp8266_rtos_sdk_v3_4.patch
+
       - name: Build
         run: |
           cp sdkconfig.${{ matrix.build_type }} sdkconfig
