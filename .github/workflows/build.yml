@@ -8,15 +8,19 @@ on:
   workflow_dispatch:
 jobs:
   build:
+    strategy:
+      matrix:
+        build_type: [flash1mb, flash4mb]
     runs-on: ubuntu-latest
     steps:
       - name: Code Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
+          fetch-depth: 0
           submodules: recursive
       
       - name: Checkout SDK
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: espressif/ESP8266_RTOS_SDK
           ref: release/v3.4
@@ -31,3 +35,16 @@ jobs:
         run: |
           cd sdk
           ./install.sh
+      
+      - name: Build
+        run: |
+          cp sdkconfig.${{ matrix.build_type }}
+          source sdk/export.sh
+          idf.py build otagen
+      
+      - name: Store images
+        uses: action/upload-artifact@v3
+        with:
+          name: esp8266-${{ matrix.build_type }}
+          path: |
+            build/homething*
