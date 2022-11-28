@@ -36,6 +36,8 @@ jobs:
         run: |
           cd sdk
           ./install.sh
+          cd ..
+          pip install -r requirements.txt
       
       - name: Build
         run: |
