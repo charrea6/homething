@@ -38,7 +38,7 @@ jobs:
       
       - name: Build
         run: |
-          cp sdkconfig.${{ matrix.build_type }}
+          cp sdkconfig.${{ matrix.build_type }} sdkconfig
           source sdk/export.sh
           idf.py build otagen
       
