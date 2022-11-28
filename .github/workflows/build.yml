@@ -9,8 +9,8 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        fail-fast: false
         build_type: [flash1mb, flash4mb]
     runs-on: ubuntu-latest
     steps:
