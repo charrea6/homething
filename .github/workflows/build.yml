@@ -21,6 +21,7 @@ jobs:
           repository: espressif/ESP8266_RTOS_SDK
           ref: release/v3.4
           path: sdk
+          fetch-depth: 0
 
       - uses: actions/setup-python@v4
         with:
