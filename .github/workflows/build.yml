@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: espressif/ESP8266_RTOS_SDK
-          ref: release/v3.4
+          ref: release/v3.3
           path: sdk
           fetch-depth: 0
 
