@@ -55,9 +55,13 @@ struct DS18x20Pin {
     TimerHandle_t readTimer;
 };
 
+#if defined(CONFIG_DHT22) || defined(CONFIG_BME280) || defined(CONFIG_SI7021) || defined(CONFIG_DS18x20)
 static void updateForHundredth(int hundredths, Notifications_Class_e clazz, struct Sensor *sensor, int index);
+#endif
 
+#if defined(CONFIG_DHT22) || defined(CONFIG_BME280) || defined(CONFIG_SI7021)
 static int addHumiditySensor(struct Sensor **sensor, uint32_t *sensorId);
+#endif
 
 #ifdef CONFIG_DHT22
 static void dht22MeasureTimer(TimerHandle_t xTimer);
@@ -78,6 +82,7 @@ static void ds18x20ReadTimer(TimerHandle_t xTimer);
 
 static char const TAG[]="sensors";
 
+#if defined(CONFIG_DHT22) || defined(CONFIG_BME280) || defined(CONFIG_SI7021)
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
     humidityElementDescription,
     IOT_ELEMENT_TYPE_SENSOR_HUMIDITY,
@@ -86,7 +91,9 @@ IOT_DESCRIBE_ELEMENT_NO_SUBS(
         IOT_DESCRIBE_PUB(RETAINED, CELSIUS, "temperature")
     )
 );
+#endif
 
+#if defined(CONFIG_BME280)
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
     htpElementDescription, // Humidity / Temperature / Pressure
     IOT_ELEMENT_TYPE_SENSOR_HUMIDITY,
@@ -98,14 +105,6 @@ IOT_DESCRIBE_ELEMENT_NO_SUBS(
 );
 
 IOT_DESCRIBE_ELEMENT_NO_SUBS(
-    temperatureElementDescription, // Temperature
-    IOT_ELEMENT_TYPE_SENSOR_TEMPERATURE,
-    IOT_PUB_DESCRIPTIONS(
-        IOT_DESCRIBE_PUB(RETAINED, CELSIUS, IOT_PUB_USE_ELEMENT)
-    )
-);
-
-IOT_DESCRIBE_ELEMENT_NO_SUBS(
     tpElementDescription, // Temperature / Pressure
     IOT_ELEMENT_TYPE_SENSOR_TEMPERATURE,
     IOT_PUB_DESCRIPTIONS(
@@ -113,11 +112,24 @@ IOT_DESCRIBE_ELEMENT_NO_SUBS(
         IOT_DESCRIBE_PUB(RETAINED, KPA, "pressure")
     )
 );
+#endif
 
+#if defined(CONFIG_DS18x20)
+IOT_DESCRIBE_ELEMENT_NO_SUBS(
+    temperatureElementDescription, // Temperature
+    IOT_ELEMENT_TYPE_SENSOR_TEMPERATURE,
+    IOT_PUB_DESCRIPTIONS(
+        IOT_DESCRIBE_PUB(RETAINED, CELSIUS, IOT_PUB_USE_ELEMENT)
+    )
+);
+#endif
+
+#if defined(CONFIG_DHT22) || defined(CONFIG_BME280) || defined(CONFIG_SI7021)
 static uint32_t nrofHumiditySensors = 0;
 static uint32_t humiditySensorCount = 0;
 
 static struct Sensor *humiditySensors = NULL;
+#endif
 
 #ifdef CONFIG_BME280
 static struct BME280 *bme280Devices;
@@ -314,6 +326,18 @@ int sensorsSI7021Add(DeviceProfile_Si7021Config_t *config)
         ESP_LOGE(TAG, "addSI7021: Failed to init %d", err);
         return -1;
     }
+
+    err = si7021_reset(&dev->dev);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "addSI7021: Failed to reset %d", err);
+        return -1;
+    }
+
+    err = si7021_set_heater(&dev->dev, false);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "addSI7021: Failed to disable heater %d", err);
+        return -1;
+    }
     si7021Devices++;
 
     sensor->element = iotNewElement(&humidityElementDescription, 0, NULL, sensor, "humidity%d", sensorId);
@@ -454,6 +478,7 @@ static void ds18x20ReadTimer(TimerHandle_t xTimer)
 }
 #endif
 
+#if defined(CONFIG_DHT22) || defined(CONFIG_BME280) || defined(CONFIG_SI7021)
 static int addHumiditySensor(struct Sensor **sensor, uint32_t *sensorId)
 {
     struct Sensor *newSensor;
@@ -475,7 +500,9 @@ static int addHumiditySensor(struct Sensor **sensor, uint32_t *sensorId)
     humiditySensorCount ++;
     return 0;
 }
+#endif
 
+#if defined(CONFIG_DHT22) || defined(CONFIG_BME280) || defined(CONFIG_SI7021) || defined(CONFIG_DS18x20)
 static void updateForHundredth(int hundredths, Notifications_Class_e clazz, struct Sensor *sensor, int index)
 {
     NotificationsData_t data;
@@ -489,10 +516,11 @@ static void updateForHundredth(int hundredths, Notifications_Class_e clazz, stru
         notificationsNotify(clazz, sensor->id, &data);
     }
 }
+#endif
 
 void sensorsInit(DeviceProfile_DeviceConfig_t *config)
 {
-    int i;
+    ESP_LOGI(TAG, "Initialising sensors");
 #ifdef CONFIG_DHT22
     sensorsDHT22Init(config->dht22Count);
 #endif
@@ -507,23 +535,35 @@ void sensorsInit(DeviceProfile_DeviceConfig_t *config)
 #endif
 
 #ifdef CONFIG_DHT22
-    for (i = 0; i < config->dht22Count; i ++) {
-        sensorsDHT22Add(&config->dht22Config[i]);
+    {
+        int i;
+        for (i = 0; i < config->dht22Count; i ++) {
+            sensorsDHT22Add(&config->dht22Config[i]);
+        }
     }
 #endif
 #ifdef CONFIG_BME280
-    for (i = 0; i < config->bme280Count; i ++) {
-        sensorsBME280Add(&config->bme280Config[i]);
+    {
+        int i;
+        for (i = 0; i < config->bme280Count; i ++) {
+            sensorsBME280Add(&config->bme280Config[i]);
+        }
     }
 #endif
 #ifdef CONFIG_SI7021
-    for (i = 0; i < config->si7021Count; i ++) {
-        sensorsSI7021Add(&config->si7021Config[i]);
+    {
+        int i;
+        for (i = 0; i < config->si7021Count; i ++) {
+            sensorsSI7021Add(&config->si7021Config[i]);
+        }
     }
 #endif
 #ifdef CONFIG_DS18x20
-    for (i = 0; i < config->ds18x20Count; i ++) {
-        sensorsDS18x20Add(&config->ds18x20Config[i]);
+    {
+        int i;
+        for (i = 0; i < config->ds18x20Count; i ++) {
+            sensorsDS18x20Add(&config->ds18x20Config[i]);
+        }
     }
 #endif
 }
