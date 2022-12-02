@@ -1,7 +1,7 @@
 name: Build
 on:
   push:
-    branches: [ master, main ]
+    branches: 
     paths-ignore:
       - 'README.md'
       - 'docs/**'
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: espressif/ESP8266_RTOS_SDK
-          ref: release/v3.3
+          ref: release/v3.4
           path: sdk
           fetch-depth: 0
 
