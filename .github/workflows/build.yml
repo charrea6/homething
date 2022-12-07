@@ -33,7 +33,6 @@ jobs:
 
       - name: Checkout SDK
         uses: actions/checkout@v3
-        if: matrix.build_type != 'esp32'
         with:
           repository: ${{ steps.sdk.outputs.repo }}
           ref: ${{ steps.sdk.outputs.ref }}
