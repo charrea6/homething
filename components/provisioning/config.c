@@ -8,7 +8,6 @@
 
 #include "provisioning.h"
 #include "provisioning_int.h"
-#include "captdns.h"
 
 #include "wifi.h"
 #include "iot.h"

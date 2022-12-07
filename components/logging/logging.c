@@ -47,7 +47,7 @@ static uint32_t sequence = 0;
 static char *loggingHost;
 static uint16_t loggingPort;
 static int loggingSocket = -1;
-static SemaphoreHandle_t *loggingMutex;
+static SemaphoreHandle_t loggingMutex;
 
 
 void loggingInit()

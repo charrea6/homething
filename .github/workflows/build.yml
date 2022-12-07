@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build_type: [flash1mb, flash4mb]
+        build_type: [flash1mb, flash4mb, esp32]
     runs-on: ubuntu-latest
     steps:
       - name: Code Checkout
@@ -19,12 +19,24 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      
+
+      - name: Determine SDK and version
+        id: sdk
+        run: |
+          if [ "${{ matrix.build_type }}" == "esp32" ]; then
+            echo "repo=espressif/esp-idf" >> $GITHUB_OUTPUT
+            echo "ref=release/v4.4" >> $GITHUB_OUTPUT
+          else
+            echo "repo=espressif/ESP8266_RTOS_SDK" >> $GITHUB_OUTPUT
+            echo "ref=release/v3.3" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout SDK
         uses: actions/checkout@v3
+        if: matrix.build_type != 'esp32'
         with:
-          repository: espressif/ESP8266_RTOS_SDK
-          ref: release/v3.3
+          repository: ${{ steps.sdk.outputs.repo }}
+          ref: ${{ steps.sdk.outputs.ref }}
           path: sdk
           fetch-depth: 0
 

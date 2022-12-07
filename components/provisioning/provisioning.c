@@ -3,7 +3,6 @@
 
 #include "provisioning.h"
 #include "provisioning_int.h"
-#include "captdns.h"
 
 #include "wifi.h"
 #include "iot.h"
@@ -78,10 +77,6 @@ int provisioningStart(void)
         httpd_register_uri_handler(server, &handlers[i]);
     }
 
-    // Disable Captive Portal DNS
-    // TODO: Reduce task memory requirements
-    ///    : wasn't responding to `dig @<ESP IP> www.google.com` as arcount wasn't 0
-    //captdnsInit();
     return 0;
 }
 
