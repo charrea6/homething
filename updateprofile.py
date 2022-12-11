@@ -4,12 +4,11 @@ import yaml
 import collections
 import gencomponents
 import requests
-import cbor2
 import json
 import sys
 
 
-VERSION=2
+VERSION='1.0'
 
 class Messages:
     def __init__(self) -> None:
@@ -166,7 +165,7 @@ def get_device_ip(mqtt_host, device_id):
     return device_info['ip']
 
 
-def upload_profile(mqtt_host, device_id, cbor_dict):
+def upload_profile(mqtt_host, device_id, profile):
     device_info = {}
     client = mqtt.Client(userdata=device_info)
     
@@ -193,7 +192,7 @@ def upload_profile(mqtt_host, device_id, cbor_dict):
 
     print("Sending new profile")
     #client.publish(f"homething/{device_id}/device/ctrl", b"restart")
-    client.publish(f"homething/{device_id}/device/ctrl", b"setprofile\0" + cbor_dict)
+    client.publish(f"homething/{device_id}/device/ctrl", b"setprofile\0" + profile)
     
     print("Waiting for device to restart...")
     start_time = time.time()
@@ -231,9 +230,8 @@ def main():
         messages.print()
         sys.exit(1)
 
-    profile = [VERSION, profile_dict]
-    cbor_profile = cbor2.dumps(profile)
-    upload_profile(mqtt_host, device_id, cbor_profile)
+    profile = { 'version': VERSION, 'components': profile_dict}
+    upload_profile(mqtt_host, device_id, json.dumps(profile))
     print("Profile updated!")
 
 

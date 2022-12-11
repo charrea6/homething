@@ -1,6 +1,8 @@
-import configparser
 import argparse
 import sys
+
+import yaml
+import json
 
 class OptionInfo:
     def __init__(self, type_name, optional=False):
@@ -23,12 +25,7 @@ defaults = dict(
     gpiox={'num':OptionInfo('u8', True),
            'sda':OptionInfo('u8', True),
            'scl':OptionInfo('u8', True),},
-    thing={'relayOnLevel':OptionInfo('u8', True), 
-           'lights': ProcessedOptionInfo(), 
-           'doorbells': ProcessedOptionInfo(), 
-           'motionsensors': ProcessedOptionInfo(), 
-           'temperaturesensors': ProcessedOptionInfo(), 
-           'fans': ProcessedOptionInfo()}
+    thing={'profile':ProcessedOptionInfo(),}
     )
 
 def process_wifi(options, _):
@@ -58,55 +55,10 @@ def process_gpiox(options, _):
 
 def process_thing(options, config):
     thing = 'thing,namespace,,\n'
-    profile = ''
-
-    for key, value in options.items():
-        if isinstance(defaults['thing'][key], OptionInfo):
-            if value is not None:
-                thing += '%s,data,%s,%s\n' % (key, defaults['thing'][key].type_name, value)
-        else:
-            count = int(value)
-            profile += eval('process_%s(config, count)' % key)
-    
-    thing += 'profile,data,hex2bin,%s\n' % profile
-
+    profile = { 'version': '1.0', 'components': options.get('profile', {})}
+    thing += 'deviceprofile,data,string,%s\n' % json.dumps(profile)
     return thing
 
-
-def process_lights(config, count):
-    profile = ''
-    for i in range(count):
-        section_name = 'light%d' % i
-        if not config.has_section(section_name):
-            print("Missing section '%s'" % section_name)
-            sys.exit(1)
-        relay = config.getint(section_name, 'relay')
-        switch = config.getint(section_name, 'switch')
-        profile += '%02x%02x%02x' % (ord('L'), relay, switch)
-    return profile
-
-def process_simple_profile(config, section_name_prefix, count, func_char):
-    profile = ''
-    for i in range(count):
-        section_name = '%s%d' % (section_name_prefix, i)
-        if not config.has_section(section_name):
-            print("Missing section '%s'" % section_name)
-            sys.exit(1)
-        pin = config.getint(section_name, 'pin')
-        profile += '%02x%02x' % (ord(func_char), pin)
-    return profile
-
-def process_doorbells(config, count):
-    return process_simple_profile(config, 'doorbell', count, 'B')
-
-def process_motionsensors(config, count):
-    return process_simple_profile(config, 'motionsensor', count, 'M')
-
-def process_temperaturesensors(config, count):
-    return process_simple_profile(config, 'temperaturesensor', count, 'T')
-
-def process_fans(config, count):
-    return process_simple_profile(config, 'fan', count, 'F')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Translates settings config file into csv file for NVS generation.')
@@ -115,15 +67,15 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    config = configparser.RawConfigParser()
-    config.readfp(args.infile)
+    config = yaml.safe_load(args.infile)
 
     csv = 'key,type,encoding,value\n'
     for section, option_defaults in defaults.items():
         options = {}
+        section_config = config.get(section, {})
         for option,value in option_defaults.items():
-            if config.has_option(section, option):
-                options[option] = config.get(section, option)
+            if option in section_config:
+                options[option] = section_config.get(option)
             else:
                 if value.optional:
                     options[option] = value.default
@@ -132,7 +84,4 @@ if __name__ == '__main__':
 
     args.outfile.write(csv)
     args.outfile.close()
-
-    
-
 
