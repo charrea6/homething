@@ -2,7 +2,7 @@ import os
 import io
 from flask import Flask, send_file, jsonify, redirect, url_for, request, make_response, Response
 import gensettings
-import cbor2
+import json
 app = Flask(__name__)
 
 class StaticFile:
@@ -29,7 +29,7 @@ def settings():
 
 setting_values = {
     'thing': {
-        'id': b'\x01\x02\x03\xA1\xB2\xC3',
+        'id': '010203A1B2C3',
     }
 }
 
@@ -37,10 +37,10 @@ setting_values = {
 def values():
     global setting_values
     if request.method == 'GET':
-        return Response(cbor2.dumps(setting_values), mimetype='application/cbor')
+        return Response(json.dumps(setting_values), mimetype='application/json')
     else:
-        setting_values = cbor2.loads(request.get_data())
-        setting_values['thing']['id'] = b'\x01\x02\x03\xA1\xB2\xC3'
+        setting_values = json.loads(request.get_data())
+        setting_values['thing']['id'] = '010203A1B2C3'
         if 'wifi' in setting_values and 'pass' in setting_values['wifi']:
             if setting_values['wifi']['pass'] == 'error':
                 return make_response('Error found!', 500)

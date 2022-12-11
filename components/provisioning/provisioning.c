@@ -28,7 +28,6 @@ static const char *content_types[CT_MAX] = {
     "text/css",
     "text/javascript",
     "application/json",
-    "application/cbor"
 };
 
 static const httpd_uri_t handlers[] = {{
