@@ -1,3 +1,3 @@
-idf_component_register(SRCS "deviceprofile.c" "component_config.c"
+idf_component_register(SRCS "deviceprofile.c" "deserialize.c"
                     INCLUDE_DIRS "include"
-                    REQUIRES "nvs_flash" "tinycbor" "utils")
+                    REQUIRES "nvs_flash" "json" "utils")

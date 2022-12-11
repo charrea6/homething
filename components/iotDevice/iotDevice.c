@@ -211,9 +211,8 @@ static void iotDeviceControl(iotValue_t value)
     if (strcmp(RESTART, (const char *)value.bin->data) == 0) {
         esp_restart();
     } else if (safestrcmp(SETPROFILE, (const char *)value.bin->data, (int)value.bin->len) == 0) {
-        uint8_t *profile = value.bin->data + sizeof(SETPROFILE);
-        size_t profileLen = value.bin->len - sizeof(SETPROFILE);
-        if (deviceProfileSetProfile(profile, profileLen) == 0) {
+        char *profile = (char * )(value.bin->data + sizeof(SETPROFILE));
+        if (deviceProfileSetProfile(profile) == 0) {
             esp_restart();
         }
     } else if (strncmp(UPDATE, (const char *)value.bin->data, sizeof(UPDATE) - 1) == 0) {
@@ -254,24 +253,11 @@ static void iotDeviceOnConnect(int pubId, bool release, iotValueType_t *valueTyp
 {
     switch(pubId) {
     case DEVICE_PUB_INDEX_PROFILE:
-        if (release) {
-            if (value->bin) {
-                free((void *)value->bin);
+        if (!release) {
+            *valueType = IOT_VALUE_TYPE_STRING;
+            if (deviceProfileGetProfile(&value->s) != 0) {
+                value->s = "";
             }
-        } else {
-            iotBinaryValue_t *bin;
-            *valueType = IOT_VALUE_TYPE_BINARY;
-            bin = malloc(sizeof(iotBinaryValue_t));
-
-            if (bin == NULL) {
-                ESP_LOGE(TAG, "Failed to allocate memory for iotBinaryValue_t");
-            } else {
-                if (deviceProfileGetProfile(&bin->data, (size_t*)&bin->len) != 0) {
-                    free(bin);
-                    bin = NULL;
-                }
-            }
-            value->bin = bin;
         }
         break;
     case DEVICE_PUB_INDEX_TOPICS:

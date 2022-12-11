@@ -1,0 +1,80 @@
+/* AUTO-GENERATED DO NOT EDIT */
+{% if "choice" in used_types %}
+{% if type_conditions["choice"] %}
+#if {{type_conditions["choice"]}}
+{% endif %}
+#define FIELD_TYPE_USED_CHOICE
+{% if type_conditions["choice"] %}
+#endif
+{% endif %}
+{% endif %}
+
+{% if uint_types.intersection(used_types) %}
+{% if type_conditions["uint"] %}
+#if {{type_conditions["uint"]}}
+{% endif %}
+#define FIELD_TYPE_USED_UINT
+{% if type_conditions["uint"] %}
+#endif
+{% endif %}
+{% endif %}
+
+{% if "gpioPin" in used_types %}
+{% if type_conditions["gpioPin"] %}
+#if {{type_conditions["gpioPin"]}}
+{% endif %}
+#define FIELD_TYPE_USED_GPIOPIN
+{% if type_conditions["gpioPin"] %}
+#endif
+{% endif %}
+{% endif %}
+
+{% if "gpioLevel" in used_types %}
+{% if type_conditions["gpioLevel"] %}
+#if {{type_conditions["gpioLevel"]}}
+{% endif %}
+#define FIELD_TYPE_USED_GPIOLEVEL
+{% if type_conditions["gpioLevel"] %}
+#endif
+{% endif %}
+{% endif %}
+
+{% if "i2cAddr" in used_types %}
+{% if type_conditions["i2cAddr"] %}
+#if {{type_conditions["i2cAddr"]}}
+{% endif %}
+#define FIELD_TYPE_USED_I2CADDR
+{% if type_conditions["i2cAddr"] %}
+#endif
+{% endif %}
+{% endif %}
+
+{% if "int" in used_types %}
+{% if type_conditions["int"] %}
+#if {{type_conditions["int"]}}
+{% endif %}
+#define FIELD_TYPE_USED_INT
+{% if type_conditions["int"] %}
+#endif
+{% endif %}
+{% endif %}
+
+{% if "bool" in used_types %}
+{% if type_conditions["bool"] %}
+#if {{type_conditions["bool"]}}
+{% endif %}
+#define FIELD_TYPE_USED_BOOL
+{% if type_conditions["bool"] %}
+#endif
+{% endif %}
+{% endif %}
+
+{% if "string" in used_types %}
+{% if type_conditions["string"] %}
+#if {{type_conditions["string"]}}
+{% endif %}
+#define FIELD_TYPE_USED_STRING
+{% if type_conditions["string"] %}
+#endif
+{% endif %}
+{% endif %}

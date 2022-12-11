@@ -21,17 +21,16 @@ static const char TAG[] = "profile";
 
 void processProfile(void)
 {
-    uint8_t *profile = NULL;
-    size_t profileLen = 0;
+    const char *profile = NULL;
     DeviceProfile_DeviceConfig_t config;
 
     ESP_LOGI(TAG, "Processing Profile");
-    if (deviceProfileGetProfile(&profile, &profileLen)) {
+    if (deviceProfileGetProfile(&profile)) {
         ESP_LOGE(TAG, "Failed to load profile!");
         return;
     }
 
-    if (deviceProfileDeserialize(profile, profileLen, &config)) {
+    if (deviceProfileDeserialize(profile, &config)) {
         ESP_LOGE(TAG, "Failed to deserialise profile!");
         return;
     }

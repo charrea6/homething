@@ -38,7 +38,7 @@ static uint32_t switchCount = 0;
 
 static const struct SwitchTypeInfo allSwitchTypeInfo[] = {
     {
-        .type = DeviceProfile_Choices_Switch_Type_Momemetary,
+        .type = DeviceProfile_Choices_Switch_Type_Momentary,
         .deviceName = "momentary%d",
         .highState = "released",
         .lowState = "pressed",
@@ -164,7 +164,7 @@ static void switchRelayController(struct Switch *switchInstance, bool switchStat
 {
     Relay_t *relay = switchInstance->relay;
     switch(switchInstance->typeInfo->type) {
-    case DeviceProfile_Choices_Switch_Type_Momemetary:
+    case DeviceProfile_Choices_Switch_Type_Momentary:
         if (switchState) {
             relaySetState(relay, !relayIsOn(relay));
         }

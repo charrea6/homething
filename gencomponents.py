@@ -136,9 +136,13 @@ def main():
         template = env.get_template("component_config.h.jinja")
         fp.write(template.render(components=components, used_types=used_types))
 
-    with open("components/deviceprofile/component_config.c", "w") as fp:
-        template = env.get_template("component_config.c.jinja")
+    with open("components/deviceprofile/component_config_internal.h", "w") as fp:
+        template = env.get_template("component_config_internal.h.jinja")
         fp.write(template.render(components=components, used_types=used_types, uint_types=uint_types, type_conditions=type_conditions))
+    
+    with open("components/deviceprofile/field_types_used.h", "w") as fp:
+        template = env.get_template("field_types_used.h.jinja")
+        fp.write(template.render(used_types=used_types, uint_types=uint_types, type_conditions=type_conditions))
     
     with open("components/provisioning/components_json.c", "w") as fp:
         template = env.get_template("components_json.c.jinja")

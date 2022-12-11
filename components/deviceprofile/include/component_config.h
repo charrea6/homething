@@ -5,7 +5,7 @@
 
 /* Enum Mappings */
 enum DeviceProfile_Choices_Switch_Type {
-    DeviceProfile_Choices_Switch_Type_Momemetary,
+    DeviceProfile_Choices_Switch_Type_Momentary,
     DeviceProfile_Choices_Switch_Type_Toggle,
     DeviceProfile_Choices_Switch_Type_Onoff,
     DeviceProfile_Choices_Switch_Type_Contact,
@@ -125,5 +125,5 @@ typedef struct DeviceProfile_DeviceConfig {
     uint32_t humidistatCount;
     DeviceProfile_ThermostatConfig_t *thermostatConfig;
     uint32_t thermostatCount;
-} DeviceProfile_DeviceConfig_t;
+}DeviceProfile_DeviceConfig_t;
 #endif

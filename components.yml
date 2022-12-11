@@ -4,7 +4,7 @@ switch:
     type:
       type: choice
       choices:
-        - momemetary
+        - momentary
         - toggle
         - onOff
         - contact

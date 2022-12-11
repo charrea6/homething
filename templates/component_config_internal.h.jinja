@@ -1,0 +1,69 @@
+/* AUTO-GENERATED DO NOT EDIT */
+{% for component in components %}
+/**** {{component.name}} ****/
+{% if component.condition %}
+#if {{ component.condition}}
+{% endif %}
+    {% for arg in component.arguments %}
+    {% if arg.type == "choice" %}
+static const struct choice {{arg.enum_name}}Strings[] = {
+    {% for choice in arg.options['choices'] %}
+    { "{{ choice }}", DeviceProfile_Choices_{{arg.component|title}}_{{arg.name|title}}_{{choice|title}} },
+    {% endfor %}
+    { NULL, 0 }
+};
+
+    {% endif %}
+    {% endfor %}
+struct field fields_{{component.normalised_name}}[] = {
+    {% for arg in component.arguments %}
+    {
+        .key = "{{arg.name}}",  
+        .flags = {% if arg.is_optional %} FIELD_FLAG_OPTIONAL{% else %} FIELD_FLAG_DEFAULT{% endif %}, 
+        .dataOffset = offsetof(struct DeviceProfile_{{component.normalised_name}}Config, {{ arg.name }}),
+        {% if arg.type == 'choice' %}
+        .choices = {{arg.enum_name}}Strings,
+        .validateAndSet = validateAndSetChoice
+        {% elif arg.type == "gpioPin" %}
+        .validateAndSet = validateAndSetGPIOPin
+        {% elif arg.type == "gpioLevel" %}
+        .validateAndSet = validateAndSetGPIOLevel
+        {% elif arg.type == "i2cAddr" %}
+        .validateAndSet = validateAndSetI2CAddr
+        {% elif arg.type == "uint" %}
+        .validateAndSet = validateAndSetUInt
+        {% elif arg.type == "int" %}
+        .validateAndSet = validateAndSetInt
+        {% elif arg.type == "bool" %}
+        .validateAndSet = validateAndSetBool
+        {% elif arg.type in ("string", "id") %}
+        .validateAndSet = validateAndSetString
+        {% else %}
+        .validateAndSet = NULL
+        {% endif %}
+    },
+    {% endfor %}
+};
+{% if component.condition %}
+#endif
+{% endif %}
+{% endfor %}
+
+struct component componentDefinitions[] = {
+{% for component in components %}
+{% if component.condition %}
+#if {{ component.condition}}
+{% endif %}
+    {
+        .name = "{{component.name}}",
+        .structSize = sizeof(struct DeviceProfile_{{component.normalised_name}}Config),
+        .arrayOffset = offsetof(struct DeviceProfile_DeviceConfig, {{component.normalised_field_name}}Config),
+        .arrayCountOffset = offsetof(struct DeviceProfile_DeviceConfig, {{component.normalised_field_name}}Count),
+        .fields = fields_{{component.normalised_name}},
+        .fieldsCount = sizeof(fields_{{component.normalised_name}}) / sizeof(struct field)
+    },
+{% if component.condition %}
+#endif
+{% endif %}
+{% endfor %}
+};
