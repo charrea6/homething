@@ -30,7 +30,7 @@ void processProfile(void)
         ESP_LOGE(TAG, "Failed to load profile!");
         return;
     }
-    
+
     if (deviceProfileDeserialize(profile, profileLen, &config)) {
         ESP_LOGE(TAG, "Failed to deserialise profile!");
         return;

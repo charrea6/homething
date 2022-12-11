@@ -12,8 +12,8 @@ static const char TAG[] = "compcfg";
 
 /* Enum Mappings */
 struct choice {
-	const char *str;
-	int val;
+    const char *str;
+    int val;
 };
 
 enum field_flags {
@@ -27,7 +27,7 @@ typedef int (*validateAndSet_t)(CborValue *, struct field *, void *);
 
 struct field {
     char *key;
-    enum field_flags flags;  
+    enum field_flags flags;
     size_t dataOffset;
     const struct choice *choices;
     validateAndSet_t validateAndSet;
@@ -42,10 +42,10 @@ struct component {
     size_t fieldsCount;
 };
 
-static int findChoice(const struct choice *choices, char *input, int *output) 
+static int findChoice(const struct choice *choices, char *input, int *output)
 {
     int i;
-    for (i = 0; choices[i].str != NULL; i++){
+    for (i = 0; choices[i].str != NULL; i++) {
         if (strcmp(choices[i].str, input) == 0) {
             *output = choices[i].val;
             return 0;
@@ -146,39 +146,39 @@ static const struct choice Choices_Switch_TypeStrings[] = {
 
 struct field fields_Switch[] = {
     {
-        .key = "pin",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "pin",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_SwitchConfig, pin),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "type",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "type",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_SwitchConfig, type),
         .choices = Choices_Switch_TypeStrings,
         .validateAndSet = validateAndSetChoice
     },
     {
-        .key = "relay",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "relay",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_SwitchConfig, relay),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "icon",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "icon",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_SwitchConfig, icon),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_SwitchConfig, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_SwitchConfig, id),
         .validateAndSet = validateAndSetString
     },
@@ -186,26 +186,26 @@ struct field fields_Switch[] = {
 /**** relay ****/
 struct field fields_Relay[] = {
     {
-        .key = "pin",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "pin",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_RelayConfig, pin),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "level",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "level",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_RelayConfig, level),
         .validateAndSet = validateAndSetGPIOLevel
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_RelayConfig, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_RelayConfig, id),
         .validateAndSet = validateAndSetString
     },
@@ -214,20 +214,20 @@ struct field fields_Relay[] = {
 #if defined(CONFIG_DHT22)
 struct field fields_Dht22[] = {
     {
-        .key = "pin",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "pin",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Dht22Config, pin),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Dht22Config, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Dht22Config, id),
         .validateAndSet = validateAndSetString
     },
@@ -237,32 +237,32 @@ struct field fields_Dht22[] = {
 #if defined(CONFIG_SI7021)
 struct field fields_Si7021[] = {
     {
-        .key = "sda",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "sda",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Si7021Config, sda),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "scl",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "scl",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Si7021Config, scl),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "addr",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "addr",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Si7021Config, addr),
         .validateAndSet = validateAndSetI2CAddr
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Si7021Config, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Si7021Config, id),
         .validateAndSet = validateAndSetString
     },
@@ -272,32 +272,32 @@ struct field fields_Si7021[] = {
 #if defined(CONFIG_TSL2561)
 struct field fields_Tsl2561[] = {
     {
-        .key = "sda",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "sda",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Tsl2561Config, sda),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "scl",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "scl",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Tsl2561Config, scl),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "addr",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "addr",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Tsl2561Config, addr),
         .validateAndSet = validateAndSetI2CAddr
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Tsl2561Config, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Tsl2561Config, id),
         .validateAndSet = validateAndSetString
     },
@@ -307,32 +307,32 @@ struct field fields_Tsl2561[] = {
 #if defined(CONFIG_BME280)
 struct field fields_Bme280[] = {
     {
-        .key = "sda",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "sda",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Bme280Config, sda),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "scl",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "scl",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Bme280Config, scl),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "addr",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "addr",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Bme280Config, addr),
         .validateAndSet = validateAndSetI2CAddr
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Bme280Config, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Bme280Config, id),
         .validateAndSet = validateAndSetString
     },
@@ -342,20 +342,20 @@ struct field fields_Bme280[] = {
 #if defined(CONFIG_DS18x20)
 struct field fields_Ds18x20[] = {
     {
-        .key = "pin",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "pin",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_Ds18x20Config, pin),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Ds18x20Config, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Ds18x20Config, id),
         .validateAndSet = validateAndSetString
     },
@@ -364,20 +364,20 @@ struct field fields_Ds18x20[] = {
 /**** led ****/
 struct field fields_Led[] = {
     {
-        .key = "pin",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "pin",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_LedConfig, pin),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_LedConfig, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_LedConfig, id),
         .validateAndSet = validateAndSetString
     },
@@ -385,20 +385,20 @@ struct field fields_Led[] = {
 /**** led_strip_spi ****/
 struct field fields_LedStripSpi[] = {
     {
-        .key = "numberOfLEDs",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "numberOfLEDs",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_LedStripSpiConfig, numberOfLEDs),
         .validateAndSet = validateAndSetUInt
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_LedStripSpiConfig, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_LedStripSpiConfig, id),
         .validateAndSet = validateAndSetString
     },
@@ -407,32 +407,32 @@ struct field fields_LedStripSpi[] = {
 #if defined(CONFIG_DRAYTONSCR)
 struct field fields_Draytonscr[] = {
     {
-        .key = "pin",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "pin",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_DraytonscrConfig, pin),
         .validateAndSet = validateAndSetGPIOPin
     },
     {
-        .key = "onCode",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "onCode",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_DraytonscrConfig, onCode),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "offCode",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "offCode",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_DraytonscrConfig, offCode),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_DraytonscrConfig, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_DraytonscrConfig, id),
         .validateAndSet = validateAndSetString
     },
@@ -442,26 +442,26 @@ struct field fields_Draytonscr[] = {
 #if defined(CONFIG_HUMIDISTAT)
 struct field fields_Humidistat[] = {
     {
-        .key = "sensor",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "sensor",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_HumidistatConfig, sensor),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "relay",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "relay",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_HumidistatConfig, relay),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_HumidistatConfig, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_HumidistatConfig, id),
         .validateAndSet = validateAndSetString
     },
@@ -471,26 +471,26 @@ struct field fields_Humidistat[] = {
 #if defined(CONFIG_THERMOSTAT)
 struct field fields_Thermostat[] = {
     {
-        .key = "sensor",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "sensor",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_ThermostatConfig, sensor),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "relay",  
-        .flags =  FIELD_FLAG_DEFAULT, 
+        .key = "relay",
+        .flags =  FIELD_FLAG_DEFAULT,
         .dataOffset = offsetof(struct DeviceProfile_ThermostatConfig, relay),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "name",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_ThermostatConfig, name),
         .validateAndSet = validateAndSetString
     },
     {
-        .key = "id",  
-        .flags =  FIELD_FLAG_OPTIONAL, 
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_ThermostatConfig, id),
         .validateAndSet = validateAndSetString
     },
@@ -615,8 +615,7 @@ struct component componentDefinitions[] = {
 int deserializeComponent(struct component *componentDef, CborValue *map, void *structPtr)
 {
     int i;
-    for (i = 0; i < componentDef->fieldsCount; i++)
-    {
+    for (i = 0; i < componentDef->fieldsCount; i++) {
         CborValue value;
         if (cbor_value_map_find_value(map, componentDef->fields[i].key, &value) != CborNoError) {
             return -1;
@@ -629,16 +628,17 @@ int deserializeComponent(struct component *componentDef, CborValue *map, void *s
             }
         }
 
-        if (componentDef->fields[i].validateAndSet(&value, 
-                                                   &componentDef->fields[i], 
-                                                   structPtr + componentDef->fields[i].dataOffset)) {
+        if (componentDef->fields[i].validateAndSet(&value,
+                &componentDef->fields[i],
+                structPtr + componentDef->fields[i].dataOffset)) {
             return -1;
         }
     }
     return 0;
 }
 
-int deserializeComponents(struct DeviceProfile_DeviceConfig *config, struct component *componentDef, CborValue *array) {
+int deserializeComponents(struct DeviceProfile_DeviceConfig *config, struct component *componentDef, CborValue *array)
+{
     CborValue iter;
     size_t len;
     void *structs = NULL, *current;
@@ -647,9 +647,9 @@ int deserializeComponents(struct DeviceProfile_DeviceConfig *config, struct comp
     if (cbor_value_get_array_length(array, &len) != CborNoError) {
         return -1;
     }
-    
+
     structs = calloc(len, componentDef->structSize);
-    if (structs == NULL){
+    if (structs == NULL) {
         return -1;
     }
     current = structs;

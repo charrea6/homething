@@ -143,7 +143,7 @@ esp_err_t provisioningConfigGetHandler(httpd_req_t *req)
         errorMsg = "Out of memory";
         goto error;
     }
-    
+
     for (i=0; i < nrofSettings; i++) {
         cJSON *settingGroup;
 
@@ -158,7 +158,7 @@ esp_err_t provisioningConfigGetHandler(httpd_req_t *req)
             ESP_LOGE(TAG, "Failed to create object for settings group %s", settings[i].name);
             errorMsg = "Out of memory";
             goto error;
-        } 
+        }
 
         if (!getVariables(handle, &settings[i], settingGroup)) {
             errorMsg = "Failed to add variables";
@@ -238,7 +238,7 @@ static char *setVariables(nvs_handle handle, struct setting *setting, cJSON *obj
         }
         break;
         case FT_CHECKBOX: {
-            if (!cJSON_IsBool(value)){
+            if (!cJSON_IsBool(value)) {
                 errorMsg = "Failed to extract bool variable value";
                 goto error;
             }

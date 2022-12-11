@@ -44,7 +44,7 @@ static int initGPIORelays(DeviceProfile_RelayConfig_t *relayConfig, uint32_t rel
 }
 
 #ifdef CONFIG_DRAYTONSCR
-static int addDraytonSCR(DeviceProfile_DraytonscrConfig_t *config) 
+static int addDraytonSCR(DeviceProfile_DraytonscrConfig_t *config)
 {
     Relay_t *relay = draytonSCRInit(config->pin, config->onCode, config->offCode);
     if (relay == NULL) {
@@ -62,10 +62,10 @@ static int addDraytonSCR(DeviceProfile_DraytonscrConfig_t *config)
 
 static int initDraytonSCR(DeviceProfile_DraytonscrConfig_t *config, uint32_t draytonSCRCount)
 {
-    if (draytonSCRCount > 0){
+    if (draytonSCRCount > 0) {
         return addDraytonSCR(&config[0]);
     }
-        
+
     return 0;
 }
 #endif
@@ -74,7 +74,7 @@ int initRelays(DeviceProfile_DeviceConfig_t *config)
 {
     initGPIORelays(config->relayConfig, config->relayCount);
 
-#ifdef CONFIG_DRAYTONSCR    
+#ifdef CONFIG_DRAYTONSCR
     initDraytonSCR(config->draytonscrConfig, config->draytonscrCount);
 #endif
     return 0;

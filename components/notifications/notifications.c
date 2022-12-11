@@ -108,11 +108,11 @@ Notifications_ID_t notificationsNewId(const char *name)
     if (entry == NULL) {
         return NOTIFICATIONS_ID_ERROR;
     }
-    
+
     entry->id = id;
     entry->name = name;
     entry->next = rootEntry;
-    rootEntry = entry;   
+    rootEntry = entry;
     return id;
 }
 
@@ -124,7 +124,7 @@ int notificationsRegisterId(Notifications_ID_t id, const char *name)
     if (entry == NULL) {
         return -1;
     }
-    
+
     entry->id = id;
     entry->name = name;
     entry->next = rootEntry;

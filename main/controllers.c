@@ -8,7 +8,7 @@ static void controllersInitFinished(void *user, NotificationsMessage_t *message)
 static void thermostatsInit();
 
 static DeviceProfile_ThermostatConfig_t *thermostatConfig = NULL;
-static uint32_t thermostatCount = 0; 
+static uint32_t thermostatCount = 0;
 #endif
 
 #ifdef CONFIG_HUMIDISTAT
@@ -41,11 +41,11 @@ void initControllers(DeviceProfile_DeviceConfig_t *config)
 static void controllersInitFinished(void *user, NotificationsMessage_t *message)
 {
 #ifdef CONFIG_THERMOSTAT
-    if (thermostatCount > 0){
-       thermostatsInit();
-       free(thermostatConfig);
-       thermostatConfig = NULL;
-       thermostatCount = 0;
+    if (thermostatCount > 0) {
+        thermostatsInit();
+        free(thermostatConfig);
+        thermostatConfig = NULL;
+        thermostatCount = 0;
     }
 #endif
 #ifdef CONFIG_HUMIDISTAT
@@ -66,10 +66,10 @@ static void thermostatsInit()
     if (thermostats == NULL) {
         return;
     }
-    for (i = 0; i < thermostatCount; i++){
+    for (i = 0; i < thermostatCount; i++) {
         Relay_t *relay = relayFind(thermostatConfig[i].relay);
         Notifications_ID_t sensor = notificationsFindId(thermostatConfig[i].sensor);
-        if ((relay != NULL) && (sensor != NOTIFICATIONS_ID_ERROR)){
+        if ((relay != NULL) && (sensor != NOTIFICATIONS_ID_ERROR)) {
             thermostatInit(&thermostats[i], relay, sensor);
             if (thermostatConfig[i].name) {
                 iotElementSetHumanDescription(thermostats[i].element, thermostatConfig[i].name);
@@ -88,10 +88,10 @@ static void humidistatsInit()
     if (humidistats == NULL) {
         return;
     }
-    for (i = 0; i < humidistatCount; i++){
+    for (i = 0; i < humidistatCount; i++) {
         Relay_t *relay = relayFind(humidistatConfig[i].relay);
         Notifications_ID_t sensor = notificationsFindId(humidistatConfig[i].sensor);
-        if ((relay != NULL) && (sensor != NOTIFICATIONS_ID_ERROR)){
+        if ((relay != NULL) && (sensor != NOTIFICATIONS_ID_ERROR)) {
             humidityFanInit(&humidistats[i], relay, sensor, 80);
             if (humidistatConfig[i].name) {
                 iotElementSetHumanDescription(humidistats[i].element, humidistatConfig[i].name);

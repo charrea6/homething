@@ -53,7 +53,7 @@ void relaySetState(Relay_t *relay, bool on)
         return;
     }
     relay->intf->setState(relay, on);
-    if (relay->element){
+    if (relay->element) {
         iotValue_t value;
         value.b = relay->fields.on;
         iotElementPublish(relay->element, 0, value);

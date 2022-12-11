@@ -125,5 +125,5 @@ typedef struct DeviceProfile_DeviceConfig {
     uint32_t humidistatCount;
     DeviceProfile_ThermostatConfig_t *thermostatConfig;
     uint32_t thermostatCount;
-}DeviceProfile_DeviceConfig_t;
+} DeviceProfile_DeviceConfig_t;
 #endif

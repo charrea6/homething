@@ -168,7 +168,7 @@ int sensorsDHT22Add(DeviceProfile_Dht22Config_t *config)
     pinConfig.pull_up_en = GPIO_PULLUP_ENABLE;
     gpio_config(&pinConfig);
 
-    if (config->id){
+    if (config->id) {
         dht->id = notificationsNewId(config->id);
     }
     dht->element = iotNewElement(&humidityElementDescription, 0, NULL, dht, "humidity%d", sensorId);

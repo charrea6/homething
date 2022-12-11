@@ -27,7 +27,7 @@ typedef struct DraytonSCR {
     const char* onSequence;
     const char* offSequence;
     TaskHandle_t task;
-}DraytonSCR_t;
+} DraytonSCR_t;
 
 #define BASE_DURATION 500 /* microseconds */
 #define RETRANSMIT_INTERVAL 5000 /* milliseconds */

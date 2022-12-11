@@ -31,7 +31,7 @@ void relayRegister(Relay_t *relay, const char *id)
 
 Relay_t *relayFind(const char *id)
 {
-    struct RelayMapEntry *entry;   
+    struct RelayMapEntry *entry;
     for (entry = rootEntry; entry; entry = entry->next) {
         if (strcmp(id, entry->id) == 0) {
             return entry->relay;

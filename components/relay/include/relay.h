@@ -6,7 +6,7 @@ typedef struct Relay Relay_t;
 
 typedef struct RelayInterface {
     void (*setState)(Relay_t *, bool);
-}RelayInterface_t;
+} RelayInterface_t;
 
 struct Relay {
     const RelayInterface_t *intf;

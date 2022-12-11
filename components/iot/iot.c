@@ -52,7 +52,7 @@ int iotInit(void)
     return mqttInit();
 }
 
-void iotSetValueUpdatePolicy(iotValueUpdatePolicy_e policy) 
+void iotSetValueUpdatePolicy(iotValueUpdatePolicy_e policy)
 {
     valueUpdatePolicy = policy;
 }

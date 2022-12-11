@@ -37,13 +37,13 @@ static uint32_t switchCount = 0;
 
 
 static const struct SwitchTypeInfo allSwitchTypeInfo[] = {
-    { 
+    {
         .type = DeviceProfile_Choices_Switch_Type_Momemetary,
         .deviceName = "momentary%d",
         .highState = "released",
         .lowState = "pressed",
     },
-    { 
+    {
         .type = DeviceProfile_Choices_Switch_Type_Toggle,
         .deviceName = "toggle%d",
         .highState = "toggled",
@@ -55,13 +55,13 @@ static const struct SwitchTypeInfo allSwitchTypeInfo[] = {
         .highState = "off",
         .lowState = "on",
     },
-    {   
+    {
         .type = DeviceProfile_Choices_Switch_Type_Contact,
         .deviceName = "contact%d",
         .highState = "open",
         .lowState = "closed",
     },
-    { 
+    {
         .type = DeviceProfile_Choices_Switch_Type_Motion,
         .deviceName = "motion%d",
         .highState = "motion detected",
@@ -110,8 +110,8 @@ void addSwitch(struct Switch *switchInstance, DeviceProfile_SwitchConfig_t *conf
     Notifications_ID_t id;
     const struct SwitchTypeInfo *typeInfo = NULL;
     int i;
-    
-    for (i =0; i < sizeof(allSwitchTypeInfo) / sizeof(struct SwitchTypeInfo); i++){
+
+    for (i =0; i < sizeof(allSwitchTypeInfo) / sizeof(struct SwitchTypeInfo); i++) {
         if (allSwitchTypeInfo[i].type == config->type) {
             typeInfo = &allSwitchTypeInfo[i];
             break;
@@ -161,12 +161,12 @@ static void switchUpdated(void *user,  NotificationsMessage_t *message)
 }
 
 static void switchRelayController(struct Switch *switchInstance, bool switchState)
-{   
+{
     Relay_t *relay = switchInstance->relay;
     switch(switchInstance->typeInfo->type) {
     case DeviceProfile_Choices_Switch_Type_Momemetary:
         if (switchState) {
-            relaySetState(relay, !relayIsOn(relay));    
+            relaySetState(relay, !relayIsOn(relay));
         }
         break;
     case DeviceProfile_Choices_Switch_Type_Toggle:
