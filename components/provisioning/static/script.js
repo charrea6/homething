@@ -64,15 +64,7 @@ function variableSetValue(setting, variable, values) {
         case "checkbox": el.checked = value;
             break;
         case "device_id":
-            mac = ''
-            for (var i of value) {
-                let byte = i.toString(16);
-                if (byte.length < 2) {
-                    byte = '0' + byte;
-                }
-                mac += byte;
-            }
-            el.value = 'homething-' + mac;
+            el.value = 'homething-' + value;
             break;
         default:
             el.value = value;
@@ -102,16 +94,7 @@ function loadConfig(){
             cfgEl.innerHTML += `<div class="row">${html}</div>`;
         }
     }
-    var xhttp = new XMLHttpRequest();
-    xhttp.onreadystatechange = function() {
-        if (this.readyState == 4 && this.status == 200) {
-            var data = CBOR.decode(this.response);
-            loadValues(data);
-        }
-    };
-    xhttp.open("GET", "/config", true);
-    xhttp.responseType = "arraybuffer";
-    xhttp.send();
+    fetch("/config").then((response) => response.json()).then((data) => loadValues(data));
 }
 
 function loadValues(values) {
@@ -151,22 +134,22 @@ function saveConfig() {
             }
         }
     }
-    var xhttp = new XMLHttpRequest();
-    xhttp.open("POST", "/config", true);
-    xhttp.setRequestHeader("Content-Type", "application/cbor");
-    xhttp.onreadystatechange = function() {
-    if (this.readyState == 4) {
+
+    fetch('/config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+    }).then((response) => {
         document.getElementById('savebtn').disabled=false;
         var el=document.getElementById('msg');
-        if (this.status == 200) {
-            msg.innerHTML = this.responseText;
+        if (response.status == 200) {
+            msg.innerHTML = response.statusText;
         } else {
-            msg.innerHTML =`<span class="error">${this.responseText}</span>`;
+            msg.innerHTML =`<span class="error">${response.statusText}</span>`;
         }
-    }
-    };
-    document.getElementById('savebtn').disabled=true;
-    xhttp.send(CBOR.encode(config));
+    });
 }
 
 (function(){

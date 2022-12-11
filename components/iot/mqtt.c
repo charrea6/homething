@@ -13,7 +13,6 @@
 #include "nvs_flash.h"
 
 #include "mqtt_client.h"
-#include "cbor.h"
 
 #include "iot.h"
 #include "wifi.h"

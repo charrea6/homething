@@ -1,7 +1,7 @@
 idf_component_register(SRCS "config.c" "provisioning.c" "${CMAKE_BINARY_DIR}/static_files.c" "components_json.c"
                     INCLUDE_DIRS "include" 
                     PRIV_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}
-                    REQUIRES "esp_http_server" "json" "wifi" "iot" "uzlib" "tinycbor" "utils") 
+                    REQUIRES "esp_http_server" "json" "wifi" "iot" "uzlib" "utils") 
 
 file(GLOB static_file_deps static/*)
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/static_files.c

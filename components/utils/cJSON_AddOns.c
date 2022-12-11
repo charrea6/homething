@@ -25,6 +25,15 @@ cJSON* cJSON_AddUIntToObjectCS(cJSON * const object, const char * const name, co
     return numberItem;
 }
 
+cJSON* cJSON_AddIntToObjectCS(cJSON * const object, const char * const name, const int32_t number)
+{
+    char numberStr[11];
+    sprintf(numberStr, "%d", number);
+    cJSON *numberItem = cJSON_CreateRaw(numberStr);
+    cJSON_AddItemToObjectCS(object, name, numberItem);
+    return numberItem;
+}
+
 cJSON* cJSON_AddStringToObjectCS(cJSON *object, const char * const name, const char * const string)
 {
     cJSON *stringItem = cJSON_CreateString(string);

@@ -11,7 +11,6 @@
 
 #include "esp_log.h"
 #include "esp_system.h"
-#include "cbor.h"
 
 #include "iot.h"
 #include "iotInternal.h"
