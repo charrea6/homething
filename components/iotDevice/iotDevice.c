@@ -15,7 +15,6 @@
 #include "nvs_flash.h"
 
 #include "mqtt_client.h"
-#include "cbor.h"
 #include "cJSON.h"
 #include "cJSON_AddOns.h"
 
@@ -62,15 +61,13 @@ static TaskStatus_t *getTaskStats(unsigned long *nrofTasks);
 #endif
 static void iotDeviceUpdateDiag(TimerHandle_t xTimer);
 static void iotDeviceControl(iotValue_t value);
-static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue);
+static char* iotGetAnnouncedTopics(void);
 static void iotDeviceElementCallback(void *userData, iotElement_t element, iotElementCallbackReason_t reason, iotElementCallbackDetails_t *details);
 static void iotDeviceOnConnect(int pubId, bool release, iotValueType_t *valueType, iotValue_t *value);
 static char* iotDeviceGetDescription(void);
 static char *iotDeviceGetInfo(void);
 
-/* CBOR Helper functions */
-static size_t getCborStrRequirement(const char *str);
-static size_t getCborUintRequirement(const uint value) ;
+static bool iotElementDescriptionToJson(const iotElementDescription_t *desc, cJSON *object) ;
 
 IOT_DESCRIBE_ELEMENT(
     deviceElementDescription,
@@ -279,24 +276,12 @@ static void iotDeviceOnConnect(int pubId, bool release, iotValueType_t *valueTyp
         break;
     case DEVICE_PUB_INDEX_TOPICS:
         if (release) {
-            if (value->bin) {
-                free(value->bin->data);
-                free((void *)value->bin);
+            if (value->s) {
+                free((char*)value->s);
             }
         } else {
-            iotBinaryValue_t *bin;
-            *valueType = IOT_VALUE_TYPE_BINARY;
-            bin = malloc(sizeof(iotBinaryValue_t));
-
-            if (bin == NULL) {
-                ESP_LOGE(TAG, "Failed to allocate memory for iotBinaryValue_t");
-            } else {
-                if (iotGetAnnouncedTopics(bin) != 0) {
-                    free(bin);
-                    bin = NULL;
-                }
-            }
-            value->bin = bin;
+            *valueType = IOT_VALUE_TYPE_STRING;
+            value->s = iotGetAnnouncedTopics();
         }
         break;
     case DEVICE_PUB_INDEX_INFO:
@@ -315,21 +300,18 @@ static void iotDeviceOnConnect(int pubId, bool release, iotValueType_t *valueTyp
     }
 }
 
-static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
+static char* iotGetAnnouncedTopics(void)
 {
     int i, nrofElements = 0;
+    char *json = NULL;
     iotElementIterator_t iterator = IOT_ELEMENT_ITERATOR_START;
     iotElement_t element;
     iotElementDescription_t const **descriptions;
-    size_t descriptionsEstimate = 1, elementsEstimate = 1, totalEstimate;
     int nrofDescriptions = 0;
-    uint8_t *buffer = NULL;
+    cJSON *object = NULL, *descriptorsArray, *elementsArray;
 
     while(iotElementIterate(&iterator, true, &element)) {
-        char *name = iotElementGetName(element);
         nrofElements++;
-        // String length + 2 bytes for CBOR encoding of string + 5 bytes for description id
-        elementsEstimate += getCborStrRequirement(name) + 5;
     }
 
     descriptions = calloc(nrofElements, sizeof(iotElementDescription_t *));
@@ -337,170 +319,83 @@ static int iotGetAnnouncedTopics(iotBinaryValue_t *binValue)
         ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for descriptions");
         goto error;
     }
+    object = cJSON_CreateObject();
+    if (object == NULL) {
+        ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for object");
+        goto error;
+    }
+
+    descriptorsArray = cJSON_AddArrayToObjectCS(object, "descriptions");
+    if (descriptorsArray == NULL) {
+        ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for descriptions");
+        goto error;
+    }
+
+    elementsArray = cJSON_AddArrayToObjectCS(object, "elements");
+    if (elementsArray == NULL) {
+        ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for elements");
+        goto error;
+    }
 
     iterator = IOT_ELEMENT_ITERATOR_START;
     while(iotElementIterate(&iterator, true, &element)) {
         bool found = false;
+        int foundIdx = 0;
         char *elementName = iotElementGetName(element);
         const iotElementDescription_t *desc = iotElementGetDescription(element);
-        size_t estimate = 1; // 1 byte for array of pubs and subs + 2 for pubs map
+
         for (i = 0; i < nrofDescriptions; i++) {
             if (descriptions[i] == desc) {
                 found = true;
+                foundIdx = i;
                 break;
             }
         }
-        if (found) {
-            continue;
-        }
-        descriptions[nrofDescriptions] = desc;
-        nrofDescriptions ++;
+        if (!found) {
 
-        if (desc->nrofPubs > 255) {
-            ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many pubs for %s", elementName);
+            descriptions[nrofDescriptions] = desc;
+            foundIdx = nrofDescriptions;
+            nrofDescriptions ++;
+            cJSON *description = cJSON_CreateObject();
+            if (description == NULL) {
+                ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for description");
+                goto error;
+            }
+            cJSON_AddItemToArray(descriptorsArray, description);
+
+            if (!iotElementDescriptionToJson(desc, description)) {
+                goto error;
+            }
+        }
+
+        cJSON *element = cJSON_CreateObject();
+        if (element == NULL) {
+            ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for element");
             goto error;
         }
-        if (desc->nrofSubs > 256) {
-            ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Too many subs for %s", elementName);
+        cJSON_AddItemToArray(elementsArray, element);
+        if (cJSON_AddStringReferenceToObjectCS(element, "name", elementName) == NULL) {
+            ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for element name");
             goto error;
         }
-        estimate = getCborUintRequirement(desc->nrofPubs);
-
-        for (i = 0; i < desc->nrofPubs; i++) {
-            // String length + 2 bytes for CBOR encoding of string + 1 byte for type
-            estimate += getCborStrRequirement(desc->pubs[i].name) + 2;
-        }
-        estimate += getCborUintRequirement(desc->nrofSubs);
-        if (desc->nrofSubs) {
-            for (i = 0; i < desc->nrofSubs; i++) {
-                const char *name = iotElementGetSubName(element, i);
-                // String length + 2 bytes for CBOR encoding of string + 1 byte for type
-                estimate += getCborStrRequirement(name) + 2;
-            }
-        }
-
-        // Description array + 5 bytes for CBOR encoding of description id (the ptr value of element->desc)
-        descriptionsEstimate += estimate + 5;
-    }
-    totalEstimate = descriptionsEstimate + elementsEstimate + 1;
-    buffer = malloc(totalEstimate);
-    if (!buffer) {
-        ESP_LOGE(TAG, "iotUpdateAnnouncedTopics: Failed to allocate buffer");
-        goto error;
-    }
-
-
-#define MAX_CONTAINERS 5
-    CborEncoder containers[MAX_CONTAINERS];
-    char *containerNames[MAX_CONTAINERS];
-    int currentContainer = 0;
-    CborError err;
-
-    cbor_encoder_init(&containers[0], buffer, totalEstimate, 0);
-
-#define CHECK_CBOR_ERROR(call, message) do{ CborError err = call; if (err != CborNoError){ ESP_LOGE(TAG, message ", error %d", err); goto error;} }while(0)
-#define CREATE_CONTAINER(create_call, name) do{ \
-                                                if (currentContainer >= MAX_CONTAINERS) { \
-                                                    ESP_LOGE(TAG, "Too many containers open, when attempting to create %s", name); \
-                                                    goto error; \
-                                                }\
-                                                err = create_call; \
-                                                if (err != CborNoError){ \
-                                                    ESP_LOGE(TAG, "Failed to create %s, error %d", name, err); \
-                                                    goto error; \
-                                                } \
-                                                currentContainer++; \
-                                                containerNames[currentContainer] = name; \
-                                            }while(0)
-
-#define CREATE_MAP(size, name) CREATE_CONTAINER(cbor_encoder_create_map(&containers[currentContainer], &containers[currentContainer+1], size), name)
-#define CREATE_ARRAY(size, name) CREATE_CONTAINER(cbor_encoder_create_array(&containers[currentContainer], &containers[currentContainer+1], size), name)
-#define CLOSE_CONTAINER() do{ \
-                            err = cbor_encoder_close_container(&containers[currentContainer - 1], &containers[currentContainer]); \
-                            if (err != CborNoError){ \
-                                ESP_LOGE(TAG, "Failed to close container %s, error %d", containerNames[currentContainer], err); \
-                                goto error; \
-                            } \
-                            currentContainer--; \
-                          }while(0)
-
-#define ADD_UINT(value, name) do{ \
-                                err = cbor_encode_uint(&containers[currentContainer], (uint32_t)value); \
-                                if (err != CborNoError) { \
-                                    ESP_LOGE(TAG, "Failed to encode container " name ", error %d", err); \
-                                    goto error; \
-                                } \
-                              } while(0)
-#define ADD_STRING(value, name) do{ \
-                                err = cbor_encode_text_stringz(&containers[currentContainer], value); \
-                                if (err != CborNoError) { \
-                                    ESP_LOGE(TAG, "Failed to encode container " name ", error %d", err); \
-                                    goto error; \
-                                } \
-                              } while(0)
-
-    CREATE_ARRAY(2, "descriptions/elements array");
-
-    // Encode descriptions: { description ptr: { topic name: type... } ..}
-    CREATE_MAP(nrofDescriptions, "descriptions map");
-    for (i = 0; i < nrofDescriptions; i++) {
-        int psIndex;
-        ADD_UINT(i, "description key");
-        CREATE_ARRAY(2, "description array");
-
-        CREATE_MAP(descriptions[i]->nrofPubs, "pubs map");
-        for (psIndex = 0; psIndex < descriptions[i]->nrofPubs; psIndex++) {
-            ADD_STRING(descriptions[i]->pubs[psIndex].name, "pub name");
-            ADD_UINT(descriptions[i]->pubs[psIndex].type, "pub type");
-
-        }
-        CLOSE_CONTAINER();
-
-        CREATE_MAP(descriptions[i]->nrofSubs, "subs map");
-        for (psIndex = 0; psIndex < descriptions[i]->nrofSubs; psIndex++) {
-            const char *name = descriptions[i]->subs[psIndex].name;
-            if (name == NULL) {
-                name = IOT_DEFAULT_CONTROL_STR;
-            }
-            ADD_STRING(name, "sub name");
-            ADD_UINT(descriptions[i]->subs[psIndex].type, "sub type");
-        }
-        CLOSE_CONTAINER();
-
-        CLOSE_CONTAINER();
-    }
-    CLOSE_CONTAINER();
-
-    // Encode elements: { element name: description ptr ...}
-    CREATE_MAP(nrofElements, "elements map");
-    iterator = IOT_ELEMENT_ITERATOR_START;
-    while(iotElementIterate(&iterator, true, &element)) {
-        const iotElementDescription_t *desc = iotElementGetDescription(element);
-        ADD_STRING(iotElementGetName(element), "element name");
-        for (i = 0; i < nrofDescriptions; i++) {
-            if (descriptions[i] == desc) {
-                ADD_UINT(i, "element description key");
-                break;
-            }
+        if (cJSON_AddUIntToObjectCS(element, "index", (uint32_t)foundIdx) == NULL) {
+            ESP_LOGW(TAG, "iotUpdateAnnouncedTopics: Failed to allocate memory for element index");
+            goto error;
         }
     }
-    CLOSE_CONTAINER();
 
-    CLOSE_CONTAINER();
-
-    binValue->data = buffer;
-    binValue->len = cbor_encoder_get_buffer_size(&containers[0], buffer);
-    ESP_LOGI(TAG, "iotUpdateAnnouncedTopics: Estimate %d Used %d", totalEstimate, binValue->len);
-    return 0;
-
+    json = cJSON_PrintUnformatted(object);
+    ESP_LOGI(TAG, "JSON: %s", json);
 error:
+
     if (descriptions) {
         free(descriptions);
     }
-    if (buffer) {
-        free(buffer);
+
+    if (object) {
+        cJSON_Delete(object);
     }
-    return -1;
+    return json;
 }
 
 static char* iotDeviceGetDescription(void)
@@ -542,27 +437,62 @@ static char *iotDeviceGetInfo(void)
     return result;
 }
 
-static size_t getCborStrRequirement(const char *str)
+static bool iotElementDescriptionToJson(const iotElementDescription_t *desc, cJSON *object)
 {
-    size_t len = strlen(str);
-    size_t req = len + getCborUintRequirement(len);
-    if (len > 0xffff) {
-        ESP_LOGE(TAG, "getCborStrRequirement: Very large string! len %u", len);
+    cJSON *pubs = cJSON_AddArrayToObjectCS(object, "pubs");
+    if (pubs == NULL) {
+        ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for pubs");
+        return false;
     }
-    return req;
-}
 
-static size_t getCborUintRequirement(const uint value)
-{
-    size_t req = 1;
-    if (value > 23) {
-        req++;
-        if (value > 255) {
-            req++;
-            if (value > 0xffff) {
-                req += 2;
-            }
+    int psIndex;
+
+    for (psIndex = 0; psIndex < desc->nrofPubs; psIndex++) {
+
+        cJSON *pub = cJSON_CreateObject();
+        if (pub == NULL) {
+            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for pub");
+            return false;
+        }
+
+        cJSON_AddItemToArray(pubs, pub);
+        if (cJSON_AddStringReferenceToObjectCS(pub, "name", desc->pubs[psIndex].name) == NULL) {
+            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for pub name");
+            return false;
+        }
+        if (cJSON_AddUIntToObjectCS(pub, "type", desc->pubs[psIndex].type) == NULL) {
+            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for pub type");
+            return false;
         }
     }
-    return req;
+
+    cJSON *subs = cJSON_AddArrayToObjectCS(object, "subs");
+    if (subs == NULL) {
+        ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for subs");
+        return false;
+    }
+
+    for (psIndex = 0; psIndex < desc->nrofSubs; psIndex++) {
+        cJSON *sub = cJSON_CreateObject();
+        if (sub == NULL) {
+            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for sub");
+            return false;
+        }
+        cJSON_AddItemToArray(subs, sub);
+        const char *name = desc->subs[psIndex].name;
+        if ((name == NULL) || (name[0] == 0)) {
+            name = IOT_DEFAULT_CONTROL_STR;
+        }
+
+        if (cJSON_AddStringReferenceToObjectCS(sub, "name", name) == NULL) {
+            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for sub name");
+            return false;
+        }
+        if (cJSON_AddUIntToObjectCS(sub, "type", desc->subs[psIndex].type) == NULL) {
+            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for sub type");
+            return false;
+        }
+    }
+
+    return true;
 }
