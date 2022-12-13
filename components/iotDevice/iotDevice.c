@@ -425,8 +425,8 @@ static char *iotDeviceGetInfo(void)
 
 static bool iotElementDescriptionToJson(const iotElementDescription_t *desc, cJSON *object)
 {
-    cJSON *pubs = cJSON_AddArrayToObjectCS(object, "pubs");
-    if (pubs == NULL) {
+    cJSON *pub = cJSON_AddObjectToObjectCS(object, "pub");
+    if (pub == NULL) {
         ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for pubs");
         return false;
     }
@@ -434,47 +434,25 @@ static bool iotElementDescriptionToJson(const iotElementDescription_t *desc, cJS
     int psIndex;
 
     for (psIndex = 0; psIndex < desc->nrofPubs; psIndex++) {
-
-        cJSON *pub = cJSON_CreateObject();
-        if (pub == NULL) {
-            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for pub");
-            return false;
-        }
-
-        cJSON_AddItemToArray(pubs, pub);
-        if (cJSON_AddStringReferenceToObjectCS(pub, "name", desc->pubs[psIndex].name) == NULL) {
-            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for pub name");
-            return false;
-        }
-        if (cJSON_AddUIntToObjectCS(pub, "type", desc->pubs[psIndex].type) == NULL) {
+        if (cJSON_AddUIntToObjectCS(pub, desc->pubs[psIndex].name, desc->pubs[psIndex].type) == NULL) {
             ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for pub type");
             return false;
         }
     }
 
-    cJSON *subs = cJSON_AddArrayToObjectCS(object, "subs");
-    if (subs == NULL) {
+    cJSON *sub = cJSON_AddObjectToObjectCS(object, "sub");
+    if (sub == NULL) {
         ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for subs");
         return false;
     }
 
     for (psIndex = 0; psIndex < desc->nrofSubs; psIndex++) {
-        cJSON *sub = cJSON_CreateObject();
-        if (sub == NULL) {
-            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for sub");
-            return false;
-        }
-        cJSON_AddItemToArray(subs, sub);
         const char *name = desc->subs[psIndex].name;
         if ((name == NULL) || (name[0] == 0)) {
             name = IOT_DEFAULT_CONTROL_STR;
         }
 
-        if (cJSON_AddStringReferenceToObjectCS(sub, "name", name) == NULL) {
-            ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for sub name");
-            return false;
-        }
-        if (cJSON_AddUIntToObjectCS(sub, "type", desc->subs[psIndex].type) == NULL) {
+        if (cJSON_AddUIntToObjectCS(sub, name, desc->subs[psIndex].type) == NULL) {
             ESP_LOGW(TAG, "iotElementDescriptionToJson: Failed to allocate memory for sub type");
             return false;
         }
