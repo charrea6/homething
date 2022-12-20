@@ -69,10 +69,10 @@ static void updaterThread(void *pvParameter)
             if ((partitionId <= 0) || (partitionId > 16)) {
                 partitionId = 1;
             }
-            snprintf(updatePath, sizeof(updatePath),"%s/homething.app%d__%s.ota", CONFIG_UPDATER_PATH_PREFIX, partitionId, newVersion);
+            snprintf(updatePath, sizeof(updatePath), CONFIG_UPDATER_PATH_PREFIX "/homething." CONFIG_IDF_TARGET ".app%d.%s.ota", partitionId, newVersion);
         }
 #else
-        snprintf(updatePath, sizeof(updatePath),"%s/homething__%s.ota", CONFIG_UPDATER_PATH_PREFIX, newVersion);
+        snprintf(updatePath, sizeof(updatePath), CONFIG_UPDATER_PATH_PREFIX "/homething." CONFIG_IDF_TARGET ".%s.ota", newVersion);
 #endif
 
         updaterDownloadAndUpdate(CONFIG_UPDATER_HOST, CONFIG_UPDATER_PORT, updatePath);

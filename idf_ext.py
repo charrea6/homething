@@ -69,12 +69,13 @@ def ota_gen(action, ctx, args):
     project_desc = load_project_description(args)
     project_name = project_desc['project_name']
     version = get_version(args)
+    device_type = config['IDF_TARGET']
     
     print("Generating OTA file(s)")
     print('Project: %s' % project_name)
     print('Version: %s' % version)
-
-    ota_suffix = f'__{version}.ota'
+    ota_prefix = f'{project_name}.{device_type}'
+    ota_suffix = f'.{version}.ota'
     build_dir = args['build_dir']
 
     build_action('app', ctx, args)
@@ -116,14 +117,14 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="{new_parttable}"''')
         args.build_dir = ota_part1_build_dir
         build_action('app', ctx, args)
 
-        ota_files = [os.path.join(build_dir, '%s.app1%s' % (project_name, ota_suffix)),
-                    os.path.join(build_dir, '%s.app2%s' % (project_name, ota_suffix))]
+        ota_files = [os.path.join(build_dir, f'{ota_prefix}.app1{ota_suffix}'),
+                    os.path.join(build_dir, f'{ota_prefix}.app2{ota_suffix}')]
         
         generate_ota_file(os.path.join(build_dir, '%s.bin' % project_name), ota_files[0])
 
         generate_ota_file(os.path.join(ota_part1_build_dir, '%s.bin' % project_name), ota_files[1])    
     else:
-        ota_files = [os.path.join(build_dir, project_name + ota_suffix)]
+        ota_files = [os.path.join(build_dir,  f'{ota_prefix}{ota_suffix}')]
         generate_ota_file(os.path.join(build_dir, '%s.bin' % project_name), ota_files[0])
     
     print(f"Generated {len(ota_files)} ota file{'s' if len(ota_files) > 1 else ''}")
