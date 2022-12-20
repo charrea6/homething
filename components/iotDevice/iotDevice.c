@@ -35,12 +35,27 @@ static const char *DESCRIPTION="description";
 static const char *UPTIME="uptime";
 static const char *CAPABILITIES="capabilities";
 static const char *VERSION="version";
+static const char *DEVICE="device";
 static const char *MEMORY="mem";
 static const char *MEMORY_FREE="free";
 static const char *MEMORY_LOW="low";
 static const char *TASK_STATS="tasks";
 static const char *TASK_NAME="name";
 static const char *TASK_STACK="stackMinLeft";
+
+#ifdef CONFIG_IDF_TARGET
+#define DEVICE_STR CONFIG_IDF_TARGET
+#else 
+#define DEVICE_STR "unknown"
+#endif 
+
+#ifdef CONFIG_IDF_TARGET_ESP8266 
+#define MEM_AVAILABLE 96
+#elif CONFIG_IDF_TARGET_ESP32
+#define MEM_AVAILABLE 320
+#else
+#define MEM_AVAILABLE 0
+#endif
 
 #define DEVICE_PUB_INDEX_INFO        0
 #define DEVICE_PUB_INDEX_PROFILE     1
@@ -412,6 +427,8 @@ static char *iotDeviceGetInfo(void)
 
     cJSON_AddStringReferenceToObjectCS(object, IP, wifiGetIPAddrStr());
     cJSON_AddStringReferenceToObjectCS(object, VERSION, version);
+    cJSON_AddStringReferenceToObjectCS(object, DEVICE, DEVICE_STR);
+    cJSON_AddUIntToObjectCS(object, MEMORY, MEM_AVAILABLE);
     cJSON_AddStringReferenceToObjectCS(object, CAPABILITIES, capabilities);
 
     char *desc = iotDeviceGetDescription();
