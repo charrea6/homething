@@ -12,6 +12,7 @@
 
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_wifi.h"
 #include "nvs_flash.h"
 
 #include "mqtt_client.h"
@@ -39,17 +40,18 @@ static const char *DEVICE="device";
 static const char *MEMORY="mem";
 static const char *MEMORY_FREE="free";
 static const char *MEMORY_LOW="low";
+static const char *WIFI="wifi";
 static const char *TASK_STATS="tasks";
 static const char *TASK_NAME="name";
 static const char *TASK_STACK="stackMinLeft";
 
 #ifdef CONFIG_IDF_TARGET
 #define DEVICE_STR CONFIG_IDF_TARGET
-#else 
+#else
 #define DEVICE_STR "unknown"
-#endif 
+#endif
 
-#ifdef CONFIG_IDF_TARGET_ESP8266 
+#ifdef CONFIG_IDF_TARGET_ESP8266
 #define MEM_AVAILABLE 96
 #elif CONFIG_IDF_TARGET_ESP32
 #define MEM_AVAILABLE 320
@@ -67,6 +69,9 @@ static iotElement_t deviceElement;
 
 #define DIAG_UPDATE_MS (1000 * 30) // 30 Seconds
 static char *diagValue = NULL;
+static time_t wifiScanTime = 0;
+static uint8_t wifiScanRecordsCount = 0;
+static wifi_ap_record_t *wifiScanRecords = NULL;
 
 static const char *version = NULL;
 static const char *capabilities = NULL;
@@ -81,6 +86,7 @@ static void iotDeviceElementCallback(void *userData, iotElement_t element, iotEl
 static void iotDeviceOnConnect(int pubId, bool release, iotValueType_t *valueType, iotValue_t *value);
 static char* iotDeviceGetDescription(void);
 static char *iotDeviceGetInfo(void);
+static void iotDeviceWifiScan();
 
 static bool iotElementDescriptionToJson(const iotElementDescription_t *desc, cJSON *object) ;
 
@@ -203,6 +209,36 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
         free(tasksStatus);
     }
 #endif
+
+    cJSON *wifi = cJSON_AddObjectToObjectCS(object, WIFI);
+    if (wifi != NULL) {
+        cJSON_AddIntToObjectCS(wifi, "count", wifiGetConnectionCount());
+        if (wifiScanRecords != NULL) {
+            uint8_t idx;
+            cJSON_AddIntToObjectCS(wifi, "scanAge", tv.tv_sec - wifiScanTime);
+            cJSON *results = cJSON_AddArrayToObjectCS(wifi, "scanResults");
+            for (idx = 0; idx < wifiScanRecordsCount; idx ++) {
+                cJSON *result = cJSON_CreateObject();
+                if (result == NULL) {
+                    break;
+                }
+                if (cJSON_AddStringToObjectCS(result, "name", (char *)wifiScanRecords[idx].ssid) == NULL) {
+                    cJSON_Delete(result);
+                    break;
+                }
+                if (cJSON_AddIntToObjectCS(result, "rssi", wifiScanRecords[idx].rssi) == NULL) {
+                    cJSON_Delete(result);
+                    break;
+                }
+                if (cJSON_AddUIntToObjectCS(result, "channel", wifiScanRecords[idx].primary) == NULL) {
+                    cJSON_Delete(result);
+                    break;
+                }
+                cJSON_AddItemToArray(results, result);
+            }
+        }
+    }
+
     diagValue = cJSON_PrintUnformatted(object);
     uint32_t free_after_format = esp_get_free_heap_size();
     cJSON_Delete(object);
@@ -221,6 +257,7 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
 #define SETPROFILE          "setprofile"
 #define UPDATE              "update "
 #define VALUE_UPDATE_POLICY "valueupdatepolicy "
+#define WIFI_SCAN           "wifiscan"
 static void iotDeviceControl(iotValue_t value)
 {
     if (strcmp(RESTART, (const char *)value.bin->data) == 0) {
@@ -245,6 +282,8 @@ static void iotDeviceControl(iotValue_t value)
             ESP_LOGE(TAG, "Policy updated to on change");
             iotSetValueUpdatePolicy(IOT_VALUE_UPDATE_POLICY_ON_CHANGE);
         }
+    } else if (strncmp(WIFI_SCAN, (const char *)value.bin->data, sizeof(WIFI_SCAN) - 1) == 0) {
+        iotDeviceWifiScan();
     }
 }
 
@@ -476,4 +515,30 @@ static bool iotElementDescriptionToJson(const iotElementDescription_t *desc, cJS
     }
 
     return true;
+}
+
+static void iotDeviceWifiScanResult(uint8_t nrofAPs, wifi_ap_record_t *records)
+{
+    ESP_LOGI(TAG, "Scan completed %u APs found", nrofAPs);
+    uint8_t idx;
+    for (idx = 0; idx < nrofAPs; idx ++) {
+        ESP_LOGI(TAG, "%u) %s (%02x:%02x:%02x:%02x:%02x:%02x) rssi %d channel %u", idx, records[idx].ssid,
+                 records[idx].bssid[0], records[idx].bssid[1], records[idx].bssid[2], records[idx].bssid[3],
+                 records[idx].bssid[4], records[idx].bssid[5], records[idx].rssi, records[idx].primary);
+    }
+
+    if (records != NULL) {
+        wifi_ap_record_t *prev = wifiScanRecords;
+        wifiScanRecordsCount = 0;
+        wifiScanRecords = records;
+        wifiScanRecordsCount = nrofAPs;
+        if (prev != NULL) {
+            free(prev);
+        }
+    }
+}
+
+static void iotDeviceWifiScan()
+{
+    wifiScan(iotDeviceWifiScanResult);
 }

@@ -1,7 +1,9 @@
 #ifndef _WIFI_H_
 #define _WIFI_H_
 #include <stdbool.h>
+#include "esp_wifi.h"
 
+typedef void (*wifiScanCallback_t)(uint8_t nrofAPs, wifi_ap_record_t *records);
 /**
  * Initialise Wifi stack ready to create a station connection or access point for provisioning.
  * returns 0 on success or non-zero on error.
@@ -24,4 +26,15 @@ const char *wifiGetIPAddrStr(void);
  * Return true if connected, false otherwise.
  */
 bool wifiIsConnected(void);
+
+/**
+ * Initiate a wifi scan and report the result via the supplied callback.
+ * returns 0 on success or non-zero on error.
+ */
+int wifiScan(wifiScanCallback_t callback);
+
+/**
+ * Returns the number of times, since boot, that this device has connected to an access point.
+ */
+uint32_t wifiGetConnectionCount();
 #endif

@@ -36,13 +36,25 @@
 #define MAX_LENGTH_WIFI_NAME 32
 #define MAX_LENGTH_WIFI_PASSWORD 64
 
+#ifdef CONFIG_IDF_TARGET_ESP8266
+typedef void* esp_event_base_t;
+typedef system_event_sta_got_ip_t ip_event_got_ip_t;
+typedef system_event_sta_scan_done_t wifi_event_sta_scan_done_t;
+#endif
+
 static const char *TAG="WIFI";
 
 static char *wifiSsid = NULL;
 static char *wifiPassword = NULL;
 static char ipAddr[16]; // ddd.ddd.ddd.ddd\0
 static bool connected = false;
+static uint32_t connectionCount = 0;
 static time_t disconnectedSeconds = 0;
+static wifiScanCallback_t scanCallback = NULL;
+
+#if CONFIG_IDF_TARGET_ESP32
+static esp_netif_t *stationNetif = NULL, *apNetif = NULL;
+#endif
 
 static void wifiDriverInit(void);
 static void wifiStartStation(void);
@@ -81,104 +93,63 @@ int wifiInit(void)
     return result;
 }
 
-#ifdef CONFIG_IDF_TARGET_ESP8266
-static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
+uint32_t wifiGetConnectionCount()
 {
-    struct timeval tv;
-    char hostname[UNIQ_NAME_LEN];
-    NotificationsData_t notification;
-    esp_err_t err;
-    wifi_sta_list_t staList;
+    return connectionCount;
+}
 
-    gettimeofday(&tv, NULL);
-    ESP_LOGI(TAG, "System Event: %d (secs %ld disconnectedSeconds %ld)", event->event_id, tv.tv_sec, disconnectedSeconds);
-    switch(event->event_id) {
-    case SYSTEM_EVENT_STA_START:
-        connected = false;
-        disconnectedSeconds = tv.tv_sec;
-        getUniqName(hostname);
-        err = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, \"%s\") == %d", hostname, err);
+int wifiScan(wifiScanCallback_t callback)
+{
+    scanCallback = callback;
+    wifi_scan_config_t config = {
+        .bssid = NULL,
+        .channel = 0,
+        .ssid = NULL,
+        .show_hidden = true,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time.active = {
+            .min = 500,
+            .max = 1500
         }
-        notification.connectionState = Notifications_ConnectionState_Connecting;
-        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
+    };
+    esp_err_t err = esp_wifi_scan_start(&config, false);
+    if (err != ESP_OK) {
+        scanCallback = NULL;
+        ESP_LOGW(TAG, "Wifi scan start failed: %x", err);
+        return -1;
+    }
+    ESP_LOGI(TAG, "Wifi scan started");
+    return 0;
+}
 
-        wifiStartStation();
-        break;
-    case SYSTEM_EVENT_STA_GOT_IP:
-        sprintf(ipAddr, IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
-        ESP_LOGI(TAG, "Connected to SSID, IP=%s", ipAddr);
-        connected = true;
-        disconnectedSeconds = 0;
-        notification.connectionState = Notifications_ConnectionState_Connected;
-        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
-        break;
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-        sprintf(ipAddr, IPSTR, 0, 0, 0, 0);
-        wifiStartStation();
-        if (connected) {
-            connected = false;
-            notification.connectionState = Notifications_ConnectionState_Disconnected;
-            notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
+static void wifiEventScanDone(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+    wifi_event_sta_scan_done_t *scanResult = (wifi_event_sta_scan_done_t*)event_data;
+    ESP_LOGI(TAG, "Scan completed: status %x number %u id %u", scanResult->status, scanResult->number, scanResult->scan_id);
+    uint16_t nrofAPs = 0;
+    wifi_ap_record_t *records = NULL;
 
-            disconnectedSeconds = tv.tv_sec;
-        } else {
-            if ((disconnectedSeconds + SECS_BEFORE_AP) <= tv.tv_sec) {
-                wifi_mode_t mode = WIFI_MODE_NULL;
-                esp_wifi_get_mode(&mode);
-                if (mode != WIFI_MODE_APSTA) {
-                    ESP_LOGI(TAG, "Timeout connecting to SSID, enabling AP...");
-                    wifiSetupAP(true);
-                }
-                if ((disconnectedSeconds + SECS_BEFORE_REBOOT) <tv.tv_sec) {
-                    ESP_LOGI(TAG, "Timeout connecting to SSID, rebooting...");
-                    esp_restart();
-                }
+    if (scanResult->status) {
+        scanCallback(0, NULL);
+        scanCallback = NULL;
+    } else {
+        nrofAPs = scanResult->number;
+        records = calloc(nrofAPs, sizeof(wifi_ap_record_t));
+        if (records != NULL) {
+            esp_err_t err = esp_wifi_scan_get_ap_records(&nrofAPs, records);
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "Wifi scan get aps failed: %x", err);
+                free(records);
+                records = NULL;
             }
         }
-        break;
-    case SYSTEM_EVENT_AP_START:
-        getUniqName(hostname);
-        err = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, \"%s\") == %d", hostname, err);
+        if (records == NULL) {
+            nrofAPs = 0;
         }
-        notification.connectionState = Notifications_ConnectionState_Connecting;
-        notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
-        break;
-    case SYSTEM_EVENT_AP_STAIPASSIGNED:
-        staList.num = 0;
-        if ((esp_wifi_ap_get_sta_list(&staList) == ESP_OK) && (staList.num == 1)) {
-            notification.connectionState = Notifications_ConnectionState_Connected;
-            notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
-        }
-        break;
-    case SYSTEM_EVENT_AP_STADISCONNECTED:
-        staList.num = 0;
-        if ((esp_wifi_ap_get_sta_list(&staList) == ESP_OK) && (staList.num == 0)) {
-            notification.connectionState = Notifications_ConnectionState_Disconnected;
-            notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
-
-            notification.connectionState = Notifications_ConnectionState_Connecting;
-            notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
-        }
-        break;
-
-    default:
-        break;
     }
-    return ESP_OK;
+    scanCallback(nrofAPs, records);
+    scanCallback = NULL;
 }
-
-static void wifiDriverInit(void)
-{
-    tcpip_adapter_init();
-    ESP_ERROR_CHECK(esp_event_loop_init(wifiEventHandler, NULL));
-}
-#elif CONFIG_IDF_TARGET_ESP32
-
-static esp_netif_t *stationNetif = NULL, *apNetif = NULL;
 
 static void wifiEventStationStart(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
@@ -191,10 +162,18 @@ static void wifiEventStationStart(void* arg, esp_event_base_t event_base, int32_
     connected = false;
     disconnectedSeconds = tv.tv_sec;
     getUniqName(hostname);
+
+#ifdef CONFIG_IDF_TARGET_ESP8266
+    err = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, \"%s\") == %d", hostname, err);
+    }
+#elif CONFIG_IDF_TARGET_ESP32
     err = esp_netif_set_hostname(stationNetif, hostname);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_netif_set_hostname(stationNetif, \"%s\") == %d", hostname, err);
     }
+#endif
     notification.connectionState = Notifications_ConnectionState_Connecting;
     notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
 
@@ -209,6 +188,7 @@ static void wifiEventStationGotIP(void* arg, esp_event_base_t event_base, int32_
     sprintf(ipAddr, IPSTR, IP2STR(&event->ip_info.ip));
     ESP_LOGI(TAG, "Connected to SSID, IP=%s", ipAddr);
     connected = true;
+    connectionCount++;
     disconnectedSeconds = 0;
     notification.connectionState = Notifications_ConnectionState_Connected;
     notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_STATION, &notification);
@@ -254,10 +234,18 @@ static void wifiEventAPStart(void* arg, esp_event_base_t event_base, int32_t eve
     gettimeofday(&tv, NULL);
 
     getUniqName(hostname);
+
+#ifdef CONFIG_IDF_TARGET_ESP8266
+    err = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, hostname);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, \"%s\") == %d", hostname, err);
+    }
+#elif CONFIG_IDF_TARGET_ESP32
     err = esp_netif_set_hostname(apNetif, hostname);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_netif_set_hostname(apNetif, \"%s\") == %d", hostname, err);
     }
+#endif
     notification.connectionState = Notifications_ConnectionState_Connecting;
     notificationsNotify(Notifications_Class_Network, NOTIFICATIONS_ID_WIFI_AP, &notification);
 }
@@ -289,6 +277,44 @@ static void wifiEventAPStationDisconnected(void* arg, esp_event_base_t event_bas
     }
 }
 
+#ifdef CONFIG_IDF_TARGET_ESP8266
+static esp_err_t wifiEventHandler(void *ctx, system_event_t *event)
+{
+    switch(event->event_id) {
+    case SYSTEM_EVENT_SCAN_DONE:
+        wifiEventScanDone(NULL, NULL, SYSTEM_EVENT_SCAN_DONE, &event->event_info);
+        break;
+    case SYSTEM_EVENT_STA_START:
+        wifiEventStationStart(NULL, NULL, SYSTEM_EVENT_STA_START, &event->event_info);
+        break;
+    case SYSTEM_EVENT_STA_GOT_IP:
+        wifiEventStationGotIP(NULL, NULL, SYSTEM_EVENT_STA_GOT_IP, &event->event_info);
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        wifiEventStationDisconnected(NULL, NULL, SYSTEM_EVENT_STA_DISCONNECTED, &event->event_info);
+        break;
+    case SYSTEM_EVENT_AP_START:
+        wifiEventAPStart(NULL, NULL, SYSTEM_EVENT_AP_START, &event->event_info);
+        break;
+    case SYSTEM_EVENT_AP_STAIPASSIGNED:
+        wifiEventAPStationIPAssigned(NULL, NULL, SYSTEM_EVENT_AP_STAIPASSIGNED, &event->event_info);
+        break;
+    case SYSTEM_EVENT_AP_STADISCONNECTED:
+        wifiEventAPStationDisconnected(NULL, NULL, SYSTEM_EVENT_AP_STADISCONNECTED, &event->event_info);
+        break;
+
+    default:
+        break;
+    }
+    return ESP_OK;
+}
+
+static void wifiDriverInit(void)
+{
+    tcpip_adapter_init();
+    ESP_ERROR_CHECK(esp_event_loop_init(wifiEventHandler, NULL));
+}
+#elif CONFIG_IDF_TARGET_ESP32
 static void wifiDriverInit(void)
 {
     ESP_ERROR_CHECK(esp_netif_init());
@@ -298,6 +324,11 @@ static void wifiDriverInit(void)
     esp_wifi_set_default_wifi_sta_handlers();
     esp_wifi_set_default_wifi_ap_handlers();
 
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                    WIFI_EVENT_SCAN_DONE,
+                    wifiEventScanDone,
+                    NULL,
+                    NULL));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                     WIFI_EVENT_STA_START,
                     wifiEventStationStart,
@@ -313,7 +344,6 @@ static void wifiDriverInit(void)
                     wifiEventStationGotIP,
                     NULL,
                     NULL));
-
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                     WIFI_EVENT_AP_START,
                     wifiEventAPStart,
