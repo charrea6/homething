@@ -82,6 +82,10 @@ void app_main(void)
     notificationLedInit();
 #endif
 
+#ifdef CONFIG_LOG_SET_LEVEL
+    esp_log_level_set("gpio", ESP_LOG_WARN);
+#endif
+
     loggingInit();
 
     CHECK_ERROR(wifiInit());
