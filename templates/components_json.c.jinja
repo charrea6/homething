@@ -11,7 +11,7 @@ static const char json[] = "{"
     "{{component_comma()}}\"{{component.name}}\":{"
     {% set arg_comma= joiner(",") %}
     {% for arg in component.arguments %}
-        "{{arg_comma()}}\"{{arg.name}}\":{" 
+        "{{arg_comma()}}\"{{arg.name}}\":{"
             "\"type\":\"{{arg.type}}\""
         {% if arg.options %}
         {% if "default" in arg.options %}

@@ -18,8 +18,8 @@ static const struct choice {{arg.enum_name}}Strings[] = {
 struct field fields_{{component.normalised_name}}[] = {
     {% for arg in component.arguments %}
     {
-        .key = "{{arg.name}}",  
-        .flags = {% if arg.is_optional %} FIELD_FLAG_OPTIONAL{% else %} FIELD_FLAG_DEFAULT{% endif %}, 
+        .key = "{{arg.name}}",
+        .flags = {% if arg.is_optional %} FIELD_FLAG_OPTIONAL{% else %} FIELD_FLAG_DEFAULT{% endif %},
         .dataOffset = offsetof(struct DeviceProfile_{{component.normalised_name}}Config, {{ arg.name }}),
         {% if arg.type == 'choice' %}
         .choices = {{arg.enum_name}}Strings,

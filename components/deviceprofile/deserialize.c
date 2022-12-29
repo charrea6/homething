@@ -11,8 +11,8 @@ static const char TAG[] = "compcfg";
 
 /* Enum Mappings */
 struct choice {
-	const char *str;
-	int val;
+    const char *str;
+    int val;
 };
 
 enum field_flags {
@@ -26,7 +26,7 @@ typedef int (*validateAndSet_t)(cJSON *, struct field *, void *);
 
 struct field {
     char *key;
-    enum field_flags flags;  
+    enum field_flags flags;
     size_t dataOffset;
     const struct choice *choices;
     validateAndSet_t validateAndSet;
@@ -42,10 +42,10 @@ struct component {
 };
 
 #ifdef FIELD_TYPE_USED_CHOICE
-static int findChoice(const struct choice *choices, char *input, int *output) 
+static int findChoice(const struct choice *choices, char *input, int *output)
 {
     int i;
-    for (i = 0; choices[i].str != NULL; i++){
+    for (i = 0; choices[i].str != NULL; i++) {
         if (strcmp(choices[i].str, input) == 0) {
             *output = choices[i].val;
             return 0;
@@ -56,7 +56,7 @@ static int findChoice(const struct choice *choices, char *input, int *output)
 static int validateAndSetChoice(cJSON *value, struct field *field, void *output)
 {
     char *text = cJSON_GetStringValue(value);
-    
+
     if (text == NULL) {
         return -1;
     }
@@ -165,8 +165,7 @@ static int validateAndSetString(cJSON *value, struct field *field, void *output)
 int deserializeComponent(struct component *componentDef, cJSON *object, void *structPtr)
 {
     int i;
-    for (i = 0; i < componentDef->fieldsCount; i++)
-    {
+    for (i = 0; i < componentDef->fieldsCount; i++) {
         cJSON *value;
         value = cJSON_GetObjectItem(object, componentDef->fields[i].key);
         if (value == NULL) {
@@ -175,9 +174,9 @@ int deserializeComponent(struct component *componentDef, cJSON *object, void *st
             }
             return -1;
         }
-        if (componentDef->fields[i].validateAndSet(value, 
-                                                   &componentDef->fields[i], 
-                                                   structPtr + componentDef->fields[i].dataOffset)) {
+        if (componentDef->fields[i].validateAndSet(value,
+                &componentDef->fields[i],
+                structPtr + componentDef->fields[i].dataOffset)) {
             ESP_LOGI(TAG, "Component %s->%s failed validation", componentDef->name, componentDef->fields[i].key);
             return -1;
         }
@@ -185,18 +184,19 @@ int deserializeComponent(struct component *componentDef, cJSON *object, void *st
     return 0;
 }
 
-int deserializeComponents(struct DeviceProfile_DeviceConfig *config, struct component *componentDef, cJSON *array) {
+int deserializeComponents(struct DeviceProfile_DeviceConfig *config, struct component *componentDef, cJSON *array)
+{
     int i, len;
     void *structs = NULL, *current;
 
     len = cJSON_GetArraySize(array);
-    
+
     structs = calloc(len, componentDef->structSize);
-    if (structs == NULL){
+    if (structs == NULL) {
         return -1;
     }
     current = structs;
-    
+
     for (i = 0; i < len; i ++) {
         cJSON *object = cJSON_GetArrayItem(array, i);
         if ((object == NULL) || !cJSON_IsObject(object)) {
@@ -229,7 +229,7 @@ static bool checkVersionSupported(cJSON *object)
     if (versionStr != NULL) {
         ESP_LOGI(TAG, "Profile version %s", versionStr);
 
-        if (strcmp(versionStr, SUPPORTED_VERSION) == 0){
+        if (strcmp(versionStr, SUPPORTED_VERSION) == 0) {
             return true;
         }
     }
