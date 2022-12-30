@@ -530,6 +530,9 @@ static void iotDeviceWifiScanResult(uint8_t nrofAPs, wifi_ap_record_t *records)
     if (records != NULL) {
         wifi_ap_record_t *prev = wifiScanRecords;
         wifiScanRecordsCount = 0;
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        wifiScanTime = tv.tv_sec;
         wifiScanRecords = records;
         wifiScanRecordsCount = nrofAPs;
         if (prev != NULL) {
