@@ -98,6 +98,11 @@ uint32_t wifiGetConnectionCount()
     return connectionCount;
 }
 
+const char* wifiGetConnectionSSID()
+{
+    return wifiSsid;
+}
+
 int wifiScan(wifiScanCallback_t callback)
 {
     scanCallback = callback;

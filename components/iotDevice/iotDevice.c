@@ -212,7 +212,8 @@ static void iotDeviceUpdateDiag(TimerHandle_t xTimer)
 
     cJSON *wifi = cJSON_AddObjectToObjectCS(object, WIFI);
     if (wifi != NULL) {
-        cJSON_AddIntToObjectCS(wifi, "count", wifiGetConnectionCount());
+        cJSON_AddIntToObjectCS(wifi, "connectionAttempts", wifiGetConnectionCount());
+        cJSON_AddStringReferenceToObjectCS(wifi, "ssid", wifiGetConnectionSSID());
         if (wifiScanRecords != NULL) {
             uint8_t idx;
             cJSON_AddIntToObjectCS(wifi, "scanAge", tv.tv_sec - wifiScanTime);

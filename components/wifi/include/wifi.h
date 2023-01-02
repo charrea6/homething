@@ -37,4 +37,10 @@ int wifiScan(wifiScanCallback_t callback);
  * Returns the number of times, since boot, that this device has connected to an access point.
  */
 uint32_t wifiGetConnectionCount();
+
+/**
+ * Get the name of the Wifi network the device should connect to.
+ * Returns a string that does not need to be freed.
+ */
+const char* wifiGetConnectionSSID();
 #endif
