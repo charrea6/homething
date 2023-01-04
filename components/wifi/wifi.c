@@ -36,7 +36,7 @@
 #define MAX_LENGTH_WIFI_NAME 32
 #define MAX_LENGTH_WIFI_PASSWORD 64
 
-#ifdef CONFIG_IDF_TARGET_ESP8266
+#if defined(CONFIG_IDF_TARGET_ESP8266) && !defined(ESP_EVENT_BASE_H_)
 typedef void* esp_event_base_t;
 typedef system_event_sta_got_ip_t ip_event_got_ip_t;
 typedef system_event_sta_scan_done_t wifi_event_sta_scan_done_t;
