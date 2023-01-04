@@ -1,0 +1,3 @@
+repo=espressif/esp-idf
+ref=release/v4.4
+patch=no

@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build_type: [flash1mb, flash4mb, esp32]
+        build_type: [esp8266-flash1mb, esp8266-flash4mb, esp32]
     runs-on: ubuntu-latest
     steps:
       - name: Code Checkout
@@ -20,22 +20,16 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Determine SDK and version
-        id: sdk
+      - name: Load settings
+        id: settings
         run: |
-          if [ "${{ matrix.build_type }}" == "esp32" ]; then
-            echo "repo=espressif/esp-idf" >> $GITHUB_OUTPUT
-            echo "ref=release/v4.4" >> $GITHUB_OUTPUT
-          else
-            echo "repo=espressif/ESP8266_RTOS_SDK" >> $GITHUB_OUTPUT
-            echo "ref=release/v3.3" >> $GITHUB_OUTPUT
-          fi
+          cat ".github/workflows/settings.${{ matrix.build_type }}" >> $GITHUB_OUTPUT
 
       - name: Checkout SDK
         uses: actions/checkout@v3
         with:
-          repository: ${{ steps.sdk.outputs.repo }}
-          ref: ${{ steps.sdk.outputs.ref }}
+          repository: ${{ steps.settings.outputs.repo }}
+          ref: ${{ steps.settings.outputs.ref }}
           path: sdk
           fetch-depth: 0
 
@@ -53,10 +47,11 @@ jobs:
           source sdk/export.sh
           pip install -r requirements.txt
 
-      # - name: Patch SDK for pthread link issue
-      #   run: |
-      #     cd sdk
-      #     git apply ../esp8266_rtos_sdk_v3_4.patch
+      - name: Patch SDK for pthread link issue
+        if:  ${{ steps.settings.outputs.patch }} == 'yes'
+        run: |
+          cd sdk
+          git apply ../esp8266_rtos_sdk_v3_4.patch
 
       - name: Build
         run: |
@@ -67,6 +62,6 @@ jobs:
       - name: Store images
         uses: actions/upload-artifact@v3
         with:
-          name: esp8266-${{ matrix.build_type }}
+          name: ${{ matrix.build_type }}
           path: |
             build/homething*
