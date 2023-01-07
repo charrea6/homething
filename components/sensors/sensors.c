@@ -439,7 +439,7 @@ int sensorsDS18x20Add(DeviceProfile_Ds18x20Config_t *config)
         if ((i == 0) && (config->id)) {
             pinStruct->sensors[i].id = notificationsNewId(config->id);
         }
-        pinStruct->sensors[i].element = iotNewElement(&temperatureElementDescription, 0, NULL, NULL, "temperature%llx", deviceAddrs[i]);
+        pinStruct->sensors[i].element = iotNewElement(&temperatureElementDescription, 0, NULL, NULL, "temperature%08x%08x", (uint32_t)(deviceAddrs[i]>> 32), (uint32_t)(deviceAddrs[i]));
     }
     pinStruct->measureTimer = xTimerCreate("ds18x20M", SECS_TO_TICKS(5), pdFALSE, pinStruct, ds18x20MeasureTimer);
     pinStruct->readTimer = xTimerCreate("ds18x20R", MSECS_TO_TICKS(750), pdFALSE, pinStruct, ds18x20ReadTimer);
