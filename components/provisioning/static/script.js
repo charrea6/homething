@@ -1,3 +1,5 @@
+var wifiNetworkElements = [];
+
 function variableId(setting, variable){
     return `${setting.name}_${variable.name}`;
 }
@@ -8,6 +10,15 @@ function variableToStr(setting, variable){
 
     switch(variable.type) {
     case 'username':html=`<div class="six columns"><label for="${varId}">${variable.title}</label><input class="u-full-width" type="text" placeholder="${variable.title}" id="${varId}"></div>`;
+        break;
+    case 'ssid':html=`<div class="six columns"><label for="${varId}">${variable.title}</label>
+    <div class="u-full-width select-editable">
+    <select onchange="this.nextElementSibling.value=this.value" id="${varId}-options">
+    </select>
+    <input placeholder="${variable.title}" id="${varId}" type="text" value="" onchange="updateSelectedSSID(this.id);"/>
+    </div>
+    </div>`;
+        wifiNetworkElements.push(varId);
         break;
     case 'password':html=`<div class="six columns"><label for="${varId}">${variable.title}</label><input class="u-full-width" type="password" placeholder="${variable.title}" id="${varId}"></div>`;
         break;
@@ -152,6 +163,75 @@ function saveConfig() {
     });
 }
 
+function updateSelectedSSID(id) {
+    var el = document.getElementById(`${id}-options`); 
+    var input = document.getElementById(id).value;
+    var selected = -1;
+    for (var idx = 0; idx < el.options.length; idx ++) {
+        if (el.options[idx].value == input) {
+            selected = idx;
+            break;
+        }
+    }
+    if (selected == -1) {
+        if (el.options[0].text.includes('(rssi')) {
+            var o = document.createElement("option");
+            o.text = input;
+            o.value = input;
+            el.options.add(o, 0);
+        } else {
+            el.options[0].value = input;
+            el.options[0].text = input;
+        }
+        el.selectedIndex = 0;
+    } else {
+        el.selectedIndex = idx;
+        if (!el.options[0].text.includes('(rssi')){
+            el.options.remove(0);
+        }
+    }
+
+}
+
+function loadWifi(networks) {
+    wifiNetworkElements.forEach((value) => { 
+        var el = document.getElementById(`${value}-options`); 
+        while (el.options.length > 0) { 
+            el.options.remove(0);
+        }
+        var input = document.getElementById(value).value;
+        var selected = -1;
+        networks.forEach((network, idx) => {
+            var o = document.createElement("option");
+            o.text = `${network.name} (rssi ${network.rssi} channel ${network.channel})`;
+            o.value = network.name;
+            el.options.add(o);
+            if (input == network.name) {
+                 selected = idx;
+            }
+        });
+        if (selected == -1) {
+            var o = document.createElement("option");
+            o.text = input;
+            o.value = input;
+            el.options.add(o, 0);
+            el.selectedIndex = 0;
+        } else {
+            el.selectedIndex = idx;
+        }
+    });
+}
+
+var wifiTimer=null;
+function refreshWifi() {
+    if (wifiTimer != null) {
+        clearTimeout(wifiTimer);
+        wifiTimer = null;
+    }
+    fetch("/wifiscan").then((response) => response.json()).then((data) => { loadWifi(data.networks); wifiTimer = setTimeout(refreshWifi, 30000);});
+}
+
 (function(){
     loadConfig(settings);
+    refreshWifi();
 })();

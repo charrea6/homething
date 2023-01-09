@@ -45,6 +45,11 @@ static const httpd_uri_t handlers[] = {{
         .uri = "/components.json",
         .handler = provisioningComponentsJsonFileHandler,
         .user_ctx = NULL
+    }, {
+        .method = HTTP_GET,
+        .uri = "/wifiscan",
+        .handler = provisioningWifiScanGetHandler,
+        .user_ctx = NULL
     }
 };
 

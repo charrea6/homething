@@ -9,3 +9,7 @@ input[type="button"].button-primary:disabled {
   .error{
       color: red;
   }
+.select-editable {position:relative}
+.select-editable > * {position:absolute; top:0; left:0; box-sizing:border-box; outline:none;}
+.select-editable select {width:100%;}
+.select-editable input {width:calc(100% - 20px); text-overflow:ellipsis;}

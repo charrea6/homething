@@ -30,6 +30,9 @@ def settings():
 setting_values = {
     'thing': {
         'id': '010203A1B2C3',
+    },
+    'wifi': {
+        "ssid": "network1"
     }
 }
 
@@ -46,6 +49,14 @@ def values():
                 return make_response('Error found!', 500)
         return 'Saved'
 
+@app.route('/wifiscan')
+def wifiscan():
+    response = {
+        'networks':[
+            {"name":"network1", "channel":1, "rssi":-20},
+            {"name":"network2", "channel":5, "rssi":-75},
+            ]}
+    return Response(json.dumps(response), mimetype='application/json')
 
 if __name__ == '__main__':
     app.run()

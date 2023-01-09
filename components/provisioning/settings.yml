@@ -12,7 +12,7 @@
   variables:
   - - title: Wireless Network
       name: ssid
-      type: username
+      type: ssid
     - title: Passphrase
       name: pass
       type: password

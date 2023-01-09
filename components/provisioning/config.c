@@ -21,6 +21,7 @@
 
 typedef enum FieldType {
     FT_USERNAME = 0,
+    FT_SSID,
     FT_PASSWORD,
     FT_HOSTNAME,
     FT_PORT,
@@ -215,6 +216,7 @@ static char *setVariables(nvs_handle handle, struct setting *setting, cJSON *obj
         }
         switch(foundVariable->type) {
         case FT_STRING:
+        case FT_SSID:
         case FT_USERNAME:
         case FT_PASSWORD:
         case FT_HOSTNAME: {
@@ -280,6 +282,7 @@ static bool getVariables(nvs_handle handle, struct setting *setting, cJSON *obje
         cJSON *valueObject = NULL;
         switch(var->type) {
         case FT_STRING:
+        case FT_SSID:
         case FT_USERNAME:
         case FT_HOSTNAME: {
             char *value;
