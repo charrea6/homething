@@ -25,6 +25,15 @@ static uint8_t expander_pin_settings[MAX_EXPANDERS] = {0};
 static i2c_dev_t expander_devices[MAX_EXPANDERS];
 #endif
 
+#ifdef CONFIG_IDF_TARGET_ESP8266
+#define EXPANDERS_PIN_IDX 1
+#define HAS_INTERNAL_PINS_ENABLED(_pins) ((_pins)->pins[0] != 0)
+#elif CONFIG_IDF_TARGET_ESP32
+#define EXPANDERS_PIN_IDX 2
+#define HAS_INTERNAL_PINS_ENABLED(_pins) (((_pins)->pins[0] != 0) || ((_pins)->pins[1] != 0))
+#endif
+
+
 int gpioxInit(void)
 {
     int result = 0;
@@ -77,12 +86,16 @@ int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
 {
     ESP_LOGI(TAG,"Setting up Pins 0x%08x 0x%08x Mode %d", pins->pins[0], pins->pins[1], mode);
 
-    if (pins->pins[0] != 0) {
+    if (HAS_INTERNAL_PINS_ENABLED(pins)) {
         for (int i=0; i < GPIO_NUM_MAX; i++) {
             if (GPIOX_PINS_IS_SET(*pins, i)) {
                 gpio_config_t config;
 
+#ifdef CONFIG_IDF_TARGET_ESP8266
                 config.pin_bit_mask = 1<<i;
+#elif CONFIG_IDF_TARGET_ESP32
+                config.pin_bit_mask = BIT64(i);
+#endif
                 config.intr_type = GPIO_INTR_DISABLE;
                 config.pull_down_en = GPIO_PULLDOWN_DISABLE;
                 config.pull_up_en = GPIO_PULLUP_DISABLE;
@@ -116,7 +129,7 @@ int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
     if (nrofExpanders > 0) {
         if (pins->pins[1] != 0) {
             for (int i = 0; i < nrofExpanders; i ++) {
-                uint8_t expander_pins = pins->pins[1] >> (8 * i);
+                uint8_t expander_pins = pins->pins[EXPANDERS_PIN_IDX] >> (8 * i);
                 switch(mode) {
                 case GPIOX_MODE_OUT:
                     expander_pin_settings[i] &= ~expander_pins;
@@ -142,7 +155,8 @@ int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode)
 int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
 {
     GPIOX_PINS_CLEAR_ALL(*values);
-    if (pins->pins[0] != 0) {
+    if (HAS_INTERNAL_PINS_ENABLED(pins)) {
+#ifdef CONFIG_IDF_TARGET_ESP8266
         uint32_t internal_pins = pins->pins[0] & 0xffff;
         if (internal_pins != 0) {
             values->pins[0] = GPIO.in & internal_pins;
@@ -152,10 +166,19 @@ int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
                 GPIOX_PINS_SET(*values, 16);
             }
         }
+#elif CONFIG_IDF_TARGET_ESP32
+        for (int i=0; i < GPIO_NUM_MAX; i++) {
+            if (GPIOX_PINS_IS_SET(*pins, i)) {
+                if (gpio_get_level(i) == 1) {
+                    GPIOX_PINS_SET(*values, i);
+                }
+            }
+        }               
+#endif
     }
 #if CONFIG_GPIOX_EXPANDERS == 1
     if (nrofExpanders > 0) {
-        if (pins->pins[1] != 0) {
+        if (pins->pins[EXPANDERS_PIN_IDX] != 0) {
             for (int i = 0; i < nrofExpanders; i ++) {
                 uint8_t expander_pins = pins->pins[1] >> (8 * i);
                 uint8_t value;
@@ -173,7 +196,7 @@ int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
 
 int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
 {
-    if (pins->pins[0] != 0) {
+    if (HAS_INTERNAL_PINS_ENABLED(pins)) {
         for (int i=0; i < GPIO_NUM_MAX; i++) {
             if (GPIOX_PINS_IS_SET(*pins, i)) {
                 gpio_set_level(i, GPIOX_PINS_IS_SET(*values, i));
@@ -182,10 +205,10 @@ int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
     }
 #if CONFIG_GPIOX_EXPANDERS == 1
     if (nrofExpanders > 0) {
-        if (pins->pins[1] != 0) {
+        if (pins->pins[EXPANDERS_PIN_IDX] != 0) {
             for (int i = 0; i < nrofExpanders; i ++) {
-                uint8_t expander_pins = pins->pins[1] >> (8 * i);
-                uint8_t value = ((values->pins[1] >> (8 * i)) & expander_pins) | (expander_pin_settings[i] & ~expander_pins);
+                uint8_t expander_pins = pins->pins[EXPANDERS_PIN_IDX] >> (8 * i);
+                uint8_t value = ((values->pins[EXPANDERS_PIN_IDX] >> (8 * i)) & expander_pins) | (expander_pin_settings[i] & ~expander_pins);
                 if (pcf8574_port_write(&expander_devices[i], value) != ESP_OK) {
                     ESP_LOGE(TAG, "Pin write failed for expander %d", i);
                     return 1;
