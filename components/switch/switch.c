@@ -13,8 +13,11 @@ static const char *TAG="switch";
 
 #define SWITCH_THREAD_NAME "switches"
 #define SWITCH_THREAD_PRIO 8
+#ifdef CONFIG_IDF_TARGET_ESP8266
 #define SWITCH_THREAD_STACK_WORDS 2048
-
+#elif CONFIG_IDF_TARGET_ESP32
+#define SWITCH_THREAD_STACK_WORDS 3*1024
+#endif
 static GPIOX_Pins_t switchPins, switchValues;
 
 int switchInit()
