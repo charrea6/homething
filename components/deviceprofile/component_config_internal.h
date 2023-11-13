@@ -361,6 +361,41 @@ struct field fields_Thermostat[] = {
     },
 };
 #endif
+/**** gpiox ****/
+#if defined(CONFIG_GPIOX_EXPANDERS)
+struct field fields_Gpiox[] = {
+    {
+        .key = "sda",
+        .flags =  FIELD_FLAG_DEFAULT,
+        .dataOffset = offsetof(struct DeviceProfile_GpioxConfig, sda),
+        .validateAndSet = validateAndSetGPIOPin
+    },
+    {
+        .key = "scl",
+        .flags =  FIELD_FLAG_DEFAULT,
+        .dataOffset = offsetof(struct DeviceProfile_GpioxConfig, scl),
+        .validateAndSet = validateAndSetGPIOPin
+    },
+    {
+        .key = "number",
+        .flags =  FIELD_FLAG_DEFAULT,
+        .dataOffset = offsetof(struct DeviceProfile_GpioxConfig, number),
+        .validateAndSet = validateAndSetUInt
+    },
+    {
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
+        .dataOffset = offsetof(struct DeviceProfile_GpioxConfig, name),
+        .validateAndSet = validateAndSetString
+    },
+    {
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
+        .dataOffset = offsetof(struct DeviceProfile_GpioxConfig, id),
+        .validateAndSet = validateAndSetString
+    },
+};
+#endif
 
 struct component componentDefinitions[] = {
     {
@@ -473,6 +508,16 @@ struct component componentDefinitions[] = {
         .arrayCountOffset = offsetof(struct DeviceProfile_DeviceConfig, thermostatCount),
         .fields = fields_Thermostat,
         .fieldsCount = sizeof(fields_Thermostat) / sizeof(struct field)
+    },
+#endif
+#if defined(CONFIG_GPIOX_EXPANDERS)
+    {
+        .name = "gpiox",
+        .structSize = sizeof(struct DeviceProfile_GpioxConfig),
+        .arrayOffset = offsetof(struct DeviceProfile_DeviceConfig, gpioxConfig),
+        .arrayCountOffset = offsetof(struct DeviceProfile_DeviceConfig, gpioxCount),
+        .fields = fields_Gpiox,
+        .fieldsCount = sizeof(fields_Gpiox) / sizeof(struct field)
     },
 #endif
 };

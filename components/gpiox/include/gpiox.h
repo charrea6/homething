@@ -46,8 +46,14 @@ GPIO16(D0) - possibly tied to RST to allow exit from deep sleep by pulling GPIO1
 #define SD2 9
 
 #if CONFIG_GPIOX_EXPANDERS == 1
+#ifdef CONFIG_IDF_TARGET_ESP8266
 #define GPIOX_PINS_SIZE 2
 #define GPIOX_BASE 32
+#elif CONFIG_IDF_TARGET_ESP32
+#define GPIOX_PINS_SIZE 3
+#define GPIOX_BASE 64
+#endif
+
 #define X1 (GPIOX_BASE)
 #define X2 (GPIOX_BASE + 1)
 #define X3 (GPIOX_BASE + 2)
@@ -83,12 +89,23 @@ GPIO16(D0) - possibly tied to RST to allow exit from deep sleep by pulling GPIO1
 
 #define GPIOX_PINS_SET(_pins, _pin) (_pins).pins[_pin/32] |= 1 << (_pin % 32)
 #define GPIOX_PINS_CLEAR(_pins, _pin) ((_pins).pins[_pin/32] = ((_pins).pins[_pin/32] & ~(1 << (_pin % 32))))
-#define GPIOX_PINS_CLEAR_ALL(_pins) do{(_pins).pins[0] = 0;(_pins).pins[1] = 0;}while(0)
 #define GPIOX_PINS_IS_SET(_pins, _pin) (((_pins).pins[_pin/32] & 1 << (_pin % 32)) != 0)
+
+#if GPIOX_PINS_SIZE == 2
+#define GPIOX_PINS_CLEAR_ALL(_pins) do{(_pins).pins[0] = 0;(_pins).pins[1] = 0;}while(0)
 #define GPIOX_PINS_DIFF(_result, _pins1, _pins2) do{(_result).pins[0] = (_pins1).pins[0] ^ (_pins2).pins[0]; (_result).pins[1] = (_pins1).pins[1] ^ (_pins2).pins[1]; }while(0)
+#elif GPIOX_PINS_SIZE == 3
+#define GPIOX_PINS_CLEAR_ALL(_pins) do{(_pins).pins[0] = 0;(_pins).pins[1] = 0;(_pins).pins[2] = 0;}while(0)
+#define GPIOX_PINS_DIFF(_result, _pins1, _pins2) do{(_result).pins[0] = (_pins1).pins[0] ^ (_pins2).pins[0]; (_result).pins[1] = (_pins1).pins[1] ^ (_pins2).pins[1]; (_result).pins[2] = (_pins1).pins[2] ^ (_pins2).pins[2];}while(0)
+#endif
 #else
 
+#ifdef CONFIG_IDF_TARGET_ESP8266
 #define GPIOX_PINS_SIZE 1
+#elif CONFIG_IDF_TARGET_ESP32
+#define GPIOX_PINS_SIZE 2
+#endif
+
 #define GPIOX_PINS_SET(_pins, _pin) (_pins).pins[0] |= 1 << (_pin % 32)
 #define GPIOX_PINS_CLEAR(_pins, _pin) ((_pins).pins[0] = ((_pins).pins[0] & ~(1 << (_pin % 32))))
 #define GPIOX_PINS_CLEAR_ALL(_pins)  (_pins).pins[0] = 0
@@ -109,7 +126,7 @@ typedef enum {
 
 #define GPIOX_PINS_MAX (GPIOX_PINS_SIZE * 32)
 
-int gpioxInit(void);
+int gpioxInit(uint8_t count, uint8_t sda, uint8_t scl);
 int gpioxSetup(GPIOX_Pins_t *pins, GPIOX_Mode_t mode);
 int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values);
 int gpioxSetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values);

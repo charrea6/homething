@@ -17,6 +17,7 @@
 #include "led_strips.h"
 #include "controllers.h"
 #include "bootprot.h"
+#include "gpiox.h"
 
 static const char TAG[] = "profile";
 
@@ -37,6 +38,13 @@ void processProfile(void)
         if (deviceProfileDeserialize(profile, &config)) {
             ESP_LOGE(TAG, "Failed to deserialise profile!");
             return;
+        }
+        
+        if (config.gpioxCount > 0){ 
+            DeviceProfile_GpioxConfig_t *gpioxConfig = config.gpioxConfig;
+            gpioxInit(gpioxConfig->number, gpioxConfig->sda, gpioxConfig->scl);
+        } else {
+            gpioxInit(0, 0, 0);
         }
 
         initRelays(&config);

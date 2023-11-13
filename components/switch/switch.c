@@ -55,6 +55,7 @@ static void switchThread(void* pvParameters)
         for (i=0; i < GPIOX_PINS_MAX; i++) {
             if (GPIOX_PINS_IS_SET(diff, i)) {
                 data.switchState = GPIOX_PINS_IS_SET(newValues, i);
+                ESP_LOGI(TAG, "switch %d state %d", i, data.switchState);
                 notificationsNotify(Notifications_Class_Switch, NOTIFICATIONS_MAKE_ID(GPIOSWITCH, i), &data);
             }
         }

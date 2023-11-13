@@ -100,6 +100,14 @@ typedef struct DeviceProfile_ThermostatConfig {
     char *id;
 } DeviceProfile_ThermostatConfig_t;
 
+typedef struct DeviceProfile_GpioxConfig {
+    uint8_t sda;
+    uint8_t scl;
+    uint32_t number;
+    char *name;
+    char *id;
+} DeviceProfile_GpioxConfig_t;
+
 typedef struct DeviceProfile_DeviceConfig {
     DeviceProfile_SwitchConfig_t *switchConfig;
     uint32_t switchCount;
@@ -125,5 +133,7 @@ typedef struct DeviceProfile_DeviceConfig {
     uint32_t humidistatCount;
     DeviceProfile_ThermostatConfig_t *thermostatConfig;
     uint32_t thermostatCount;
+    DeviceProfile_GpioxConfig_t *gpioxConfig;
+    uint32_t gpioxCount;
 } DeviceProfile_DeviceConfig_t;
 #endif

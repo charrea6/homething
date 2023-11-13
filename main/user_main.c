@@ -20,7 +20,6 @@
 #include "iot.h"
 #include "iotDevice.h"
 #include "updater.h"
-#include "gpiox.h"
 #include "notificationled.h"
 #include "notifications.h"
 #include "provisioning.h"
@@ -94,7 +93,6 @@ void app_main(void)
     CHECK_ERROR(wifiInit());
     CHECK_ERROR(iotInit());
     CHECK_ERROR(provisioningInit());
-    CHECK_ERROR(gpioxInit());
     CHECK_ERROR(switchInit());
     updaterInit();
     CHECK_ERROR(iotDeviceInit(appVersion, capabilities));

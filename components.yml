@@ -84,3 +84,10 @@ thermostat:
   args:
     sensor: id
     relay: id
+
+gpiox:
+  condition: defined(CONFIG_GPIOX_EXPANDERS)
+  args:
+    sda: gpioPin
+    scl: gpioPin
+    number: uint

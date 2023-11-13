@@ -229,6 +229,27 @@ static const char json[] = "{"
         "}"
     "}"
 #endif
+#if defined(CONFIG_GPIOX_EXPANDERS)
+    ",\"gpiox\":{"
+        "\"sda\":{"
+            "\"type\":\"gpioPin\""
+        "}"
+        ",\"scl\":{"
+            "\"type\":\"gpioPin\""
+        "}"
+        ",\"number\":{"
+            "\"type\":\"uint\""
+        "}"
+        ",\"name\":{"
+            "\"type\":\"string\""
+            ",\"optional\":true"
+        "}"
+        ",\"id\":{"
+            "\"type\":\"string\""
+            ",\"optional\":true"
+        "}"
+    "}"
+#endif
 "}";
 
 esp_err_t provisioningComponentsJsonFileHandler(httpd_req_t *req)
