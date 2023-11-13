@@ -14,6 +14,10 @@
 
 #define MAX_FAILED_BOOTS 3
 
+#ifndef __NOINIT_ATTR
+#define __NOINIT_ATTR _SECTION_ATTR_IMPL(".noinit", __COUNTER__)
+#endif
+
 __NOINIT_ATTR static struct BootProtection {
     uint32_t magic[2];
     uint32_t bootCount;
