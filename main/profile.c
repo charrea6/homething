@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "sdkconfig.h"
+#include "esp_attr.h"
 #include "esp_log.h"
 
 #include "deviceprofile.h"
@@ -15,7 +16,7 @@
 #include "led.h"
 #include "led_strips.h"
 #include "controllers.h"
-
+#include "bootprot.h"
 
 static const char TAG[] = "profile";
 
@@ -23,32 +24,35 @@ void processProfile(void)
 {
     const char *profile = NULL;
     DeviceProfile_DeviceConfig_t config;
+    
+    if (bootprotTriggered()) {
+        ESP_LOGI(TAG, "Not loading Profile, boot protection triggered!");
+    } else {
+        ESP_LOGI(TAG, "Processing Profile");
+        if (deviceProfileGetProfile(&profile)) {
+            ESP_LOGE(TAG, "Failed to load profile!");
+            return;
+        }
 
-    ESP_LOGI(TAG, "Processing Profile");
-    if (deviceProfileGetProfile(&profile)) {
-        ESP_LOGE(TAG, "Failed to load profile!");
-        return;
-    }
+        if (deviceProfileDeserialize(profile, &config)) {
+            ESP_LOGE(TAG, "Failed to deserialise profile!");
+            return;
+        }
 
-    if (deviceProfileDeserialize(profile, &config)) {
-        ESP_LOGE(TAG, "Failed to deserialise profile!");
-        return;
-    }
+        initRelays(&config);
 
-    initRelays(&config);
+        sensorsInit(&config);
 
-    sensorsInit(&config);
+        initSwitches(config.switchConfig, config.switchCount);
 
-    initSwitches(config.switchConfig, config.switchCount);
-
-    initLeds(config.ledConfig, config.ledCount);
+        initLeds(config.ledConfig, config.ledCount);
 
 #ifdef CONFIG_LED_STRIP
-    initLEDStripSPI(config.ledStripSpiConfig, config.ledStripSpiCount);
+        initLEDStripSPI(config.ledStripSpiConfig, config.ledStripSpiCount);
 #endif
 
-    initControllers(&config);
-
+        initControllers(&config);
+    }
     ESP_LOGI(TAG, "Signalling Profile finished processing");
     NotificationsData_t notification;
     notification.systemState = Notifications_SystemState_InitFinished;

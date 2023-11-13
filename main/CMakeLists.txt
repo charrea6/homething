@@ -5,4 +5,4 @@ idf_component_register(SRCS "led_strips.c" "led.c" "switches.c" "profile.c" "use
                     INCLUDE_DIRS ""
                     REQUIRES "json" "gpiox" "iotDevice" "iot" "switch" "humidityfan" "updater" 
                     "provisioning" "notifications" "deviceprofile" "logging" "sensors" "notificationled" 
-                    "led_strip_spi" "draytonscr" "thermostat" "homeassistant")
+                    "led_strip_spi" "draytonscr" "thermostat" "homeassistant" "bootprot")
