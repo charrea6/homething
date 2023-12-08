@@ -1,4 +1,4 @@
-build
+build*
 sdkconfig
 CMakePresets.json
 components/updater/version.h

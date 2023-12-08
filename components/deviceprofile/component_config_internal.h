@@ -36,6 +36,12 @@ struct field fields_Switch[] = {
         .validateAndSet = validateAndSetString
     },
     {
+        .key = "noiseFilter",
+        .flags =  FIELD_FLAG_OPTIONAL,
+        .dataOffset = offsetof(struct DeviceProfile_SwitchConfig, noiseFilter),
+        .validateAndSet = validateAndSetUInt
+    },
+    {
         .key = "name",
         .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_SwitchConfig, name),

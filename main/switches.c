@@ -122,8 +122,8 @@ void addSwitch(struct Switch *switchInstance, DeviceProfile_SwitchConfig_t *conf
         ESP_LOGE(TAG, "Failed to find type info");
         return;
     }
-
-    id = switchAdd(config->pin);
+    
+    id = switchAdd(config->pin, (uint8_t)config->noiseFilter);
     switchInstance->id = id;
     switchInstance->typeInfo = typeInfo;
     switchInstance->relayId = config->relay;

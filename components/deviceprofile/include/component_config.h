@@ -19,6 +19,7 @@ typedef struct DeviceProfile_SwitchConfig {
     enum DeviceProfile_Choices_Switch_Type type;
     char *relay;
     char *icon;
+    uint32_t noiseFilter;
     char *name;
     char *id;
 } DeviceProfile_SwitchConfig_t;
