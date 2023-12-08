@@ -21,8 +21,13 @@
 
 #define UPDATER_THREAD_NAME "updater"
 #define UPDATER_THREAD_PRIO 7
+#ifdef CONFIG_IDF_TARGET_ESP8266
 #define UPDATER_THREAD_STACK_WORDS 2048
+#elif CONFIG_IDF_TARGET_ESP32
+#define UPDATER_THREAD_STACK_WORDS 4096
+#endif
 #define MAX_CALLBACKS 1
+
 
 static const char TAG[]="Updater";
 static const int UPDATE_BIT = BIT0;
