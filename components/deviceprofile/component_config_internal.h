@@ -402,6 +402,60 @@ struct field fields_Gpiox[] = {
     },
 };
 #endif
+/**** relay_lockout ****/
+struct field fields_RelayLockout[] = {
+    {
+        .key = "relay",
+        .flags =  FIELD_FLAG_DEFAULT,
+        .dataOffset = offsetof(struct DeviceProfile_RelayLockoutConfig, relay),
+        .validateAndSet = validateAndSetString
+    },
+    {
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
+        .dataOffset = offsetof(struct DeviceProfile_RelayLockoutConfig, name),
+        .validateAndSet = validateAndSetString
+    },
+    {
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
+        .dataOffset = offsetof(struct DeviceProfile_RelayLockoutConfig, id),
+        .validateAndSet = validateAndSetString
+    },
+};
+/**** relay_timeout ****/
+struct field fields_RelayTimeout[] = {
+    {
+        .key = "relay",
+        .flags =  FIELD_FLAG_DEFAULT,
+        .dataOffset = offsetof(struct DeviceProfile_RelayTimeoutConfig, relay),
+        .validateAndSet = validateAndSetString
+    },
+    {
+        .key = "timeout",
+        .flags =  FIELD_FLAG_DEFAULT,
+        .dataOffset = offsetof(struct DeviceProfile_RelayTimeoutConfig, timeout),
+        .validateAndSet = validateAndSetUInt
+    },
+    {
+        .key = "value",
+        .flags =  FIELD_FLAG_DEFAULT,
+        .dataOffset = offsetof(struct DeviceProfile_RelayTimeoutConfig, value),
+        .validateAndSet = validateAndSetBool
+    },
+    {
+        .key = "name",
+        .flags =  FIELD_FLAG_OPTIONAL,
+        .dataOffset = offsetof(struct DeviceProfile_RelayTimeoutConfig, name),
+        .validateAndSet = validateAndSetString
+    },
+    {
+        .key = "id",
+        .flags =  FIELD_FLAG_OPTIONAL,
+        .dataOffset = offsetof(struct DeviceProfile_RelayTimeoutConfig, id),
+        .validateAndSet = validateAndSetString
+    },
+};
 
 struct component componentDefinitions[] = {
     {
@@ -526,4 +580,20 @@ struct component componentDefinitions[] = {
         .fieldsCount = sizeof(fields_Gpiox) / sizeof(struct field)
     },
 #endif
+    {
+        .name = "relay_lockout",
+        .structSize = sizeof(struct DeviceProfile_RelayLockoutConfig),
+        .arrayOffset = offsetof(struct DeviceProfile_DeviceConfig, relayLockoutConfig),
+        .arrayCountOffset = offsetof(struct DeviceProfile_DeviceConfig, relayLockoutCount),
+        .fields = fields_RelayLockout,
+        .fieldsCount = sizeof(fields_RelayLockout) / sizeof(struct field)
+    },
+    {
+        .name = "relay_timeout",
+        .structSize = sizeof(struct DeviceProfile_RelayTimeoutConfig),
+        .arrayOffset = offsetof(struct DeviceProfile_DeviceConfig, relayTimeoutConfig),
+        .arrayCountOffset = offsetof(struct DeviceProfile_DeviceConfig, relayTimeoutCount),
+        .fields = fields_RelayTimeout,
+        .fieldsCount = sizeof(fields_RelayTimeout) / sizeof(struct field)
+    },
 };

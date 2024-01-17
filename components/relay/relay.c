@@ -11,7 +11,8 @@ static void gpioRelaySetState(Relay_t *relay, bool on);
 static const char TAG[] = "relay";
 
 static const RelayInterface_t gpioIntf = {
-    .setState = gpioRelaySetState
+    .setState = gpioRelaySetState,
+    .isOn = NULL
 };
 
 IOT_DESCRIBE_ELEMENT(
@@ -62,6 +63,9 @@ void relaySetState(Relay_t *relay, bool on)
 
 bool relayIsOn(Relay_t *relay)
 {
+    if (relay->intf->isOn) {
+        return relay->intf->isOn(relay);
+    }
     return relay->fields.on;
 }
 

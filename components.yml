@@ -94,3 +94,13 @@ gpiox:
     sda: gpioPin
     scl: gpioPin
     number: uint
+
+relay_lockout:
+  args:
+    relay: id
+
+relay_timeout:
+  args:
+    relay: id
+    timeout: uint
+    value: bool

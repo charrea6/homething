@@ -18,7 +18,8 @@
 static void draytonSCRSetState(Relay_t *relay, bool on);
 
 static const RelayInterface_t intf = {
-    .setState = draytonSCRSetState
+    .setState = draytonSCRSetState,
+    .isOn = NULL
 };
 
 typedef struct DraytonSCR {

@@ -2,6 +2,7 @@
 #ifndef _COMPONENT_CONFIG_H_
 #define _COMPONENT_CONFIG_H_
 #include <stdint.h>
+#include <stdbool.h>
 
 /* Enum Mappings */
 enum DeviceProfile_Choices_Switch_Type {
@@ -109,6 +110,20 @@ typedef struct DeviceProfile_GpioxConfig {
     char *id;
 } DeviceProfile_GpioxConfig_t;
 
+typedef struct DeviceProfile_RelayLockoutConfig {
+    char *relay;
+    char *name;
+    char *id;
+} DeviceProfile_RelayLockoutConfig_t;
+
+typedef struct DeviceProfile_RelayTimeoutConfig {
+    char *relay;
+    uint32_t timeout;
+    bool value;
+    char *name;
+    char *id;
+} DeviceProfile_RelayTimeoutConfig_t;
+
 typedef struct DeviceProfile_DeviceConfig {
     DeviceProfile_SwitchConfig_t *switchConfig;
     uint32_t switchCount;
@@ -136,5 +151,9 @@ typedef struct DeviceProfile_DeviceConfig {
     uint32_t thermostatCount;
     DeviceProfile_GpioxConfig_t *gpioxConfig;
     uint32_t gpioxCount;
+    DeviceProfile_RelayLockoutConfig_t *relayLockoutConfig;
+    uint32_t relayLockoutCount;
+    DeviceProfile_RelayTimeoutConfig_t *relayTimeoutConfig;
+    uint32_t relayTimeoutCount;
 } DeviceProfile_DeviceConfig_t;
 #endif

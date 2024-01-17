@@ -12,5 +12,6 @@
 #endif
 
 
+#define FIELD_TYPE_USED_BOOL
 
 #define FIELD_TYPE_USED_STRING
