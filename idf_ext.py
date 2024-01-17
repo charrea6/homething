@@ -153,13 +153,10 @@ def build_config(action, ctx, args, configfile=None):
     
     csv_filename = os.path.join(build_dir, 'config.csv')
     bin_filename = os.path.join(build_dir, 'config.bin')
-    if configfile.endswith('.yml'):
-        subprocess.check_call(['python', 'config/newconfiggen.py', configfile, csv_filename])    
-    else:
-        subprocess.check_call(['python', 'config/configgen.py', configfile, csv_filename])
+    subprocess.check_call(['python', 'config/configgen.py', configfile, csv_filename])
     
     nvs_part_gen_path = os.path.join(idf_path, 'components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py')
-    subprocess.check_call(['python', nvs_part_gen_path, '--input', csv_filename, '--output', bin_filename, '--size', size])
+    subprocess.check_call(['python', nvs_part_gen_path, 'generate', '--input', csv_filename, '--output', bin_filename, '--size', size])
     
     esptool_path = os.path.join(idf_path, 'components', 'esptool_py', 'esptool', 'esptool.py')
 
@@ -219,6 +216,28 @@ def format_code(action, ctx, args):
             subprocess.check_call(['astyle'] + options + [f'{root}/*.c,*.h'])
     subprocess.check_call(['astyle'] + options + ['main/*.c,*.h'])
 
+def logs(action, ctx, args):
+    import socket
+    import struct
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(('0.0.0.0', 5555))
+    header_struct = struct.Struct("!4sL6s")
+
+    last_sequence = -1
+    while True:
+        data, addr = sock.recvfrom(1200)
+        sig, sequence, mac = header_struct.unpack_from(data)
+        if sig == b'LOG\x00':
+            if sequence != last_sequence + 1:
+                print(f'Missing {sequence - (last_sequence + 1)} logging packets!')
+
+            prefix = ''
+            for b in mac:
+                prefix += '%02x' % b
+            print(prefix + ': '+  data[14:].decode(), end='')
+            last_sequence = sequence
+
 def action_extensions(base_actions, project_dir):
     global build_action
     build_action = base_actions['actions']['app']['callback']
@@ -233,6 +252,9 @@ def action_extensions(base_actions, project_dir):
                 },
                 'ensureformat': {
                     'callback': format_code
+                },
+                'logs': {
+                    'callback': logs
                 }
             }
 

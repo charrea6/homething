@@ -22,9 +22,6 @@ defaults = dict(
           'port':OptionInfo('u16', True), 
           'user':OptionInfo('string', True), 
           'pass':OptionInfo('string', True)},
-    gpiox={'num':OptionInfo('u8', True),
-           'sda':OptionInfo('u8', True),
-           'scl':OptionInfo('u8', True),},
     thing={'profile':ProcessedOptionInfo(),}
     )
 
@@ -43,15 +40,6 @@ def process_mqtt(options, _):
         if value is not None:
             mqtt += '%s,data,%s,%s\n' % (key, defaults['mqtt'][key].type_name, value)
     return mqtt
-
-def process_gpiox(options, _):
-    gpiox = ''
-    for key,value in options.items():
-        if value is not None:
-            gpiox += '%s,data,%s,%s\n' % (key, defaults['gpiox'][key].type_name, value)
-    if gpiox:
-        return 'gpiox,namespace,,\n' + gpiox
-    return ''
 
 def process_thing(options, config):
     thing = 'thing,namespace,,\n'

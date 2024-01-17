@@ -6,10 +6,6 @@ mqtt:
 # port: # <Optional Port>
 # user: # <Optional user>
 # pass: # <Optional password>
-#gpiox: # Optional GPIO Extender
-# num:  # Number of GPIO extenders 0 - 4
-# sda:  # Pin used for I2C SDA
-# scl:  # Pin used for I2C SCL  
 thing:
   profile: 
     ds18x20:
