@@ -55,11 +55,11 @@ static int initRelayLockout(DeviceProfile_RelayLockoutConfig_t *config, uint32_t
     }
 
     lockouts = calloc(lockoutCount, sizeof(RelayLockout_t));
-    if (lockouts == NULL){
+    if (lockouts == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for relay lockouts");
         return -1;
     }
-    
+
     for (i = 0; i < lockoutCount; i ++) {
         relayLockoutInit(i, config[i].relay, config[i].id, &lockouts[i]);
     }
@@ -74,13 +74,13 @@ static int initRelayTimeout(DeviceProfile_RelayTimeoutConfig_t *config, uint32_t
     }
 
     timeouts = calloc(timeoutCount, sizeof(RelayTimeout_t));
-    if (timeouts == NULL){
+    if (timeouts == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for relay timeouts");
         return -1;
     }
 
     for (i = 0; i < timeoutCount; i ++) {
-        relayTimeoutInit(i, config[i].relay, &timeouts[i]);
+        relayTimeoutInit(i, config[i].relay, config[i].value, config[i].timeout, &timeouts[i]);
     }
 
     return 0;

@@ -4,6 +4,7 @@
 #include "sdkconfig.h"
 #include "esp_log.h"
 #include "iot.h"
+#include "notifications.h"
 
 struct RelayMapEntry {
     const char *id;
@@ -23,6 +24,7 @@ void relayRegister(Relay_t *relay, const char *id)
         ESP_LOGE(TAG, "Failed to allocate entry for %s", id);
         return;
     }
+    relay->id = notificationsNewId(id);
     entry->id = id;
     entry->relay = relay;
     entry->next = rootEntry;

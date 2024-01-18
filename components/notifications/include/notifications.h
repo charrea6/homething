@@ -12,6 +12,7 @@ typedef enum {
     Notifications_Class_Temperature,
     Notifications_Class_Humidity,
     Notifications_Class_Pressure,
+    Notifications_Class_Relay,
     Notifications_Class_Max
 } Notifications_Class_e;
 
@@ -32,6 +33,7 @@ typedef union {
     uint32_t pressure;  // hPa * 100
     int32_t temperature; // degrees C * 100
     bool switchState;
+    bool relayState;
     Notifications_ConnectionState_e connectionState;
     Notifications_SystemState_e systemState;
 } NotificationsData_t;

@@ -34,6 +34,7 @@ void relayInit(uint8_t id, uint8_t pin, uint8_t onLevel, Relay_t *relay)
 
     gpioxSetup(&pins, GPIOX_MODE_OUT);
     relay->element = NULL;
+    relay->id = NOTIFICATIONS_ID_ERROR;
     relay->intf = &gpioIntf;
     relay->fields.id = id;
     relay->fields.pin = pin;
@@ -58,6 +59,11 @@ void relaySetState(Relay_t *relay, bool on)
         iotValue_t value;
         value.b = relay->fields.on;
         iotElementPublish(relay->element, 0, value);
+    }
+    if (relay->id != NOTIFICATIONS_ID_ERROR) {
+        NotificationsData_t data;
+        data.relayState = on;
+        notificationsNotify(Notifications_Class_Relay, relay->id, &data);
     }
 }
 
