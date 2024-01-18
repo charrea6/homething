@@ -29,7 +29,8 @@ static void bootprotBootSuccessfulTimer( TimerHandle_t xTimer );
 static char TAG[]="bootprot";
 
 
-void bootprotInit(void) {
+void bootprotInit(void)
+{
     ESP_LOGD(TAG, "Boot Protection: magic = {%08x, %08x} count = %u lastSuccessfulBoot = %u", bootProtection.magic[0], bootProtection.magic[1], bootProtection.bootCount, bootProtection.lastSuccessfulBoot);
 
     if ((bootProtection.magic[0] != MAGIC1) || (bootProtection.magic[1] != MAGIC2)) {
@@ -50,15 +51,16 @@ void bootprotInit(void) {
     }
 }
 
-bool bootprotTriggered(void) {
-    if ((bootProtection.bootCount > MAX_FAILED_BOOTS)  && (bootProtection.lastSuccessfulBoot < bootProtection.bootCount - MAX_FAILED_BOOTS))
-    {
+bool bootprotTriggered(void)
+{
+    if ((bootProtection.bootCount > MAX_FAILED_BOOTS)  && (bootProtection.lastSuccessfulBoot < bootProtection.bootCount - MAX_FAILED_BOOTS)) {
         ESP_LOGI(TAG, "Boot Protection triggered!");
         return true;
     }
     return false;
 }
 
-static void bootprotBootSuccessfulTimer( TimerHandle_t xTimer ) {
+static void bootprotBootSuccessfulTimer( TimerHandle_t xTimer )
+{
     bootProtection.lastSuccessfulBoot = bootProtection.bootCount;
 }

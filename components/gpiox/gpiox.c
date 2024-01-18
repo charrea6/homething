@@ -152,7 +152,7 @@ int gpioxGetPins(GPIOX_Pins_t *pins, GPIOX_Pins_t *values)
                     GPIOX_PINS_SET(*values, i);
                 }
             }
-        }               
+        }
 #endif
     }
 #if CONFIG_GPIOX_EXPANDERS == 1

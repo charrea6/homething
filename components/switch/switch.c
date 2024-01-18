@@ -53,7 +53,7 @@ static void switchThread(void* pvParameters)
 
     gpioxSetup(&switchPins, GPIOX_MODE_IN_PULLUP);
     gpioxGetPins(&switchPins, &switchValues);
-    
+
     for (historyIdx = 0; historyIdx < MAX_HISTORY; historyIdx ++) {
         history[historyIdx] = switchValues;
     }
@@ -70,7 +70,7 @@ static void switchThread(void* pvParameters)
     }
 }
 
-static void processSwitchHistories(GPIOX_Pins_t *history, int end) 
+static void processSwitchHistories(GPIOX_Pins_t *history, int end)
 {
     int pin;
     for (pin=0; pin < GPIOX_PINS_MAX; pin++) {
@@ -79,7 +79,7 @@ static void processSwitchHistories(GPIOX_Pins_t *history, int end)
             uint8_t newState = GPIOX_PINS_IS_SET(history[end], pin);
             if (noiseFilterValues[pin] != 0) {
                 int historyIdx = end, i;
-                
+
                 for (i = 0; i < noiseFilterValues[pin]; i++) {
                     historyIdx --;
                     if (historyIdx < 0) {
@@ -110,7 +110,7 @@ static void processSwitchHistories(GPIOX_Pins_t *history, int end)
 static void printPinHistory(GPIOX_Pins_t *history, int end, int pin)
 {
     uint8_t pinHistory[MAX_HISTORY + 1];
-    int pinHistoryIdx, historyIdx = end + 1;            
+    int pinHistoryIdx, historyIdx = end + 1;
     if (historyIdx >= MAX_HISTORY) {
         historyIdx = 0;
     }

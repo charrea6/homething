@@ -25,7 +25,7 @@ void processProfile(void)
 {
     const char *profile = NULL;
     DeviceProfile_DeviceConfig_t config;
-    
+
     if (bootprotTriggered()) {
         ESP_LOGI(TAG, "Not loading Profile, boot protection triggered!");
     } else {
@@ -39,8 +39,8 @@ void processProfile(void)
             ESP_LOGE(TAG, "Failed to deserialise profile!");
             return;
         }
-        
-        if (config.gpioxCount > 0){ 
+
+        if (config.gpioxCount > 0) {
             DeviceProfile_GpioxConfig_t *gpioxConfig = config.gpioxConfig;
             gpioxInit(gpioxConfig->number, gpioxConfig->sda, gpioxConfig->scl);
         } else {

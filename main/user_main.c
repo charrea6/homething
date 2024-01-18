@@ -75,7 +75,7 @@ void app_main(void)
     ESP_ERROR_CHECK( i2cdev_init() );
 #endif
     cJSON_InitHooks(NULL);
-    
+
     bootprotInit();
 
     notificationsInit();

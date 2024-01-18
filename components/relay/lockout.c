@@ -30,7 +30,7 @@ void relayLockoutInit(uint8_t id, char *relayId, char *lockoutId, RelayLockout_t
     state->fields.on = true; // So that we can set it to false in relaySetState!
     relayNewIOTElement(state, "lockout%d");
     relaySetState(state, false);
-    
+
     Relay_t *substituteRelay = &lockout->substituteRelay;
     substituteRelay->intf = &substituteIntf;
     substituteRelay->data = 0u;
