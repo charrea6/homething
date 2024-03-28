@@ -34,6 +34,8 @@ typedef struct DeviceProfile_{{component.normalised_name}}Config {
     int32_t {{arg.name}};
     {% elif arg.type == 'uint' %}
     uint32_t {{arg.name}};
+    {% elif arg.type == 'float' %}
+    float {{arg.name}};
     {% endif %}
   {% endfor %}
 } DeviceProfile_{{component.normalised_name}}Config_t;

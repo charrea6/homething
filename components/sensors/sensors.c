@@ -51,6 +51,7 @@ struct DS18x20Sensor {
 struct DS18x20Pin {
     int8_t pin;
     int nrofSensors;
+    float temperatureCorrection;
     struct DS18x20Sensor *sensors;
     TimerHandle_t measureTimer;
     TimerHandle_t readTimer;
@@ -425,6 +426,7 @@ int sensorsDS18x20Add(DeviceProfile_Ds18x20Config_t *config)
         ESP_LOGI(TAG, "addDS18x20: Found %d devices", nrofDevices);
     }
     pinStruct = ds18x20Pins;
+    pinStruct->temperatureCorrection = config->temperatureCorrection;
     pinStruct->sensors = calloc(nrofDevices, sizeof(struct DS18x20Sensor));
     if (pinStruct->sensors == NULL) {
         ESP_LOGE(TAG, "addDS18x20: Failed to allocate memory for sensors");
@@ -467,7 +469,7 @@ static void ds18x20ReadTimer(TimerHandle_t xTimer)
     for (i = 0; i < pinStruct->nrofSensors; i++) {
         float temp;
         if (ds18x20_read_temperature(pinStruct->pin, pinStruct->sensors[i].addr, &temp) == ESP_OK) {
-            int itemp = (int)(temp * 100.0);
+            int itemp = (int)((temp + pinStruct->temperatureCorrection) * 100.0);
             struct Sensor sensor;
             sensor.id = pinStruct->sensors[i].id;
             sensor.element = pinStruct->sensors[i].element;

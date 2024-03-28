@@ -15,3 +15,7 @@
 #define FIELD_TYPE_USED_BOOL
 
 #define FIELD_TYPE_USED_STRING
+
+#if (defined(CONFIG_DS18x20))
+#define FIELD_TYPE_USED_FLOAT
+#endif

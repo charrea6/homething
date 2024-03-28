@@ -219,6 +219,12 @@ struct field fields_Ds18x20[] = {
         .validateAndSet = validateAndSetGPIOPin
     },
     {
+        .key = "temperatureCorrection",
+        .flags =  FIELD_FLAG_OPTIONAL,
+        .dataOffset = offsetof(struct DeviceProfile_Ds18x20Config, temperatureCorrection),
+        .validateAndSet = validateAndSetFloat
+    },
+    {
         .key = "name",
         .flags =  FIELD_FLAG_OPTIONAL,
         .dataOffset = offsetof(struct DeviceProfile_Ds18x20Config, name),

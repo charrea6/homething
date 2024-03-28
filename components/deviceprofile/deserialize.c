@@ -160,6 +160,18 @@ static int validateAndSetString(cJSON *value, struct field *field, void *output)
 }
 #endif
 
+#ifdef FIELD_TYPE_USED_FLOAT
+static int validateAndSetFloat(cJSON *value, struct field *field, void *output)
+{
+    if (!cJSON_IsNumber(value)) {
+        return -1;
+    }
+
+    *((float*)output) = (float)value->valuedouble;
+    return 0;
+}
+#endif
+
 #include "component_config_internal.h"
 
 int deserializeComponent(struct component *componentDef, cJSON *object, void *structPtr)

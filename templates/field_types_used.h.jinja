@@ -78,3 +78,13 @@
 #endif
 {% endif %}
 {% endif %}
+
+{% if "float" in used_types %}
+{% if type_conditions["float"] %}
+#if {{type_conditions["float"]}}
+{% endif %}
+#define FIELD_TYPE_USED_FLOAT
+{% if type_conditions["float"] %}
+#endif
+{% endif %}
+{% endif %}

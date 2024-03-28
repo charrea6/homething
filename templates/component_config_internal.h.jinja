@@ -38,6 +38,8 @@ struct field fields_{{component.normalised_name}}[] = {
         .validateAndSet = validateAndSetBool
         {% elif arg.type in ("string", "id") %}
         .validateAndSet = validateAndSetString
+        {% elif arg.type == "float" %}
+        .validateAndSet = validateAndSetFloat
         {% else %}
         .validateAndSet = NULL
         {% endif %}

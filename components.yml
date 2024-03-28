@@ -60,6 +60,10 @@ ds18x20:
   condition: defined(CONFIG_DS18x20)
   args:
     pin: gpioPin
+    temperatureCorrection: 
+      type: float
+      default: 0.0
+      optional: true
 
 led:
   args:

@@ -64,6 +64,7 @@ typedef struct DeviceProfile_Bme280Config {
 
 typedef struct DeviceProfile_Ds18x20Config {
     uint8_t pin;
+    float temperatureCorrection;
     char *name;
     char *id;
 } DeviceProfile_Ds18x20Config_t;
