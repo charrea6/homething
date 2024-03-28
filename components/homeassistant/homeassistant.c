@@ -102,7 +102,7 @@ static void processSensor(struct DeviceDetails *deviceDetails, iotElement_t elem
         switch (description->pubs[pubId].type) {
         case IOT_VALUE_TYPE_PERCENT_RH:
             deviceClass = "humidity";
-            unitOfMeasurement = "% RH";
+            unitOfMeasurement = "%";
             break;
         case IOT_VALUE_TYPE_CELSIUS:
             deviceClass = "temperature";
@@ -229,9 +229,9 @@ static void sendDiscoveryMessage(struct DeviceDetails *deviceDetails, const char
     char *name = NULL;
     if (humanDesc == NULL) {
         if ((pubName == NULL) || (pubName[0] == 0)) {
-            asprintf(&name, "%s %s", deviceDetails->deviceDescription, elementName);
+            asprintf(&name, "%s", elementName);
         } else {
-            asprintf(&name, "%s %s %s", deviceDetails->deviceDescription, elementName, pubName);
+            asprintf(&name, "%s %s", elementName, pubName);
         }
     } else {
         if ((pubName == NULL) || (pubName[0] == 0)) {
