@@ -238,6 +238,9 @@ def logs(action, ctx, args):
             print(prefix + ': '+  data[14:].decode(), end='')
             last_sequence = sequence
 
+def gencomponents(actions, ctx, args):
+    subprocess.check_call(['python', "tools/gencomponents.py"])
+
 def action_extensions(base_actions, project_dir):
     global build_action
     build_action = base_actions['actions']['app']['callback']
@@ -255,6 +258,9 @@ def action_extensions(base_actions, project_dir):
                 },
                 'logs': {
                     'callback': logs
+                },
+                'gencomponents': {
+                    'callback': gencomponents
                 }
             }
 
