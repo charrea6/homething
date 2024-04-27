@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Code Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -26,14 +26,14 @@ jobs:
           cat ".github/workflows/settings.${{ matrix.build_type }}" >> $GITHUB_OUTPUT
 
       - name: Checkout SDK
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ steps.settings.outputs.repo }}
           ref: ${{ steps.settings.outputs.ref }}
           path: sdk
           fetch-depth: 0
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10' 
 
@@ -60,7 +60,7 @@ jobs:
           idf.py build otagen
       
       - name: Store images
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.build_type }}
           path: |
