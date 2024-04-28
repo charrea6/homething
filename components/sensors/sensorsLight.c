@@ -62,7 +62,7 @@ int sensorsTSL2561Add(DeviceProfile_Tsl2561Config_t *config)
         ESP_LOGE(TAG, "addTSL2561: Failed to init %d", err);
         return -1;
     }
-    
+
     if (sensorsAddSensor(&sensor) != 0) {
         return -1;
     }
@@ -83,7 +83,7 @@ int sensorsTSL2561Add(DeviceProfile_Tsl2561Config_t *config)
     return 0;
 }
 
-static void tsl2561MeasureTimer(Sensor_t *sensor) 
+static void tsl2561MeasureTimer(Sensor_t *sensor)
 {
     struct TSL2561 *tsl = sensor->details.dev;
     uint32_t lux;

@@ -106,7 +106,7 @@ int sensorsAddSensor(struct Sensor **sensor)
     return 0;
 }
 
-void sensorsCreateSecondsTimer(Sensor_t *sensor, const char *name, uint32_t seconds, SensorTimerCallback_t callback) 
+void sensorsCreateSecondsTimer(Sensor_t *sensor, const char *name, uint32_t seconds, SensorTimerCallback_t callback)
 {
     sensor->callback = callback;
     xTimerStart(xTimerCreate(name, SECS_TO_TICKS(seconds), pdTRUE, sensor, sensorsTimerHandler), 0);
