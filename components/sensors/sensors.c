@@ -80,12 +80,10 @@ struct SensorDef sensorDefs[] = {
 };
 
 
-#if defined(CONFIG_DHT22) || defined(CONFIG_BME280) || defined(CONFIG_SI7021) || defined(CONFIG_TSL2561)
 static uint32_t sensorsTotal = 0;
 static uint32_t sensorsCount = 0;
 
 static struct Sensor *sensors = NULL;
-#endif
 
 int sensorsAddSensor(struct Sensor **sensor)
 {
