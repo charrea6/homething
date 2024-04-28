@@ -1,0 +1,17 @@
+menu "Supported Sensors"
+
+    config DHT22
+        bool "Enable DHT22 support"
+    
+    config BME280
+        bool "Enable BME280 (or BMP280) support"
+    
+    config SI7021
+        bool "Enable SI7021 support"
+    
+    config DS18x20
+        bool "Enabled DS18x20 support"
+    
+    config TSL2561
+        bool "Enable TSL2561 support"
+endmenu

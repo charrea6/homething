@@ -105,6 +105,7 @@ void iotElementPublish(iotElement_t element, int pubId, iotValue_t value)
         case IOT_VALUE_TYPE_PERCENT_RH:
         case IOT_VALUE_TYPE_CELSIUS:
         case IOT_VALUE_TYPE_KPA:
+        case IOT_VALUE_TYPE_LUX:
             updateRequired = value.i != element->values[pubId].i;
             break;
         case IOT_VALUE_TYPE_FLOAT:
@@ -171,6 +172,7 @@ static bool iotElementPubSendUpdate(iotElement_t element, int pubId, iotValue_t 
         message = (value.b) ? "on":"off";
         break;
 
+    case IOT_VALUE_TYPE_LUX:
     case IOT_VALUE_TYPE_INT:
         sprintf(payload, "%d", value.i);
         break;

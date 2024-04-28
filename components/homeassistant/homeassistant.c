@@ -82,6 +82,7 @@ static void processElement(struct DeviceDetails *deviceDetails, iotElement_t ele
     switch(description->type) {
     case IOT_ELEMENT_TYPE_SENSOR_HUMIDITY:
     case IOT_ELEMENT_TYPE_SENSOR_TEMPERATURE:
+    case IOT_ELEMENT_TYPE_SENSOR_LIGHT:
         processSensor(deviceDetails, element);
         break;
     case IOT_ELEMENT_TYPE_SWITCH:
@@ -100,6 +101,10 @@ static void processSensor(struct DeviceDetails *deviceDetails, iotElement_t elem
         const char *deviceClass = NULL;
         const char *unitOfMeasurement = NULL;
         switch (description->pubs[pubId].type) {
+        case IOT_VALUE_TYPE_LUX:
+            deviceClass = "illuminance";
+            unitOfMeasurement = "lx";
+            break;
         case IOT_VALUE_TYPE_PERCENT_RH:
             deviceClass = "humidity";
             unitOfMeasurement = "%";

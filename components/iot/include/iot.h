@@ -63,7 +63,9 @@ typedef struct iotElementDescription {
 #define IOT_VALUE_TYPE_CELSIUS         6
 #define IOT_VALUE_TYPE_PERCENT_RH      7
 #define IOT_VALUE_TYPE_KPA             8
-#define IOT_VALUE_TYPE_ON_CONNECT      9
+#define IOT_VALUE_TYPE_LUX             9
+#define IOT_VALUE_TYPE_ON_CONNECT     10
+
 
 #define IOT_VALUE_NOT_RETAINED 0
 #define IOT_VALUE_RETAINED     1
@@ -78,7 +80,8 @@ typedef struct iotElementDescription {
 #define IOT_ELEMENT_TYPE_SENSOR_TEMPERATURE 1
 #define IOT_ELEMENT_TYPE_SENSOR_HUMIDITY    2
 #define IOT_ELEMENT_TYPE_SENSOR_BINARY      3
-#define IOT_ELEMENT_TYPE_SWITCH             4
+#define IOT_ELEMENT_TYPE_SENSOR_LIGHT       4
+#define IOT_ELEMENT_TYPE_SWITCH             5
 
 #define IOT_DESCRIBE_PUB(r, t, n) { .type = _IOT_DEFINE_TYPE(t), .retained = _IOT_DEFINE_RETAINED(r), .name = n}
 #define IOT_PUB_DESCRIPTIONS(pubs...) { pubs }
